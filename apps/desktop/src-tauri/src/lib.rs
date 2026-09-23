@@ -94,6 +94,9 @@ fn forward_events(app: AppHandle, ctx: Arc<AppContext>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Development convenience: a `.env` in the repo (or any parent directory)
+    // can set JOB_HUNTER_DATA_DIR, MOCK_MODE, CLAUDE_CLI_PATH, ...
+    let _ = dotenvy::dotenv();
     let paths = match AppPaths::detect() {
         Ok(p) => p,
         Err(e) => {

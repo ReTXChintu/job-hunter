@@ -2710,6 +2710,7 @@ dependencies = [
 name = "job-hunter-desktop"
 version = "0.1.0"
 dependencies = [
+ "dotenvy",
  "job-hunter-core",
  "serde",
  "serde_json",
