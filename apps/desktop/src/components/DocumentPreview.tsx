@@ -4,6 +4,7 @@ import { fileName } from "@job-hunter/shared";
 import { ExternalLink } from "lucide-react";
 import { useOpenPath, useTextFile } from "../lib/queries";
 import { useTheme } from "next-themes";
+import { errorMessage } from "../lib/tauri";
 
 /** Renders the generated HTML resume inside a sandboxed iframe. */
 export function HtmlPreview({ path, height = "720px" }: { path: string | null | undefined; height?: string }) {
@@ -19,7 +20,7 @@ export function HtmlPreview({ path, height = "720px" }: { path: string | null | 
   if (file.error)
     return (
       <Text fontSize="sm" color="red.fg">
-        Could not load preview.
+        Could not load preview: {errorMessage(file.error)}
       </Text>
     );
   const html = (file.data ?? "").replace("</head>", `<style>html{background:${resolvedTheme === "dark" ? "#2a2c33" : "#e5e7eb"};padding:16px 0}.page{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.25)}</style></head>`);

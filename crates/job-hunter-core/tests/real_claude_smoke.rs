@@ -58,7 +58,13 @@ async fn real_context() -> (Arc<AppContext>, tempfile::TempDir) {
         // Keep the directory for inspection; `TempDir` would delete it on drop.
         let path = dir.path().to_path_buf();
         std::mem::forget(dir);
-        return (ctx, tempfile::Builder::new().prefix("keep-").tempdir_in(path).unwrap());
+        return (
+            ctx,
+            tempfile::Builder::new()
+                .prefix("keep-")
+                .tempdir_in(path)
+                .unwrap(),
+        );
     }
     (ctx, dir)
 }

@@ -283,26 +283,23 @@ pub async fn update_cover_letter(ctx: Ctx<'_>, id: String, text: String) -> R<Co
 #[tauri::command]
 pub async fn read_text_file(ctx: Ctx<'_>, path: String) -> R<String> {
     let p = PathBuf::from(&path);
-    let root = ctx
-        .paths
-        .root
-        .canonicalize()
-        .unwrap_or_else(|_| ctx.paths.root.clone());
-    let canon = p.canonicalize().map_err(|e| UserFacingError {
-        code: "NOT_FOUND".into(),
-        message: format!("file not found: {e}"),
-        details: None,
-        recoverable: true,
-    })?;
-    if !canon.starts_with(&root) {
+    if !p.is_file() {
         return Err(UserFacingError {
-            code: "VALIDATION".into(),
-            message: "Only files inside the Job Hunter data directory can be read".into(),
-            details: None,
+            code: "NOT_FOUND".into(),
+            message: "file not found".into(),
+            details: Some(path.clone()),
             recoverable: true,
         });
     }
-    std::fs::read_to_string(&canon).map_err(|e| UserFacingError {
+    if !job_hunter_core::util::path_is_inside(&ctx.paths.root, &p) {
+        return Err(UserFacingError {
+            code: "VALIDATION".into(),
+            message: "Only files inside the Job Hunter data directory can be read".into(),
+            details: Some(path.clone()),
+            recoverable: true,
+        });
+    }
+    std::fs::read_to_string(&p).map_err(|e| UserFacingError {
         code: "IO".into(),
         message: e.to_string(),
         details: None,
@@ -457,26 +454,15 @@ pub async fn open_url(ctx: Ctx<'_>, url: String) -> R<()> {
 #[tauri::command]
 pub async fn open_path(ctx: Ctx<'_>, path: String) -> R<()> {
     let p = PathBuf::from(&path);
-    let root = ctx
-        .paths
-        .root
-        .canonicalize()
-        .unwrap_or_else(|_| ctx.paths.root.clone());
-    let canon = p.canonicalize().map_err(|e| UserFacingError {
-        code: "NOT_FOUND".into(),
-        message: format!("file not found: {e}"),
-        details: None,
-        recoverable: true,
-    })?;
-    if !canon.starts_with(&root) {
+    if !job_hunter_core::util::path_is_inside(&ctx.paths.root, &p) {
         return Err(UserFacingError {
             code: "VALIDATION".into(),
             message: "Only files inside the Job Hunter data directory can be opened".into(),
-            details: None,
+            details: Some(path.clone()),
             recoverable: true,
         });
     }
-    job_hunter_core::chrome::open_path(&canon).map_err(Into::into)
+    job_hunter_core::chrome::open_path(&p).map_err(Into::into)
 }
 
 #[tauri::command]

@@ -123,3 +123,62 @@ mod tests {
         assert!(extract_json("no json here").is_none());
     }
 }
+
+/// True when `file` resolves to a location inside `root` (both canonicalised,
+/// so short names, `..` and symlinks cannot escape the data directory).
+pub fn path_is_inside(root: &std::path::Path, file: &std::path::Path) -> bool {
+    let (Ok(root), Ok(file)) = (std::fs::canonicalize(root), std::fs::canonicalize(file)) else {
+        return false;
+    };
+    let norm = |p: &std::path::Path| -> String {
+        // Compare on components so `\\?\` prefixes, separators and (on
+        // Windows) letter case do not matter.
+        p.components()
+            .filter_map(|c| match c {
+                std::path::Component::Normal(s) => Some(s.to_string_lossy().to_string()),
+                std::path::Component::Prefix(pr) => {
+                    Some(pr.as_os_str().to_string_lossy().to_string())
+                }
+                _ => None,
+            })
+            .map(|s| if cfg!(windows) { s.to_lowercase() } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    };
+    let r = norm(&root);
+    let f = norm(&file);
+    f == r || f.starts_with(&format!("{r}/"))
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn detects_files_inside_and_outside_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("data");
+        std::fs::create_dir_all(root.join("resumes")).unwrap();
+        let inside = root.join("resumes").join("r.html");
+        std::fs::write(&inside, "x").unwrap();
+        let outside = dir.path().join("other.html");
+        std::fs::write(&outside, "x").unwrap();
+        assert!(path_is_inside(&root, &inside));
+        assert!(!path_is_inside(&root, &outside));
+        assert!(!path_is_inside(
+            &root,
+            &root
+                .join("resumes")
+                .join("..")
+                .join("..")
+                .join("other.html")
+        ));
+        // Short (8.3) and forward-slash spellings must be accepted on Windows.
+        let spelled = std::path::PathBuf::from(
+            inside
+                .to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/"),
+        );
+        assert!(path_is_inside(&root, &spelled));
+    }
+}
