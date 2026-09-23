@@ -1,0 +1,18 @@
+{
+  "name": "@job-hunter/config",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "files": [
+    "tsconfig.base.json",
+    "eslint.base.js"
+  ],
+  "scripts": {
+    "typecheck": "echo skip",
+    "test": "echo skip"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "typescript-eslint": "^8.70.1"
+  }
+}

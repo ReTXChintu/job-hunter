@@ -1,0 +1,21 @@
+{
+  "name": "job-hunter",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Job Hunter - a local-first, Claude Code powered personal job hunting assistant",
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @job-hunter/desktop dev",
+    "tauri": "pnpm --filter @job-hunter/desktop tauri",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:rust": "cargo test --workspace",
+    "check:rust": "cargo clippy --workspace --all-targets -- -D warnings",
+    "fmt:rust": "cargo fmt --all"
+  }
+}
