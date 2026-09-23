@@ -40,6 +40,20 @@ Use the fixture candidate for a quick demo: `agent/fixtures/candidate.json`.
 
 Real job submissions are never performed by automated tests.
 
+### Opt-in smoke tests against the real Claude CLI
+
+`crates/job-hunter-core/tests/real_claude_smoke.rs` is `#[ignore]`d so normal runs never spend your Claude quota:
+
+```bash
+# analysis + resume generation, no browser (about 3 minutes, a few cents)
+cargo test -p job-hunter-core --test real_claude_smoke -- --ignored --nocapture
+
+# additionally: read-only discovery through Claude in Chrome (Chrome must be running)
+JOB_HUNTER_REAL_CHROME=1 JOB_HUNTER_SMOKE_SOURCE=Naukri   cargo test -p job-hunter-core --test real_claude_smoke real_chrome_discovery -- --ignored --nocapture
+```
+
+Set `JOB_HUNTER_SMOKE_DIR=<dir>` to keep the temporary data directory (prompts, transcripts, generated PDFs) for inspection. These tests use the fixture candidate in an isolated data directory and never touch your real Job Hunter data; discovery never creates applications.
+
 ## Environment variables
 
 See `.env.example`. `JOB_HUNTER_DATA_DIR` overrides the data directory; `JOB_HUNTER_LOG` sets the tracing filter (e.g. `debug`).

@@ -263,7 +263,16 @@ impl CandidateProfile {
         }
         ProfileCompleteness {
             ready: missing.is_empty(),
-            missing: missing.into_iter().map(String::from).collect(),
+            missing: missing
+                .into_iter()
+                .map(|m| match m {
+                    "name" => "your name".to_string(),
+                    "email" => "your email".to_string(),
+                    "targetRoles" => "at least one target role".to_string(),
+                    "skills" => "your skills".to_string(),
+                    other => other.to_string(),
+                })
+                .collect(),
             has_master_resume: self.master_resume.is_some(),
         }
     }
@@ -420,7 +429,7 @@ mod tests {
         let mut p = CandidateProfile::new("u");
         let c = p.completeness();
         assert!(!c.ready);
-        assert!(c.missing.contains(&"name".to_string()));
+        assert!(c.missing.contains(&"your name".to_string()));
         p.personal.name = "Ada".into();
         p.personal.email = "ada@example.com".into();
         p.preferences.target_roles = vec!["Engineer".into()];

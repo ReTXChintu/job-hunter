@@ -136,7 +136,11 @@ async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<Age
         match steps::discover_source(step, &truth, source).await {
             Ok(jobs) => {
                 step.event_with(
-                    EventLevel::Success,
+                    if jobs.is_empty() {
+                        EventLevel::Warn
+                    } else {
+                        EventLevel::Success
+                    },
                     "STEP_DONE",
                     format!("Found {} jobs on {source}", jobs.len()),
                     json!({ "source": source, "count": jobs.len() }),
