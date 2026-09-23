@@ -49,7 +49,7 @@ Real job submissions are never performed by automated tests.
 cargo test -p job-hunter-core --test real_claude_smoke -- --ignored --nocapture
 
 # additionally: read-only discovery through Claude in Chrome (Chrome must be running)
-JOB_HUNTER_REAL_CHROME=1 JOB_HUNTER_SMOKE_SOURCE=Naukri   cargo test -p job-hunter-core --test real_claude_smoke real_chrome_discovery -- --ignored --nocapture
+JOB_HUNTER_REAL_CHROME=1 JOB_HUNTER_SMOKE_SOURCE=Naukri \n  cargo test -p job-hunter-core --test real_claude_smoke real_chrome_discovery -- --ignored --nocapture
 ```
 
 Set `JOB_HUNTER_SMOKE_DIR=<dir>` to keep the temporary data directory (prompts, transcripts, generated PDFs) for inspection. These tests use the fixture candidate in an isolated data directory and never touch your real Job Hunter data; discovery never creates applications.

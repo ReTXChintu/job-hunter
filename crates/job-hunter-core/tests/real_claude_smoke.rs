@@ -54,6 +54,12 @@ async fn real_context() -> (Arc<AppContext>, tempfile::TempDir) {
         enabled: true,
     }];
     ctx.save_settings(settings).await.unwrap();
+    if std::env::var("JOB_HUNTER_SMOKE_DIR").is_ok() {
+        // Keep the directory for inspection; `TempDir` would delete it on drop.
+        let path = dir.path().to_path_buf();
+        std::mem::forget(dir);
+        return (ctx, tempfile::Builder::new().prefix("keep-").tempdir_in(path).unwrap());
+    }
     (ctx, dir)
 }
 
@@ -189,7 +195,7 @@ async fn real_chrome_discovery_is_read_only() {
         );
         return;
     }
-    let (ctx, dir) = real_context().await;
+    let (ctx, _dir) = real_context().await;
     let mut events = ctx.agent.bus.subscribe_events();
     orchestrator::start_job_hunt(
         ctx.clone(),
@@ -203,9 +209,6 @@ async fn real_chrome_discovery_is_read_only() {
     let status = wait_idle(&ctx, Duration::from_secs(1200)).await;
     while let Ok(ev) = events.try_recv() {
         println!("EVENT [{:?}] {}: {}", ev.level, ev.kind, ev.message);
-    }
-    if std::env::var("JOB_HUNTER_SMOKE_DIR").is_ok() {
-        std::mem::forget(dir);
     }
     println!(
         "REAL DISCOVERY: state={:?} stats={:?} error={:?}",
