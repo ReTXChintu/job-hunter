@@ -1,0 +1,53 @@
+[package]
+name = "job-hunter-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Core domain, agent orchestration, Claude CLI integration and persistence for Job Hunter"
+
+[lib]
+name = "job_hunter_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+directories.workspace = true
+strsim.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+regex.workspace = true
+once_cell.workspace = true
+url.workspace = true
+mongodb = "3"
+which = "7"
+tempfile = "3"
+dotenvy = "0.15"
+html-escape = "0.2"
+pdf-extract = "0.12"
+zip = { version = "4", default-features = false, features = ["deflate"] }
+quick-xml = "0.38"
+docx-rs = "0.4"
+genpdf = "0.2"
+tokio-util = { version = "0.7", features = ["rt"] }
+open = "5"
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
