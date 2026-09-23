@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "properties": {
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "company": { "type": "string" },
+          "url": { "type": "string" },
+          "location": { "type": "string" },
+          "postedAt": { "type": "string" },
+          "sourceJobId": { "type": "string" },
+          "employmentType": { "type": "string" },
+          "remote": { "type": "string" },
+          "salary": { "type": "string" },
+          "seniority": { "type": "string" },
+          "description": { "type": "string" },
+          "requirements": { "type": "array", "items": { "type": "string" } },
+          "responsibilities": { "type": "array", "items": { "type": "string" } },
+          "skills": { "type": "array", "items": { "type": "string" } },
+          "detailsComplete": { "type": "boolean" }
+        },
+        "required": ["title", "company", "url"]
+      }
+    },
+    "notes": { "type": "string" },
+    "blocked": { "type": "boolean" },
+    "blockedReason": { "type": "string" }
+  },
+  "required": ["jobs"]
+}

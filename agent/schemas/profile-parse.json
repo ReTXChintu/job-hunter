@@ -1,0 +1,96 @@
+{
+  "type": "object",
+  "properties": {
+    "personal": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "location": { "type": "string" },
+        "linkedin": { "type": "string" },
+        "github": { "type": "string" },
+        "portfolio": { "type": "string" },
+        "currentTitle": { "type": "string" }
+      }
+    },
+    "summary": { "type": "string" },
+    "skills": {
+      "type": "object",
+      "properties": {
+        "frontend": { "type": "array", "items": { "type": "string" } },
+        "backend": { "type": "array", "items": { "type": "string" } },
+        "database": { "type": "array", "items": { "type": "string" } },
+        "devops": { "type": "array", "items": { "type": "string" } },
+        "cloud": { "type": "array", "items": { "type": "string" } },
+        "testing": { "type": "array", "items": { "type": "string" } },
+        "other": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "experiences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "company": { "type": "string" },
+          "role": { "type": "string" },
+          "location": { "type": "string" },
+          "startDate": { "type": "string" },
+          "endDate": { "type": ["string", "null"] },
+          "description": { "type": "string" },
+          "technologies": { "type": "array", "items": { "type": "string" } },
+          "achievements": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["company", "role"]
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "role": { "type": "string" },
+          "technologies": { "type": "array", "items": { "type": "string" } },
+          "responsibilities": { "type": "array", "items": { "type": "string" } },
+          "achievements": { "type": "array", "items": { "type": "string" } },
+          "url": { "type": "string" },
+          "experienceCompany": { "type": "string" }
+        },
+        "required": ["name"]
+      }
+    },
+    "education": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "institution": { "type": "string" },
+          "degree": { "type": "string" },
+          "field": { "type": "string" },
+          "startDate": { "type": "string" },
+          "endDate": { "type": "string" },
+          "grade": { "type": "string" }
+        },
+        "required": ["institution"]
+      }
+    },
+    "certifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "issuer": { "type": "string" },
+          "date": { "type": "string" },
+          "url": { "type": "string" }
+        },
+        "required": ["name"]
+      }
+    },
+    "achievements": { "type": "array", "items": { "type": "string" } },
+    "languages": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["personal", "skills", "experiences"]
+}

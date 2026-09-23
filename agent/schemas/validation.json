@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "status": { "type": "string", "enum": ["PASS", "REVISE", "FAIL"] },
+    "keywordCoverage": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "missingKeywords": { "type": "array", "items": { "type": "string" } },
+    "unsupportedClaims": { "type": "array", "items": { "type": "string" } },
+    "missingRequirements": { "type": "array", "items": { "type": "string" } },
+    "formattingIssues": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "string" }
+  },
+  "required": ["status", "keywordCoverage", "missingKeywords", "unsupportedClaims"]
+}

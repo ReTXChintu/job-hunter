@@ -1,0 +1,119 @@
+{
+  "profile": {
+    "id": "fixture-profile",
+    "userId": "local-user",
+    "personal": {
+      "name": "Asha Verma",
+      "email": "asha.verma@example.com",
+      "phone": "+91 98765 43210",
+      "location": "Mumbai, India",
+      "linkedin": "https://www.linkedin.com/in/asha-verma-example",
+      "github": "https://github.com/asha-example",
+      "portfolio": "",
+      "currentTitle": "Full Stack Developer"
+    },
+    "preferences": {
+      "targetRoles": ["Full Stack Developer", "Frontend Engineer", "Backend Developer"],
+      "preferredLocations": ["Mumbai", "Pune", "Remote"],
+      "remotePreference": "ANY",
+      "hybridAcceptable": true,
+      "relocation": "MAYBE",
+      "minimumExperienceYears": null,
+      "salary": { "minimum": 1800000, "maximum": null, "currency": "INR", "period": "YEAR" },
+      "employmentTypes": ["FULL_TIME"],
+      "noticePeriod": "30 days",
+      "notes": ""
+    },
+    "skills": {
+      "frontend": ["React", "TypeScript", "Next.js", "CSS", "Redux"],
+      "backend": ["Node.js", "Express", "NestJS", "REST", "GraphQL"],
+      "database": ["PostgreSQL", "MongoDB", "Redis"],
+      "devops": ["Docker", "GitHub Actions", "CI/CD"],
+      "cloud": ["AWS"],
+      "testing": ["Jest", "React Testing Library", "Playwright"],
+      "other": ["Git", "Agile"]
+    },
+    "education": [
+      { "id": "edu-1", "institution": "University of Mumbai", "degree": "B.E.", "field": "Computer Engineering", "startDate": "2015-07", "endDate": "2019-05", "grade": "8.4 CGPA", "description": "" }
+    ],
+    "certifications": [
+      { "id": "cert-1", "name": "AWS Certified Developer - Associate", "issuer": "Amazon Web Services", "date": "2023-03", "url": "" }
+    ],
+    "achievements": ["Reduced checkout page load time by 40% at Meridian Retail"],
+    "languages": ["English", "Hindi", "Marathi"],
+    "masterResume": null,
+    "summary": "Full stack developer with five years of experience building web applications with React, Node.js and PostgreSQL.",
+    "createdAt": "2026-01-01T00:00:00Z",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  },
+  "experiences": [
+    {
+      "id": "exp-1",
+      "userId": "local-user",
+      "company": "Meridian Retail",
+      "role": "Full Stack Developer",
+      "location": "Mumbai",
+      "startDate": "2022-06",
+      "endDate": null,
+      "description": "Build and maintain the customer web storefront and order management APIs for an omnichannel retailer.",
+      "technologies": ["React", "TypeScript", "Node.js", "NestJS", "PostgreSQL", "Redis", "AWS", "Docker", "GitHub Actions", "Jest", "Playwright"],
+      "achievements": [
+        "Reduced checkout page load time by 40% by code-splitting and caching product data in Redis",
+        "Led migration of order APIs from Express to NestJS with zero downtime",
+        "Set up GitHub Actions CI/CD with automated Playwright end-to-end tests"
+      ],
+      "projects": ["proj-1"],
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "exp-2",
+      "userId": "local-user",
+      "company": "BlueOrbit Software",
+      "role": "Software Engineer",
+      "location": "Pune",
+      "startDate": "2019-07",
+      "endDate": "2022-05",
+      "description": "Developed internal dashboards and REST APIs for logistics clients.",
+      "technologies": ["React", "Redux", "Node.js", "Express", "MongoDB", "GraphQL", "Jest"],
+      "achievements": [
+        "Built a GraphQL gateway consolidating six REST services",
+        "Mentored two interns who joined full time"
+      ],
+      "projects": ["proj-2"],
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-1",
+      "userId": "local-user",
+      "experienceId": "exp-1",
+      "name": "Storefront Replatform",
+      "description": "Rebuilt the retailer's storefront in Next.js with server-side rendering and a headless commerce API.",
+      "role": "Lead developer",
+      "technologies": ["Next.js", "React", "TypeScript", "Node.js", "PostgreSQL", "AWS"],
+      "responsibilities": ["Architecture", "Front-end implementation", "API design"],
+      "achievements": ["Improved Lighthouse performance score from 48 to 91"],
+      "url": "",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "proj-2",
+      "userId": "local-user",
+      "experienceId": "exp-2",
+      "name": "Fleet Analytics Dashboard",
+      "description": "Real-time dashboard for logistics fleet tracking with map visualisations.",
+      "role": "Frontend developer",
+      "technologies": ["React", "Redux", "GraphQL", "Mapbox"],
+      "responsibilities": ["Dashboard UI", "GraphQL client integration"],
+      "achievements": [],
+      "url": "",
+      "createdAt": "2026-01-01T00:00:00Z",
+      "updatedAt": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "masterResumeText": null
+}

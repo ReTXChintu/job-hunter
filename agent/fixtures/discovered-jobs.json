@@ -1,0 +1,109 @@
+{
+  "LinkedIn": [
+    {
+      "title": "Senior Full Stack Developer",
+      "company": "ABC Technologies",
+      "url": "https://www.linkedin.com/jobs/view/4001001001?refId=mock",
+      "location": "Mumbai, Maharashtra, India",
+      "postedAt": "2 days ago",
+      "sourceJobId": "4001001001",
+      "employmentType": "Full-time",
+      "remote": "Hybrid",
+      "salary": "₹25L – ₹35L per year",
+      "seniority": "Senior",
+      "description": "ABC Technologies is hiring a Senior Full Stack Developer to build customer-facing web applications for our fintech platform. You will own features end to end across a React front end and Node.js services backed by PostgreSQL, deploy to AWS with Docker and CI/CD, and mentor two junior developers. We work hybrid from our Mumbai office three days a week.",
+      "requirements": [
+        "5+ years of professional software development experience",
+        "Strong experience with React and TypeScript",
+        "Strong experience with Node.js (Express or NestJS)",
+        "Experience with PostgreSQL and data modelling",
+        "Experience deploying to AWS with Docker",
+        "Familiarity with automated testing (Jest, Playwright)"
+      ],
+      "responsibilities": [
+        "Design and build features across the stack",
+        "Review code and mentor junior developers",
+        "Improve performance and reliability of the platform",
+        "Collaborate with product and design"
+      ],
+      "skills": ["React", "TypeScript", "Node.js", "Express", "PostgreSQL", "AWS", "Docker", "Jest", "Playwright", "CI/CD"],
+      "detailsComplete": true
+    },
+    {
+      "title": "Frontend Engineer (React)",
+      "company": "Northwind Labs",
+      "url": "https://www.linkedin.com/jobs/view/4001001002",
+      "location": "Remote - India",
+      "postedAt": "1 day ago",
+      "sourceJobId": "4001001002",
+      "employmentType": "Full-time",
+      "remote": "Remote",
+      "salary": null,
+      "seniority": "Mid-level",
+      "description": "Northwind Labs builds analytics dashboards for logistics companies. We are looking for a Frontend Engineer who loves React, TypeScript and clean component design. You will work with a design system, GraphQL APIs and a fully remote team across India.",
+      "requirements": [
+        "3+ years building production React applications",
+        "TypeScript",
+        "Experience consuming GraphQL or REST APIs",
+        "Testing with React Testing Library",
+        "Good communication in a remote team"
+      ],
+      "responsibilities": ["Build dashboard features", "Maintain the component library", "Write tests"],
+      "skills": ["React", "TypeScript", "GraphQL", "React Testing Library", "CSS"],
+      "detailsComplete": true
+    },
+    {
+      "title": "Staff Machine Learning Engineer",
+      "company": "Quantessence AI",
+      "url": "https://www.linkedin.com/jobs/view/4001001003",
+      "location": "Bengaluru, Karnataka, India",
+      "postedAt": "3 days ago",
+      "sourceJobId": "4001001003",
+      "employmentType": "Full-time",
+      "remote": "On-site",
+      "salary": null,
+      "seniority": "Staff",
+      "description": "Lead the design of large-scale training pipelines and model serving infrastructure. Requires 10+ years of experience including deep expertise in PyTorch, distributed training, CUDA optimisation and a PhD in machine learning or related field.",
+      "requirements": ["10+ years of experience", "PhD in ML or related field", "PyTorch", "Distributed training", "CUDA"],
+      "responsibilities": ["Lead ML infrastructure", "Mentor researchers"],
+      "skills": ["PyTorch", "CUDA", "Kubernetes", "Python"],
+      "detailsComplete": true
+    }
+  ],
+  "Naukri": [
+    {
+      "title": "Senior Full-Stack Developer",
+      "company": "ABC Technologies Pvt Ltd",
+      "url": "https://www.naukri.com/job-listings-senior-full-stack-developer-abc-technologies-mumbai-5-to-8-years-9900112233",
+      "location": "Mumbai",
+      "postedAt": "3 days ago",
+      "sourceJobId": "9900112233",
+      "employmentType": "Full Time, Permanent",
+      "remote": "Hybrid",
+      "salary": "25-35 Lacs PA",
+      "seniority": "Senior",
+      "description": "ABC Technologies is hiring a Senior Full Stack Developer to build customer-facing web applications for our fintech platform. You will own features end to end across a React front end and Node.js services backed by PostgreSQL, deploy to AWS with Docker and CI/CD, and mentor junior developers. Hybrid from our Mumbai office.",
+      "requirements": ["5-8 years experience", "React, TypeScript", "Node.js", "PostgreSQL", "AWS, Docker"],
+      "responsibilities": ["Build features across the stack", "Mentor junior developers"],
+      "skills": ["React", "TypeScript", "Node.js", "PostgreSQL", "AWS", "Docker"],
+      "detailsComplete": true
+    },
+    {
+      "title": "Backend Developer - Node.js",
+      "company": "Coastal Commerce",
+      "url": "https://www.naukri.com/job-listings-backend-developer-nodejs-coastal-commerce-pune-3-to-6-years-9900112244",
+      "location": "Pune",
+      "postedAt": "Today",
+      "sourceJobId": "9900112244",
+      "employmentType": "Full Time, Permanent",
+      "remote": "On-site",
+      "salary": "Not disclosed",
+      "seniority": "Mid-level",
+      "description": "Coastal Commerce runs an e-commerce marketplace. We need a Backend Developer with Node.js, MongoDB and Redis experience to build order and inventory services, integrate payment gateways, and improve API performance. Experience with message queues (RabbitMQ or Kafka) is a plus.",
+      "requirements": ["3-6 years with Node.js", "MongoDB", "Redis", "REST API design", "Payment gateway integration"],
+      "responsibilities": ["Build order and inventory services", "Integrate payment gateways", "Optimise APIs"],
+      "skills": ["Node.js", "MongoDB", "Redis", "REST", "RabbitMQ", "Kafka"],
+      "detailsComplete": true
+    }
+  ]
+}

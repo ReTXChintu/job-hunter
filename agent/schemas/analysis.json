@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "analyses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "jobId": { "type": "string" },
+          "relevant": { "type": "boolean" },
+          "matchScore": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "matchedSkills": { "type": "array", "items": { "type": "string" } },
+          "missingSkills": { "type": "array", "items": { "type": "string" } },
+          "requiredExperienceMet": { "type": "boolean" },
+          "seniorityMatch": { "type": "boolean" },
+          "locationMatch": { "type": "boolean" },
+          "employmentTypeMatch": { "type": "boolean" },
+          "salaryAssessment": { "type": "string" },
+          "requiredQualifications": { "type": "array", "items": { "type": "string" } },
+          "niceToHave": { "type": "array", "items": { "type": "string" } },
+          "concerns": { "type": "array", "items": { "type": "string" } },
+          "importantKeywords": { "type": "array", "items": { "type": "string" } },
+          "summary": { "type": "string" }
+        },
+        "required": ["jobId", "relevant", "matchScore", "matchedSkills", "missingSkills", "summary"]
+      }
+    }
+  },
+  "required": ["analyses"]
+}

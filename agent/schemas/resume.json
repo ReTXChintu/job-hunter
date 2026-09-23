@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "properties": {
+    "resume": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "email": { "type": "string" },
+            "phone": { "type": "string" },
+            "location": { "type": "string" },
+            "linkedin": { "type": "string" },
+            "github": { "type": "string" },
+            "portfolio": { "type": "string" }
+          },
+          "required": ["name"]
+        },
+        "headline": { "type": "string" },
+        "summary": { "type": "string" },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "items": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["name", "items"]
+          }
+        },
+        "experience": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "company": { "type": "string" },
+              "role": { "type": "string" },
+              "location": { "type": "string" },
+              "startDate": { "type": "string" },
+              "endDate": { "type": "string" },
+              "bullets": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["company", "role", "bullets"]
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "technologies": { "type": "array", "items": { "type": "string" } },
+              "bullets": { "type": "array", "items": { "type": "string" } },
+              "url": { "type": "string" }
+            },
+            "required": ["name"]
+          }
+        },
+        "education": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "institution": { "type": "string" },
+              "degree": { "type": "string" },
+              "field": { "type": "string" },
+              "startDate": { "type": "string" },
+              "endDate": { "type": "string" },
+              "grade": { "type": "string" }
+            },
+            "required": ["institution"]
+          }
+        },
+        "certifications": { "type": "array", "items": { "type": "string" } },
+        "achievements": { "type": "array", "items": { "type": "string" } },
+        "languages": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["contact", "headline", "summary", "skills", "experience"]
+    },
+    "coverLetter": { "type": "string" },
+    "applicationNotes": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["resume"]
+}
