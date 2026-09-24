@@ -5,11 +5,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex, Notify, RwLock};
 
+use super::backend::{self, BackendClientHandle};
 use super::local::{LocalStore, SyncOp};
-use super::mongo::MongoClientHandle;
 use crate::domain::COLLECTIONS;
 use crate::error::{CoreError, CoreResult};
-use crate::secrets::{SecretStore, MONGODB_URI_KEY};
+use crate::secrets::{SecretStore, BACKEND_DEVICE_TOKEN_KEY};
 use crate::util::now;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -27,12 +27,14 @@ pub struct SyncStatus {
     pub syncing: bool,
 }
 
-/// Background worker that mirrors the local store into MongoDB Atlas.
+/// Background worker that mirrors the local store into a self-hosted
+/// `@job-hunter/backend` account (see `apps/backend`, `docs/backend.md`).
 pub struct SyncWorker {
     store: Arc<LocalStore>,
     secrets: Arc<dyn SecretStore>,
-    database: RwLock<String>,
-    client: Mutex<Option<MongoClientHandle>>,
+    backend_url: RwLock<String>,
+    account_email: RwLock<String>,
+    client: Mutex<Option<BackendClientHandle>>,
     status: RwLock<SyncStatus>,
     status_tx: broadcast::Sender<SyncStatus>,
     kick: Notify,
@@ -43,13 +45,15 @@ impl SyncWorker {
     pub fn new(
         store: Arc<LocalStore>,
         secrets: Arc<dyn SecretStore>,
-        database: String,
+        backend_url: String,
+        account_email: String,
     ) -> Arc<Self> {
         let (status_tx, _) = broadcast::channel(64);
         Arc::new(Self {
             store,
             secrets,
-            database: RwLock::new(database),
+            backend_url: RwLock::new(backend_url),
+            account_email: RwLock::new(account_email),
             client: Mutex::new(None),
             status: RwLock::new(SyncStatus::default()),
             status_tx,
@@ -70,28 +74,15 @@ impl SyncWorker {
     }
 
     pub fn is_configured(&self) -> bool {
-        self.secrets
-            .get(MONGODB_URI_KEY)
-            .ok()
-            .flatten()
-            .map(|u| !u.trim().is_empty())
-            .unwrap_or(false)
-            || std::env::var("MONGODB_URI")
-                .map(|u| !u.trim().is_empty())
-                .unwrap_or(false)
+        self.token().is_some()
     }
 
-    fn uri(&self) -> Option<String> {
+    fn token(&self) -> Option<String> {
         self.secrets
-            .get(MONGODB_URI_KEY)
+            .get(BACKEND_DEVICE_TOKEN_KEY)
             .ok()
             .flatten()
-            .filter(|u| !u.trim().is_empty())
-            .or_else(|| {
-                std::env::var("MONGODB_URI")
-                    .ok()
-                    .filter(|u| !u.trim().is_empty())
-            })
+            .filter(|t| !t.trim().is_empty())
     }
 
     /// Wake the worker (called after every local write).
@@ -104,47 +95,73 @@ impl SyncWorker {
         self.kick();
     }
 
-    pub async fn set_database(&self, database: String) {
-        *self.database.write().await = database;
+    pub async fn set_backend_url(&self, backend_url: String) {
+        *self.backend_url.write().await = backend_url;
         *self.client.lock().await = None;
         self.kick();
     }
 
-    /// Store a new connection string (in the OS credential store), verify it,
-    /// and queue all existing local data for upload.
-    pub async fn configure(&self, uri: &str, database: &str) -> CoreResult<SyncStatus> {
-        let uri = uri.trim();
-        if !(uri.starts_with("mongodb://") || uri.starts_with("mongodb+srv://")) {
-            return Err(CoreError::Validation(
-                "The connection string must start with mongodb:// or mongodb+srv://".into(),
-            ));
-        }
-        let handle = MongoClientHandle::connect(uri, database).await?;
-        handle.ensure_indexes().await?;
-        self.secrets.set(MONGODB_URI_KEY, uri)?;
-        *self.database.write().await = database.to_string();
-        *self.client.lock().await = Some(handle.clone());
+    pub async fn set_account_email(&self, account_email: String) {
+        *self.account_email.write().await = account_email;
+    }
+
+    /// Pings a backend address with no credentials, to confirm it's
+    /// reachable before the caller commits an email/password to it.
+    pub async fn test_connection(&self, backend_url: &str, allow_insecure: bool) -> CoreResult<()> {
+        let backend_url = backend::normalize_backend_url(backend_url, allow_insecure)?;
+        let http = http_client();
+        backend::ping_backend(&http, &backend_url).await
+    }
+
+    /// Registers a new account (`is_register: true`) or signs in to an
+    /// existing one, registers this desktop as a device on it, stores the
+    /// resulting device token, and queues all existing local data for
+    /// upload.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn configure(
+        &self,
+        backend_url: &str,
+        email: &str,
+        password: &str,
+        is_register: bool,
+        device_name: &str,
+        allow_insecure: bool,
+    ) -> CoreResult<SyncStatus> {
+        let backend_url = backend::normalize_backend_url(backend_url, allow_insecure)?;
+        let http = http_client();
+        let access_token = if is_register {
+            backend::register_account(&http, &backend_url, email, password).await?
+        } else {
+            backend::login_account(&http, &backend_url, email, password).await?
+        };
+        let (_device_id, device_token) =
+            backend::register_device(&http, &backend_url, &access_token, device_name).await?;
+        self.secrets.set(BACKEND_DEVICE_TOKEN_KEY, &device_token)?;
+        *self.backend_url.write().await = backend_url.clone();
+        *self.account_email.write().await = email.to_string();
+        let label = backend::label_for(&backend_url, email);
+        let handle = BackendClientHandle::new(http, backend_url, device_token, label.clone());
+        *self.client.lock().await = Some(handle);
         self.store.enqueue_everything()?;
         {
             let mut s = self.status.write().await;
             s.configured = true;
             s.connected = true;
             s.last_error = None;
-            s.target = Some(handle.label().to_string());
+            s.target = Some(label);
         }
         self.publish().await;
         self.kick();
         Ok(self.status().await)
     }
 
-    pub async fn test_connection(&self, uri: &str, database: &str) -> CoreResult<String> {
-        let handle = MongoClientHandle::connect(uri.trim(), database).await?;
-        Ok(handle.label().to_string())
-    }
-
-    pub async fn clear_configuration(&self) -> CoreResult<()> {
-        self.secrets.delete(MONGODB_URI_KEY)?;
+    /// Forgets this desktop's backend credentials locally. Does not delete
+    /// the account or other devices.
+    pub async fn sign_out(&self) -> CoreResult<()> {
+        self.secrets.delete(BACKEND_DEVICE_TOKEN_KEY)?;
         *self.client.lock().await = None;
+        *self.backend_url.write().await = String::new();
+        *self.account_email.write().await = String::new();
         let mut s = self.status.write().await;
         s.configured = false;
         s.connected = false;
@@ -159,14 +176,19 @@ impl SyncWorker {
         let _ = self.status_tx.send(s);
     }
 
-    async fn client(&self) -> CoreResult<MongoClientHandle> {
+    async fn client(&self) -> CoreResult<BackendClientHandle> {
         let mut guard = self.client.lock().await;
         if let Some(c) = guard.as_ref() {
             return Ok(c.clone());
         }
-        let uri = self.uri().ok_or(CoreError::MongoNotConfigured)?;
-        let db = self.database.read().await.clone();
-        let handle = MongoClientHandle::connect(&uri, &db).await?;
+        let token = self.token().ok_or(CoreError::BackendNotConfigured)?;
+        let backend_url = self.backend_url.read().await.clone();
+        if backend_url.trim().is_empty() {
+            return Err(CoreError::BackendNotConfigured);
+        }
+        let email = self.account_email.read().await.clone();
+        let label = backend::label_for(&backend_url, &email);
+        let handle = BackendClientHandle::new(http_client(), backend_url, token, label);
         *guard = Some(handle.clone());
         Ok(handle)
     }
@@ -232,10 +254,7 @@ impl SyncWorker {
                     match self.pull_all().await {
                         Ok(n) => {
                             pulled_once = true;
-                            tracing::info!(
-                                merged = n,
-                                "pulled remote documents from MongoDB Atlas"
-                            );
+                            tracing::info!(merged = n, "pulled remote documents from the backend");
                         }
                         Err(e) => {
                             ok = false;
@@ -254,10 +273,7 @@ impl SyncWorker {
                                 s.target = Some(c.label().to_string());
                             }
                             if n > 0 {
-                                tracing::info!(
-                                    flushed = n,
-                                    "synced local changes to MongoDB Atlas"
-                                );
+                                tracing::info!(flushed = n, "synced local changes to the backend");
                             }
                             backoff = Duration::from_secs(15);
                         }
@@ -289,9 +305,16 @@ impl SyncWorker {
     }
 
     async fn record_error(&self, e: &CoreError) {
-        tracing::warn!(error = %e, "MongoDB sync failed; will retry");
+        tracing::warn!(error = %e, "backend sync failed; will retry");
         let mut s = self.status.write().await;
         s.connected = false;
         s.last_error = Some(e.user_message());
     }
+}
+
+fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .unwrap_or_default()
 }

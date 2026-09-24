@@ -39,34 +39,86 @@ pub async fn save_settings(ctx: Ctx<'_>, settings: AppSettings) -> R<AppSettings
     ctx.save_settings(settings).await.map_err(Into::into)
 }
 
-#[tauri::command]
-pub async fn configure_mongodb(ctx: Ctx<'_>, uri: String, database: String) -> R<SyncStatus> {
-    let status = ctx
-        .sync
-        .configure(&uri, &database)
+async fn set_backend_device_name(ctx: &Arc<AppContext>, name: Option<String>) -> R<()> {
+    let Some(name) = name.map(|n| n.trim().to_string()).filter(|n| !n.is_empty()) else {
+        return Ok(());
+    };
+    let mut settings = ctx.settings().await;
+    settings.backend.device_name = name;
+    ctx.save_settings(settings)
         .await
         .map_err(UserFacingError::from)?;
+    Ok(())
+}
+
+async fn set_backend_account_email(ctx: &Arc<AppContext>, email: &str) -> R<()> {
     let mut settings = ctx.settings().await;
-    if settings.mongodb_database != database {
-        settings.mongodb_database = database;
+    if settings.backend.account_email != email {
+        settings.backend.account_email = email.to_string();
         ctx.save_settings(settings)
             .await
             .map_err(UserFacingError::from)?;
     }
-    Ok(status)
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn test_mongodb(ctx: Ctx<'_>, uri: String, database: String) -> R<String> {
+pub async fn test_backend(ctx: Ctx<'_>, backend_url: String, allow_insecure: Option<bool>) -> R<()> {
     ctx.sync
-        .test_connection(&uri, &database)
+        .test_connection(&backend_url, allow_insecure.unwrap_or(false))
         .await
         .map_err(Into::into)
 }
 
 #[tauri::command]
-pub async fn clear_mongodb(ctx: Ctx<'_>) -> R<()> {
-    ctx.sync.clear_configuration().await.map_err(Into::into)
+pub async fn backend_register(
+    ctx: Ctx<'_>,
+    backend_url: String,
+    email: String,
+    password: String,
+    device_name: Option<String>,
+    allow_insecure: Option<bool>,
+) -> R<SyncStatus> {
+    set_backend_device_name(&ctx, device_name).await?;
+    let device_name = ctx.settings().await.backend.device_name;
+    let status = ctx
+        .sync
+        .configure(&backend_url, &email, &password, true, &device_name, allow_insecure.unwrap_or(false))
+        .await
+        .map_err(UserFacingError::from)?;
+    set_backend_account_email(&ctx, &email).await?;
+    Ok(status)
+}
+
+#[tauri::command]
+pub async fn backend_login(
+    ctx: Ctx<'_>,
+    backend_url: String,
+    email: String,
+    password: String,
+    device_name: Option<String>,
+    allow_insecure: Option<bool>,
+) -> R<SyncStatus> {
+    set_backend_device_name(&ctx, device_name).await?;
+    let device_name = ctx.settings().await.backend.device_name;
+    let status = ctx
+        .sync
+        .configure(&backend_url, &email, &password, false, &device_name, allow_insecure.unwrap_or(false))
+        .await
+        .map_err(UserFacingError::from)?;
+    set_backend_account_email(&ctx, &email).await?;
+    Ok(status)
+}
+
+#[tauri::command]
+pub async fn backend_logout(ctx: Ctx<'_>) -> R<SyncStatus> {
+    ctx.sync.sign_out().await.map_err(UserFacingError::from)?;
+    let mut settings = ctx.settings().await;
+    settings.backend = Default::default();
+    ctx.save_settings(settings)
+        .await
+        .map_err(UserFacingError::from)?;
+    Ok(ctx.sync.status().await)
 }
 
 #[tauri::command]

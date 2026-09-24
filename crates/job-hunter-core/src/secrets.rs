@@ -1,13 +1,19 @@
 //! Secret storage backed by the operating system credential store
 //! (Windows Credential Manager, macOS Keychain, Linux Secret Service).
 //!
-//! The MongoDB connection string is the only secret Job Hunter holds. Claude
-//! authentication belongs to Claude Code and is never read or stored here.
+//! Claude authentication belongs to Claude Code and is never read or stored
+//! here. The two secrets Job Hunter does hold are opaque device tokens --
+//! never a password -- for the two self-hosted services this desktop can
+//! optionally sign into.
 
 use crate::error::{CoreError, CoreResult};
 
 const SERVICE: &str = "JobHunter";
-pub const MONGODB_URI_KEY: &str = "mongodb-uri";
+/// This desktop's own long-lived device token on the configured
+/// `@job-hunter/backend` instance (see `apps/backend`, `docs/backend.md`).
+/// Grants only that account's data sync for this device, never the account
+/// password.
+pub const BACKEND_DEVICE_TOKEN_KEY: &str = "backend-device-token";
 /// This desktop's own long-lived device token on the configured relay (see
 /// `crates/job-hunter-relay`). Grants only relay message routing for the
 /// signed-in account, nothing else; never the relay account password.
@@ -71,19 +77,6 @@ impl SecretStore for MemorySecretStore {
     }
 }
 
-/// Mask a MongoDB URI for display/logging: keeps scheme, user and host, hides
-/// the password.
-pub fn redact_mongo_uri(uri: &str) -> String {
-    if let Some(at) = uri.rfind('@') {
-        if let Some(scheme_end) = uri.find("://") {
-            let creds = &uri[scheme_end + 3..at];
-            let user = creds.split(':').next().unwrap_or("");
-            return format!("{}://{}:***@{}", &uri[..scheme_end], user, &uri[at + 1..]);
-        }
-    }
-    uri.to_string()
-}
-
 /// Strip anything that looks like a credential from a free-form string before
 /// it is logged.
 pub fn redact_secrets(text: &str) -> String {
@@ -110,10 +103,6 @@ mod tests {
     #[test]
     fn redacts_mongo_password() {
         let uri = "mongodb+srv://alice:s3cret@cluster0.example.mongodb.net/db?retryWrites=true";
-        assert_eq!(
-            redact_mongo_uri(uri),
-            "mongodb+srv://alice:***@cluster0.example.mongodb.net/db?retryWrites=true"
-        );
         let logged = redact_secrets(&format!("connecting to {uri}"));
         assert!(!logged.contains("s3cret"));
         assert!(logged.contains("alice:***@"));

@@ -27,7 +27,6 @@ futures.workspace = true
 regex.workspace = true
 once_cell.workspace = true
 url.workspace = true
-mongodb = "3"
 which = "7"
 tempfile = "3"
 dotenvy = "0.15"

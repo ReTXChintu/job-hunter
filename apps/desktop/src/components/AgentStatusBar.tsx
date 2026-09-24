@@ -58,7 +58,7 @@ export function AgentStatusBar() {
       <Link to="/settings">
         <HStack gap={1.5} color={sync.data?.connected ? "green.fg" : sync.data?.configured ? "orange.fg" : "fg.subtle"}>
           <Box w={1.5} h={1.5} borderRadius="full" bg="currentColor" />
-          <Text>{sync.data?.connected ? "Atlas synced" : sync.data?.configured ? `Atlas offline · ${sync.data.pending} pending` : "Local only"}</Text>
+          <Text>{sync.data?.connected ? "Backend synced" : sync.data?.configured ? `Backend offline · ${sync.data.pending} pending` : "Local only"}</Text>
         </HStack>
       </Link>
     </Flex>

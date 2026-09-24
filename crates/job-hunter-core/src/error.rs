@@ -16,10 +16,10 @@ pub enum CoreError {
     ClaudeInChromeUnavailable { details: String },
     #[error("Google Chrome could not be found")]
     ChromeUnavailable { details: String },
-    #[error("MongoDB is unavailable: {message}")]
-    MongoUnavailable { message: String },
-    #[error("MongoDB is not configured")]
-    MongoNotConfigured,
+    #[error("Backend is unavailable: {message}")]
+    BackendUnavailable { message: String },
+    #[error("Backend account is not configured")]
+    BackendNotConfigured,
     #[error("Network failure: {0}")]
     Network(String),
     #[error("Document generation failed: {0}")]
@@ -66,8 +66,8 @@ impl CoreError {
             CoreError::ClaudeRunFailed { .. } => "CLAUDE_RUN_FAILED",
             CoreError::ClaudeInChromeUnavailable { .. } => "CLAUDE_IN_CHROME_UNAVAILABLE",
             CoreError::ChromeUnavailable { .. } => "CHROME_UNAVAILABLE",
-            CoreError::MongoUnavailable { .. } => "MONGODB_UNAVAILABLE",
-            CoreError::MongoNotConfigured => "MONGODB_NOT_CONFIGURED",
+            CoreError::BackendUnavailable { .. } => "BACKEND_UNAVAILABLE",
+            CoreError::BackendNotConfigured => "BACKEND_NOT_CONFIGURED",
             CoreError::Network(_) => "NETWORK_FAILURE",
             CoreError::DocumentGeneration(_) => "DOCUMENT_GENERATION_FAILED",
             CoreError::DocumentImport(_) => "DOCUMENT_IMPORT_FAILED",
@@ -110,11 +110,11 @@ impl CoreError {
             CoreError::ChromeUnavailable { .. } => {
                 "Google Chrome could not be found. Install Chrome or set its path in Settings.".into()
             }
-            CoreError::MongoNotConfigured => {
-                "MongoDB Atlas is not configured. Add your connection string in Settings. Data is kept locally until then.".into()
+            CoreError::BackendNotConfigured => {
+                "Not signed in to a Job Hunter backend account. Sign in from Settings. Data is kept locally until then.".into()
             }
-            CoreError::MongoUnavailable { message } => {
-                format!("MongoDB Atlas is unreachable ({message}). Your data is safe locally and will sync when the connection returns.")
+            CoreError::BackendUnavailable { message } => {
+                format!("The backend is unreachable ({message}). Your data is safe locally and will sync when the connection returns.")
             }
             other => other.to_string(),
         }

@@ -1,6 +1,11 @@
 # Architecture
 
-Job Hunter is a single desktop process. There is no server.
+Job Hunter is a single desktop process; there is no server it depends on.
+Two optional, self-hosted services extend it -- `crates/job-hunter-relay`
+(mobile app connectivity, see [`relay.md`](relay.md)) and `apps/backend`
+(owns MongoDB Atlas directly and will eventually replace the relay's data
+path too, see [`backend.md`](backend.md)) -- but the desktop works
+entirely offline without either.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -17,7 +22,7 @@ Job Hunter is a single desktop process. There is no server.
 │                                                              │
 │  domain/        entities (camelCase serde, shared with TS)   │
 │  store/         LocalStore (JSON per collection) + SyncWorker│
-│                 → MongoDB Atlas (upsert by id, newest wins)  │
+│                 → backend HTTP API → MongoDB Atlas (optional)│
 │  claude/        CLI discovery, stream-json runner, mock      │
 │  chrome/        Chrome + extension detection, print-to-pdf   │
 │  documents/     PDF/DOCX import, HTML/DOCX/PDF rendering     │
@@ -28,15 +33,15 @@ Job Hunter is a single desktop process. There is no server.
 └──────────────────────────────────────────────────────────────┘
           │                                  │
           ▼                                  ▼
-   claude -p (stream-json)            MongoDB Atlas (optional)
-          │
-          ▼
-   Claude in Chrome ─► Chrome ─► job sites
+   claude -p (stream-json)            apps/backend (optional, self-hosted)
+          │                                  │
+          ▼                                  ▼
+   Claude in Chrome ─► Chrome ─► job sites    MongoDB Atlas
 ```
 
 ## Core decisions
 
-**Local-first persistence.** `LocalStore` keeps one JSON file per collection in the app data directory (`%APPDATA%\JobHunter\database` on Windows) with an in-memory cache, atomic writes and a persisted outbound queue. Every write is queued for Atlas; `SyncWorker` flushes the queue when Atlas is reachable and pulls remote documents on start, merging by `updatedAt`. MongoDB being down never blocks the UI or the agent.
+**Local-first persistence.** `LocalStore` keeps one JSON file per collection in the app data directory (`%APPDATA%\JobHunter\database` on Windows) with an in-memory cache, atomic writes and a persisted outbound queue. Every write is queued for the backend (see [`backend.md`](backend.md)); `SyncWorker` flushes the queue when it's reachable and pulls remote documents on start, merging by `updatedAt`. Signing in to a backend account is entirely optional (Settings → Backend account); the backend being unreachable, or never configured at all, never blocks the UI or the agent.
 
 **Claude Code as the only AI engine.** Every AI step is one non-interactive process: `claude -p --output-format stream-json --verbose --permission-mode dontAsk --strict-mcp-config --max-turns N [--chrome --allowedTools …] [--json-schema …] --append-system-prompt-file system-prompt.md`. The prompt is written to stdin; the structured result is read from the final `result` message (`structured_output`). The child inherits the user's Claude login; `ANTHROPIC_API_KEY` is explicitly removed from its environment. See [claude-code.md](claude-code.md).
 

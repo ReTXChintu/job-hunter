@@ -17,11 +17,9 @@ claude -p  (your signed-in Claude Code)
 Claude ──► Claude in Chrome ──► Google Chrome ──► job websites
 ```
 
-Data is stored locally under your app data directory and mirrored to MongoDB Atlas whenever it is reachable.
+Data is stored locally under your app data directory. Mirroring it to MongoDB Atlas is optional and goes through a self-hosted **Node backend** (`apps/backend`, see [docs/backend.md](docs/backend.md)) — sign in from Settings → Backend account or the setup wizard, or skip it and stay local-only.
 
-An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone. It runs no AI and holds no job data of its own — it's a thin review client that reaches your desktop through a small relay service you self-host, only when you choose to pair it. See [docs/mobile.md](docs/mobile.md) and [docs/relay.md](docs/relay.md).
-
-A self-hosted **Node backend** (`apps/backend`) is also in the repo, built and tested but not yet wired in: it will let the mobile app read jobs and applications directly even when the desktop is offline, and eventually become the one thing that talks to MongoDB Atlas, with the desktop syncing to it the same local-first way it syncs to Atlas today. See [docs/backend.md](docs/backend.md) for what's built and what's still ahead.
+An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone. It runs no AI and holds no job data of its own — it's a thin review client that reaches your desktop through a small relay service you self-host, only when you choose to pair it. See [docs/mobile.md](docs/mobile.md) and [docs/relay.md](docs/relay.md). The relay's accounts/pairing/presence role will eventually move onto the same backend so the mobile app can read your data even when the desktop is offline — see [docs/backend.md](docs/backend.md) for what's already wired in and what's left.
 
 ## What it does
 
@@ -32,7 +30,7 @@ A self-hosted **Node backend** (`apps/backend`) is also in the repo, built and t
 5. Applications land in **Awaiting approval**. You review the job, analysis, resume and cover letter.
 6. **Approve & Apply** opens the posting in Chrome and Claude fills the form. It stops for questions it cannot answer truthfully, CAPTCHAs, logins or anti-bot walls, and never claims success without visible evidence.
 7. Anything it cannot finish becomes **Manual action required** with a reason, the deepest URL reached, the documents and known answers, plus **Mark as Applied**.
-8. Every job, analysis, resume, cover letter, application, answer, run and event is persisted locally and synced to Atlas.
+8. Every job, analysis, resume, cover letter, application, answer, run and event is persisted locally and, if you've signed in to a backend account, synced there too.
 
 ## Requirements
 
@@ -43,7 +41,7 @@ A self-hosted **Node backend** (`apps/backend`) is also in the repo, built and t
 | Tauri 2 prerequisites | WebView2 on Windows (bundled bootstrapper), `webkit2gtk` on Linux, Xcode CLT on macOS |
 | Claude Code (`claude` CLI) 2.0.73+ | signed in with `claude auth login` (Pro/Max/Team/Enterprise) |
 | Google Chrome | with the **Claude in Chrome** extension (1.0.36+) installed and enabled |
-| MongoDB Atlas cluster | optional; the app works local-only until configured |
+| A self-hosted `apps/backend` + MongoDB Atlas cluster | optional; the app works local-only until you sign in to a backend account |
 
 ## Quick start
 
@@ -52,7 +50,7 @@ pnpm install
 pnpm tauri dev          # builds the Rust backend and opens the app
 ```
 
-On first launch the setup wizard checks Claude CLI, Claude authentication, Chrome + Claude in Chrome, MongoDB Atlas, your master resume and your profile.
+On first launch the setup wizard checks Claude CLI, Claude authentication, Chrome + Claude in Chrome, an optional backend account, your master resume and your profile.
 
 Build installers:
 
@@ -76,8 +74,9 @@ job-hunter/
 │   ├── src/                 React UI (Vite, Chakra UI, TanStack Query/Router)
 │   └── src-tauri/           Tauri shell: commands + event forwarding
 ├── apps/mobile/             Flutter companion app (review-only, no AI) -- see docs/mobile.md
-├── apps/backend/            Self-hosted Node/Fastify backend (built, not yet wired in) --
-│                            owns MongoDB Atlas data directly -- see docs/backend.md
+├── apps/backend/            Self-hosted Node/Fastify backend the desktop app can sign
+│                            into (Settings → Backend account) -- owns MongoDB Atlas
+│                            data directly -- see docs/backend.md
 ├── crates/job-hunter-core/  Rust core: domain, store + Atlas sync, Claude CLI runner,
 │                            Chrome detection, documents, agent state machine, orchestrator,
 │                            remote/ (dispatches phone requests to the same orchestrator calls)

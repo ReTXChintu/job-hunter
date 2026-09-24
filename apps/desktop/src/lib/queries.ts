@@ -83,18 +83,31 @@ export function useSaveSettings() {
   return useMutation({ mutationFn: (settings: AppSettings) => invoke("save_settings", { settings }), onSuccess: () => inv([keys.settings, keys.setup, keys.dashboard]) });
 }
 
-export function useConfigureMongo() {
-  const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: { uri: string; database: string }) => invoke("configure_mongodb", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
+interface BackendAuthArgs {
+  backendUrl: string;
+  email: string;
+  password: string;
+  deviceName?: string;
+  allowInsecure?: boolean;
 }
 
-export function useTestMongo() {
-  return useMutation({ mutationFn: (args: { uri: string; database: string }) => invoke("test_mongodb", args) });
+export function useTestBackend() {
+  return useMutation({ mutationFn: (args: { backendUrl: string; allowInsecure?: boolean }) => invoke("test_backend", args) });
 }
 
-export function useClearMongo() {
+export function useBackendRegister() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: () => invoke("clear_mongodb"), onSuccess: () => inv([keys.setup, keys.sync, keys.dashboard]) });
+  return useMutation({ mutationFn: (args: BackendAuthArgs) => invoke("backend_register", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
+}
+
+export function useBackendLogin() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (args: BackendAuthArgs) => invoke("backend_login", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
+}
+
+export function useBackendLogout() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: () => invoke("backend_logout"), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
 }
 
 export function useSaveProfile() {

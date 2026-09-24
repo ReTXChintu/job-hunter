@@ -5,12 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::error::CoreResult;
 
 /// Non-secret application settings, persisted as JSON in the app data dir.
-/// Secrets (the MongoDB connection string) never live here; see `secrets`.
+/// Secrets (device tokens) never live here; see `secrets`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
-    #[serde(default = "default_db_name")]
-    pub mongodb_database: String,
     #[serde(default = "default_sources")]
     pub job_sources: Vec<JobSourceConfig>,
     #[serde(default = "default_max_jobs_per_source")]
@@ -38,6 +36,8 @@ pub struct AppSettings {
     pub minimum_match_score: u8,
     #[serde(default)]
     pub remote: RemoteSettings,
+    #[serde(default)]
+    pub backend: BackendSettings,
 }
 
 /// Non-secret configuration for the mobile companion app connection. The
@@ -74,6 +74,39 @@ impl Default for RemoteSettings {
     }
 }
 
+/// Non-secret configuration for the self-hosted `@job-hunter/backend`
+/// connection (see `apps/backend`, `docs/backend.md`). This desktop's own
+/// device token lives in the OS credential store (see
+/// `secrets::BACKEND_DEVICE_TOKEN_KEY`), never here. Empty `backend_url`
+/// means the desktop has not signed in and keeps working entirely
+/// local-first, exactly as before this existed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BackendSettings {
+    #[serde(default)]
+    pub backend_url: String,
+    /// Display-only: the signed-in account's email, shown in Settings.
+    #[serde(default)]
+    pub account_email: String,
+    /// This desktop's own device id on the backend, once registered.
+    #[serde(default)]
+    pub device_id: Option<String>,
+    /// Name this desktop registered itself under.
+    #[serde(default = "default_device_name")]
+    pub device_name: String,
+}
+
+impl Default for BackendSettings {
+    fn default() -> Self {
+        Self {
+            backend_url: String::new(),
+            account_email: String::new(),
+            device_id: None,
+            device_name: default_device_name(),
+        }
+    }
+}
+
 fn default_device_name() -> String {
     hostname_or_default()
 }
@@ -84,9 +117,6 @@ fn hostname_or_default() -> String {
         .unwrap_or_else(|_| "My Computer".into())
 }
 
-fn default_db_name() -> String {
-    "job_hunter".into()
-}
 fn default_max_jobs_per_source() -> u32 {
     10
 }
@@ -110,7 +140,6 @@ fn default_sources() -> Vec<JobSourceConfig> {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            mongodb_database: default_db_name(),
             job_sources: default_sources(),
             max_jobs_per_source: default_max_jobs_per_source(),
             max_applications_per_run: default_max_applications_per_run(),
@@ -123,6 +152,7 @@ impl Default for AppSettings {
             setup_completed: false,
             minimum_match_score: 60,
             remote: RemoteSettings::default(),
+            backend: BackendSettings::default(),
         }
     }
 }
@@ -261,11 +291,6 @@ impl AppSettings {
         if let Ok(v) = std::env::var("CHROME_PATH") {
             if !v.trim().is_empty() {
                 self.browser.chrome_path = Some(v);
-            }
-        }
-        if let Ok(v) = std::env::var("MONGODB_DATABASE") {
-            if !v.trim().is_empty() {
-                self.mongodb_database = v;
             }
         }
     }

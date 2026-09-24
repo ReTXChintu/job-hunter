@@ -500,8 +500,24 @@ export interface ClaudeSettings {
   timeoutSeconds: number;
 }
 
+export interface RemoteSettings {
+  relayUrl: string;
+  accountEmail: string;
+  deviceId: string | null;
+  deviceName: string;
+}
+
+/** Non-secret configuration for the self-hosted `@job-hunter/backend`
+ * connection (see `apps/backend`, `docs/backend.md`). The device token
+ * itself lives in the OS credential store, never here. */
+export interface BackendSettings {
+  backendUrl: string;
+  accountEmail: string;
+  deviceId: string | null;
+  deviceName: string;
+}
+
 export interface AppSettings {
-  mongodbDatabase: string;
   jobSources: JobSourceConfig[];
   maxJobsPerSource: number;
   maxApplicationsPerRun: number;
@@ -513,6 +529,8 @@ export interface AppSettings {
   mockMode: boolean;
   setupCompleted: boolean;
   minimumMatchScore: number;
+  remote: RemoteSettings;
+  backend: BackendSettings;
 }
 
 export interface ClaudeStatus {
@@ -549,7 +567,7 @@ export interface SyncStatus {
 export interface SetupStatus {
   claude: ClaudeStatus;
   chrome: ChromeStatus;
-  mongo: SyncStatus;
+  backend: SyncStatus;
   profile: ProfileCompleteness;
   mockMode: boolean;
   setupCompleted: boolean;

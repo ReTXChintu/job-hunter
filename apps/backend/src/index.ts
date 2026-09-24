@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { MongoDb } from "./mongoDb.js";

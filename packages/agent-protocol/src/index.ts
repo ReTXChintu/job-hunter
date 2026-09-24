@@ -58,9 +58,16 @@ export interface Commands {
   get_setup_status: { args: Record<string, never>; result: SetupStatus };
   get_settings: { args: Record<string, never>; result: AppSettings };
   save_settings: { args: { settings: AppSettings }; result: AppSettings };
-  configure_mongodb: { args: { uri: string; database: string }; result: SyncStatus };
-  test_mongodb: { args: { uri: string; database: string }; result: string };
-  clear_mongodb: { args: Record<string, never>; result: null };
+  test_backend: { args: { backendUrl: string; allowInsecure?: boolean }; result: null };
+  backend_register: {
+    args: { backendUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
+    result: SyncStatus;
+  };
+  backend_login: {
+    args: { backendUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
+    result: SyncStatus;
+  };
+  backend_logout: { args: Record<string, never>; result: SyncStatus };
   get_sync_status: { args: Record<string, never>; result: SyncStatus };
 
   get_candidate_profile: { args: Record<string, never>; result: CandidateProfile };

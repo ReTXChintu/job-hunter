@@ -1,12 +1,12 @@
-import { Box, Button, Field, Heading, HStack, Input, SimpleGrid, Spinner, Switch, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Checkbox, Field, Heading, HStack, Input, SegmentGroup, SimpleGrid, Spinner, Switch, Tabs, Text, VStack } from "@chakra-ui/react";
 import { formatDateTime } from "@job-hunter/shared";
 import type { AppSettings } from "@job-hunter/types";
-import { Database, Save } from "lucide-react";
+import { LogIn, LogOut, Save, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ErrorBanner, InfoBanner, PageHeader, Panel } from "../components/common";
 import { MobileAppSettings } from "../components/MobileAppSettings";
 import { LogViewer } from "./Agent";
-import { useClearMongo, useConfigureMongo, useSaveSettings, useSettings, useSetupStatus, useSyncStatus, useTestMongo } from "../lib/queries";
+import { useBackendLogin, useBackendLogout, useBackendRegister, useSaveSettings, useSettings, useSetupStatus, useSyncStatus, useTestBackend } from "../lib/queries";
 
 export function SettingsPage() {
   const settingsQ = useSettings();
@@ -39,9 +39,9 @@ export function SettingsPage() {
         }
       />
       <ErrorBanner error={save.error} />
-      <Tabs.Root defaultValue="mongo" variant="line" size="sm" lazyMount unmountOnExit>
+      <Tabs.Root defaultValue="backend" variant="line" size="sm" lazyMount unmountOnExit>
         <Tabs.List mb={4}>
-          <Tabs.Trigger value="mongo">MongoDB Atlas</Tabs.Trigger>
+          <Tabs.Trigger value="backend">Backend account</Tabs.Trigger>
           <Tabs.Trigger value="sources">Job sources</Tabs.Trigger>
           <Tabs.Trigger value="agent">Agent</Tabs.Trigger>
           <Tabs.Trigger value="resume">Resume</Tabs.Trigger>
@@ -50,8 +50,8 @@ export function SettingsPage() {
           <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
         </Tabs.List>
 
-        <Tabs.Content value="mongo">
-          <MongoSettings database={draft.mongodbDatabase} onDatabaseChange={(v) => update((s) => { s.mongodbDatabase = v; })} />
+        <Tabs.Content value="backend">
+          <BackendSettingsPanel />
         </Tabs.Content>
 
         <Tabs.Content value="sources">
@@ -156,57 +156,100 @@ export function SettingsPage() {
   );
 }
 
-function MongoSettings({ database, onDatabaseChange }: { database: string; onDatabaseChange: (v: string) => void }) {
+function BackendSettingsPanel() {
   const sync = useSyncStatus();
-  const configure = useConfigureMongo();
-  const test = useTestMongo();
-  const clear = useClearMongo();
-  const [uri, setUri] = useState("");
-  const [db, setDb] = useState(database);
-  useEffect(() => setDb(database), [database]);
-  const s = sync.data;
+  const settings = useSettings();
+  if (!sync.data || !settings.data) return sync.error ? <ErrorBanner error={sync.error} /> : <Spinner size="sm" />;
+  return sync.data.configured ? <BackendConnectedView status={sync.data} /> : <BackendSignInForm defaultDeviceName={settings.data.backend.deviceName} />;
+}
+
+function BackendSignInForm({ defaultDeviceName }: { defaultDeviceName: string }) {
+  const [mode, setMode] = useState<"register" | "login">("register");
+  const [backendUrl, setBackendUrl] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [deviceName, setDeviceName] = useState(defaultDeviceName);
+  const [allowInsecure, setAllowInsecure] = useState(false);
+  const register = useBackendRegister();
+  const login = useBackendLogin();
+  const test = useTestBackend();
+  const active = mode === "register" ? register : login;
+  const isInsecureUrl = backendUrl.trim().length > 0 && backendUrl.trim().startsWith("http://");
+
+  const submit = () => {
+    const args = { backendUrl: backendUrl.trim(), email: email.trim(), password, deviceName: deviceName.trim() || undefined, allowInsecure };
+    active.mutate(args);
+  };
+
   return (
-    <VStack align="stretch" gap={4}>
-      <Panel title="Connection">
-        <Text fontSize="sm" color="fg.muted" mb={4}>
-          The connection string is stored in your operating system&apos;s credential manager, never in a file. Data is always kept locally and synced to Atlas when it is reachable.
-        </Text>
-        <ErrorBanner error={configure.error ?? test.error ?? clear.error} />
-        {test.data ? <InfoBanner status="success">Connected to {test.data}</InfoBanner> : null}
-        {configure.isSuccess ? <InfoBanner status="success">Saved. Existing local data has been queued for upload.</InfoBanner> : null}
-        <Field.Root mb={3}>
-          <Field.Label>Connection string (mongodb+srv://…)</Field.Label>
-          <Input type="password" value={uri} placeholder={s?.configured ? "•••••••• (configured)" : "mongodb+srv://user:password@cluster.mongodb.net/"} onChange={(e) => setUri(e.target.value)} />
+    <Panel title="Backend account">
+      <Text fontSize="sm" color="fg.muted" mb={4}>
+        Sign in to your self-hosted <code>@job-hunter/backend</code> (see <code>apps/backend</code> and <code>docs/backend.md</code>). It owns your MongoDB Atlas data directly, so the mobile app can read your jobs and applications even when this desktop is offline. Data is always kept locally first and synced when the backend is reachable; you can skip this entirely and stay local-only.
+      </Text>
+      <ErrorBanner error={register.error ?? login.error ?? test.error} />
+      {test.isSuccess ? <InfoBanner status="success">Backend reachable.</InfoBanner> : null}
+      <VStack align="stretch" gap={3} maxW="480px">
+        <SegmentGroup.Root value={mode} onValueChange={(e) => setMode((e.value as "register" | "login") ?? "register")} size="sm">
+          <SegmentGroup.Indicator />
+          <SegmentGroup.Items items={[{ value: "register", label: "Create account" }, { value: "login", label: "Sign in" }]} />
+        </SegmentGroup.Root>
+        <Field.Root>
+          <Field.Label>Backend server address</Field.Label>
+          <Input placeholder="https://backend.example.com" value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} />
         </Field.Root>
-        <Field.Root mb={4} maxW="320px">
-          <Field.Label>Database name</Field.Label>
-          <Input value={db} onChange={(e) => { setDb(e.target.value); onDatabaseChange(e.target.value); }} />
+        <Field.Root>
+          <Field.Label>Email</Field.Label>
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field.Root>
+        <Field.Root>
+          <Field.Label>Password</Field.Label>
+          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={mode === "register" ? "At least 8 characters" : undefined} />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>This computer&apos;s name</Field.Label>
+          <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="e.g. Work Laptop" />
+        </Field.Root>
+        {isInsecureUrl ? (
+          <Checkbox.Root checked={allowInsecure} onCheckedChange={(e) => setAllowInsecure(!!e.checked)} size="sm">
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label>This address is not encrypted (http://). I understand and want to use it anyway (local testing only).</Checkbox.Label>
+          </Checkbox.Root>
+        ) : null}
         <HStack>
-          <Button variant="outline" onClick={() => test.mutate({ uri, database: db })} loading={test.isPending} disabled={!uri}>
+          <Button variant="outline" onClick={() => test.mutate({ backendUrl: backendUrl.trim(), allowInsecure })} loading={test.isPending} disabled={!backendUrl.trim() || (isInsecureUrl && !allowInsecure)}>
             Test connection
           </Button>
-          <Button colorPalette="brand" onClick={() => configure.mutate({ uri, database: db }, { onSuccess: () => setUri("") })} loading={configure.isPending} disabled={!uri}>
-            <Database size={14} /> Save &amp; connect
+          <Button colorPalette="brand" onClick={submit} loading={active.isPending} disabled={!backendUrl.trim() || !email.trim() || password.length < 8 || (isInsecureUrl && !allowInsecure)}>
+            {mode === "register" ? <UserPlus size={14} /> : <LogIn size={14} />}
+            {mode === "register" ? "Create account & connect" : "Sign in & connect"}
           </Button>
-          {s?.configured ? (
-            <Button variant="ghost" colorPalette="red" onClick={() => clear.mutate()} loading={clear.isPending}>
-              Remove connection
-            </Button>
-          ) : null}
         </HStack>
-      </Panel>
-      <Panel title="Sync status">
-        {s ? (
-          <SimpleGrid columns={{ base: 2, md: 4 }} gap={3} fontSize="sm">
-            <Box><Text color="fg.muted">Configured</Text><Text fontWeight="semibold">{s.configured ? "Yes" : "No"}</Text></Box>
-            <Box><Text color="fg.muted">Connected</Text><Text fontWeight="semibold" color={s.connected ? "green.fg" : s.configured ? "orange.fg" : undefined}>{s.connected ? "Yes" : s.configured ? "Offline" : "—"}</Text></Box>
-            <Box><Text color="fg.muted">Pending changes</Text><Text fontWeight="semibold">{s.pending}</Text></Box>
-            <Box><Text color="fg.muted">Last sync</Text><Text fontWeight="semibold">{s.lastSyncAt ? formatDateTime(s.lastSyncAt) : "Never"}</Text></Box>
-            {s.target ? <Box gridColumn="span 2"><Text color="fg.muted">Target</Text><Text fontFamily="mono" fontSize="xs">{s.target}</Text></Box> : null}
-            {s.lastError ? <Box gridColumn="span 2"><Text color="fg.muted">Last error</Text><Text color="orange.fg">{s.lastError}</Text></Box> : null}
-          </SimpleGrid>
-        ) : <Spinner size="sm" />}
+      </VStack>
+    </Panel>
+  );
+}
+
+function BackendConnectedView({ status: s }: { status: NonNullable<ReturnType<typeof useSyncStatus>["data"]> }) {
+  const logout = useBackendLogout();
+  return (
+    <VStack align="stretch" gap={4}>
+      <Panel
+        title="Backend account"
+        action={
+          <Button size="xs" variant="outline" colorPalette="red" onClick={() => logout.mutate()} loading={logout.isPending}>
+            <LogOut size={12} /> Sign out
+          </Button>
+        }
+      >
+        <ErrorBanner error={logout.error} />
+        <SimpleGrid columns={{ base: 2, md: 4 }} gap={3} fontSize="sm">
+          <Box><Text color="fg.muted">Connected</Text><Text fontWeight="semibold" color={s.connected ? "green.fg" : "orange.fg"}>{s.connected ? "Yes" : "Offline"}</Text></Box>
+          <Box><Text color="fg.muted">Pending changes</Text><Text fontWeight="semibold">{s.pending}</Text></Box>
+          <Box><Text color="fg.muted">Last sync</Text><Text fontWeight="semibold">{s.lastSyncAt ? formatDateTime(s.lastSyncAt) : "Never"}</Text></Box>
+          {s.target ? <Box gridColumn="span 2"><Text color="fg.muted">Account</Text><Text fontFamily="mono" fontSize="xs">{s.target}</Text></Box> : null}
+          {s.lastError ? <Box gridColumn="span 2"><Text color="fg.muted">Last error</Text><Text color="orange.fg">{s.lastError}</Text></Box> : null}
+        </SimpleGrid>
       </Panel>
     </VStack>
   );

@@ -37,7 +37,7 @@ pub struct AppContext {
 pub struct SetupStatus {
     pub claude: ClaudeStatus,
     pub chrome: ChromeStatus,
-    pub mongo: SyncStatus,
+    pub backend: SyncStatus,
     pub profile: ProfileCompleteness,
     pub mock_mode: bool,
     pub setup_completed: bool,
@@ -125,7 +125,8 @@ impl AppContext {
         let sync = SyncWorker::new(
             store.clone(),
             secrets.clone(),
-            settings.mongodb_database.clone(),
+            settings.backend.backend_url.clone(),
+            settings.backend.account_email.clone(),
         );
         tokio::spawn(sync.clone().run());
         let ctx = Arc::new(Self {
@@ -190,9 +191,14 @@ impl AppContext {
         incoming.resume.ats_max_iterations = incoming.resume.ats_max_iterations.clamp(1, 3);
         let previous = self.settings().await;
         incoming.save(&self.paths.settings_file())?;
-        if previous.mongodb_database != incoming.mongodb_database {
+        if previous.backend.backend_url != incoming.backend.backend_url {
             self.sync
-                .set_database(incoming.mongodb_database.clone())
+                .set_backend_url(incoming.backend.backend_url.clone())
+                .await;
+        }
+        if previous.backend.account_email != incoming.backend.account_email {
+            self.sync
+                .set_account_email(incoming.backend.account_email.clone())
                 .await;
         }
         if previous.mock_mode != incoming.mock_mode
@@ -274,7 +280,7 @@ impl AppContext {
         SetupStatus {
             claude: self.claude_status().await,
             chrome: self.chrome_status().await,
-            mongo: self.sync.status().await,
+            backend: self.sync.status().await,
             profile: profile.completeness(),
             mock_mode: settings.mock_mode,
             setup_completed: settings.setup_completed,

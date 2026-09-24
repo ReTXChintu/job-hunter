@@ -33,9 +33,9 @@ You can verify the integration outside Job Hunter:
 claude --chrome
 ```
 
-## 5. Configure MongoDB Atlas (optional)
+## 5. Sign in to a backend account (optional)
 
-See [mongodb.md](mongodb.md). Paste the `mongodb+srv://` connection string in **Settings → MongoDB Atlas** or in the setup wizard. It is stored in your OS credential manager.
+See [backend.md](backend.md) and [mongodb.md](mongodb.md). If you've self-hosted `apps/backend`, sign in from **Settings → Backend account** or the setup wizard with its address, email and password. This is entirely optional; the app works local-only without it.
 
 ## 6. Start Job Hunter
 
@@ -55,7 +55,7 @@ The wizard walks through:
 1. Check Claude CLI
 2. Check Claude authentication
 3. Check Chrome + Claude in Chrome
-4. Configure MongoDB Atlas (skippable)
+4. Sign in to a backend account (skippable)
 5. Import master resume (PDF or DOCX). The original file is copied to `resumes/master/` and never modified; its text is extracted for Claude. **Fill profile with Claude** parses it into structured experience, projects, skills and education.
 6. Configure candidate profile: name, email, target roles and skills are required.
 

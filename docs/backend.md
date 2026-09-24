@@ -5,12 +5,14 @@ directly, so the mobile app can read jobs and applications without the
 desktop being online, and so the desktop's own persistence eventually goes
 through one place instead of talking to MongoDB directly from Rust.
 
-**Status: built and tested as a standalone service. Not yet wired into the
-desktop app or the mobile app.** Today, both apps still use
+**Status: the desktop app signs in to this backend and syncs its local
+data through it (Settings → Backend account, or Setup step 4) instead of
+talking to MongoDB directly.** This is entirely optional -- skip it and
+the app stays local-only, exactly as before. The **mobile app is not yet**
+pointed at this backend: it still uses
 [`job-hunter-relay`](../crates/job-hunter-relay) (see
-[`relay.md`](relay.md)) exactly as before -- this document describes the
-new backend and the integration work still ahead of it, not something
-already live. See "Rollout plan" below.
+[`relay.md`](relay.md)) for accounts, pairing and presence. See "Rollout
+plan" below for what's left.
 
 ## Why this exists
 
@@ -64,10 +66,11 @@ and presence.
 It adds two things the relay never had:
 
 1. **A generic data API** -- `PUT`/`DELETE`/`GET /v1/data/:collection[/:id]`,
-   scoped to the authenticated account, mirroring
-   `crates/job-hunter-core/src/store/mongo.rs`'s `upsert`/`delete`/`fetch_all`
-   operations exactly. This is the seam the Rust sync layer will call
-   through in Phase 2 instead of the MongoDB driver directly.
+   scoped to the authenticated account, mirroring what the desktop's old
+   direct MongoDB driver calls used to do (`upsert`/`delete`/`fetch_all`).
+   This is the seam `crates/job-hunter-core/src/store/backend.rs` calls
+   through instead of the MongoDB driver directly -- see "The Rust side"
+   below.
 2. **Direct read views** -- `GET /v1/applications` and
    `GET /v1/applications/:id`, returning the same joined
    `ApplicationListItem`/`ApplicationDetail` shape `packages/types` and the
@@ -101,46 +104,47 @@ produces a runnable `dist/index.js`. There is no automated test against a
 real MongoDB Atlas cluster -- verify manually before depending on it in
 production.
 
-## Rollout plan
+## The Rust side (Phase 2, desktop half -- done)
 
-Phase 1 (done, this document's subject) is additive and safe: it changes
-nothing about how the desktop or mobile app currently behave.
+`crates/job-hunter-core/src/store/backend.rs` replaced
+`store/mongo.rs` entirely: same three operations
+(`upsert`/`delete`/`fetch_all`), same call sites in `store/sync.rs`
+(`SyncWorker::pull_all`/`flush`), just an HTTP client against
+`/v1/data/...` with a stored device token instead of the MongoDB driver.
+The local JSON-on-disk store (`store/local.rs`) and its sync queue are
+unchanged -- the desktop still works fully offline; signing in only adds
+somewhere for the existing queue to flush to.
 
-**Phase 2 (not started)** is the actual integration, and it's substantial
-enough to do as its own deliberate piece of work rather than bundled in
-with standing the backend up:
+`SyncWorker::configure()` no longer takes a raw MongoDB connection string.
+It takes a backend URL, email and password, and does the same
+register-or-login → register-device flow the mobile app's `AuthController`
+does (`POST /v1/auth/register|login` → `POST /v1/devices/register`),
+storing only the resulting device token (`secrets::BACKEND_DEVICE_TOKEN_KEY`)
+-- never the password. This is Settings → Backend account (and Setup step
+4) in the desktop UI, backed by the `test_backend`/`backend_register`/
+`backend_login`/`backend_logout` Tauri commands.
 
-1. **The Rust side.** `crates/job-hunter-core/src/store/mongo.rs` wraps
-   exactly the operations this backend's data API exposes
-   (`upsert`/`delete`/`fetch_all`). Swap it for an HTTP client hitting
-   `/v1/data/...` with a stored device token, alongside the existing local
-   JSON-on-disk store (`store/local.rs`) and its sync queue
-   (`store/sync.rs`) -- the desktop keeps working offline exactly as it
-   does today, syncing to this backend instead of to MongoDB directly, the
-   moment it's reachable.
-2. **Desktop login.** The desktop currently has no account of its own;
-   `SyncWorker.configure()` takes a raw MongoDB connection string. That
-   becomes "sign in to your Job Hunter account" (the same account system
-   this backend already provides), issuing the desktop a device token the
-   same way `/v1/devices/register` already does for the relay today.
-3. **Mobile app.** Point `ApiClient`/`RelayClient` at this backend's URL
+Tested end-to-end in `crates/job-hunter-core/tests/backend_sync.rs`
+against a real minimal HTTP server (not a mock) implementing the same
+routes this backend exposes: sign-in, push a local write, pull a
+remote-only write down, delete-and-sync, and a revoked-token failure path.
+
+## What's left
+
+1. **Mobile app.** Point `ApiClient`/`RelayClient` at this backend's URL
    instead of the relay's, and add direct calls to `GET /v1/applications`
    / `GET /v1/applications/:id` for the read side, so the app works even
    when the desktop is unreachable -- exactly the capability this backend
    was built to add. Approve/reject/apply/answer-questions can stay live
    WebSocket requests to a connected desktop (unchanged), or move to plain
-   writes through the data API that the desktop picks up next time it's
-   running -- a real design choice to make deliberately in Phase 2, not
-   something Phase 1 commits to.
-4. **Retire `job-hunter-relay`.** Once Phase 2 is live, the relay crate's
-   accounts/devices/pairing/WebSocket-hub role is fully superseded by this
-   backend (whose `auth.ts`/`hub.ts` are direct ports of the relay's own
-   `auth.rs`/`hub.rs`) -- it can be removed rather than run alongside it.
-
-Each of those is its own real chunk of work touching a different part of
-the codebase (Rust core, Tauri UI, Flutter app respectively); Phase 1
-deliberately stops short of them so the backend lands as a complete,
-verified piece rather than a half-migrated one.
+   writes through the data API that the desktop's own sync worker already
+   picks up and reacts to next time it's running -- a real design choice
+   to make deliberately, not something already committed to.
+2. **Retire `job-hunter-relay`.** Once the mobile app is pointed here, the
+   relay crate's accounts/devices/pairing/WebSocket-hub role is fully
+   superseded by this backend (whose `auth.ts`/`hub.ts` are direct ports
+   of the relay's own `auth.rs`/`hub.rs`) -- it can be removed rather than
+   run alongside it.
 
 ## Deploying it
 

@@ -4,7 +4,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Check, ChevronRight, CircleAlert, RefreshCw } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { ErrorBanner, InfoBanner } from "../components/common";
-import { useConfigureMongo, useImportMasterResume, useOpenUrl, useParseMasterResume, useSaveSettings, useSettings, useSetupStatus, useStartJobHunt } from "../lib/queries";
+import { useBackendRegister, useImportMasterResume, useOpenUrl, useParseMasterResume, useSaveSettings, useSettings, useSetupStatus, useStartJobHunt } from "../lib/queries";
 
 function Step({ n, title, ok, warn, children }: { n: number; title: string; ok: boolean; warn?: boolean; children: ReactNode }) {
   return (
@@ -26,22 +26,23 @@ export function SetupPage() {
   const setup = useSetupStatus();
   const settings = useSettings();
   const saveSettings = useSaveSettings();
-  const configure = useConfigureMongo();
+  const register = useBackendRegister();
   const importResume = useImportMasterResume();
   const parse = useParseMasterResume();
   const start = useStartJobHunt();
   const openUrl = useOpenUrl();
   const navigate = useNavigate();
-  const [uri, setUri] = useState("");
-  const [db, setDb] = useState("job_hunter");
-  const [mongoSkipped, setMongoSkipped] = useState(false);
+  const [backendUrl, setBackendUrl] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [backendSkipped, setBackendSkipped] = useState(false);
   const s = setup.data;
   if (!s) return setup.error ? <ErrorBanner error={setup.error} onRetry={() => setup.refetch()} /> : <Spinner />;
 
   const mock = s.mockMode;
   const claudeOk = mock || (s.claude.installed && s.claude.authenticated);
   const chromeOk = mock || (s.chrome.installed && s.chrome.extensionInstalled);
-  const mongoOk = s.mongo.configured;
+  const backendOk = s.backend.configured;
   const resumeOk = s.profile.hasMasterResume;
   const profileOk = s.profile.ready;
   const allReady = claudeOk && chromeOk && profileOk;
@@ -70,7 +71,7 @@ export function SetupPage() {
           Claude and Chrome are simulated with fixture data. Turn it off in Settings → Agent for real job hunts.
         </InfoBanner>
       ) : null}
-      <ErrorBanner error={configure.error ?? importResume.error ?? parse.error ?? saveSettings.error ?? start.error} />
+      <ErrorBanner error={register.error ?? importResume.error ?? parse.error ?? saveSettings.error ?? start.error} />
 
       <Step n={1} title="Check Claude CLI" ok={s.claude.installed || mock} warn={!s.claude.installed && !mock}>
         {s.claude.installed ? (
@@ -135,28 +136,40 @@ export function SetupPage() {
         ) : null}
       </Step>
 
-      <Step n={4} title="Configure MongoDB Atlas" ok={mongoOk} warn={!mongoOk && mongoSkipped}>
-        {mongoOk ? (
+      <Step n={4} title="Sign in to your backend (optional)" ok={backendOk} warn={!backendOk && backendSkipped}>
+        {backendOk ? (
           <Text fontSize="sm" color="fg.muted">
-            Connected to {s.mongo.target}. Everything is stored locally and mirrored to Atlas.
+            Connected as {s.backend.target}. Everything is stored locally and synced to your backend.
           </Text>
         ) : (
           <VStack align="stretch" gap={2} maxW="560px">
             <Text fontSize="sm" color="fg.muted">
-              Paste your Atlas connection string. It is kept in the OS credential store. You can skip this and stay local-only for now.
+              Sign in to your self-hosted <code>@job-hunter/backend</code> (see <code>docs/backend.md</code>) so the mobile app can read your data even when this desktop is offline. Your password is kept in the OS credential store, never in a file. You can skip this and stay local-only for now, and set it up later in Settings.
             </Text>
             <Field.Root>
-              <Input size="sm" type="password" placeholder="mongodb+srv://user:password@cluster.mongodb.net/" value={uri} onChange={(e) => setUri(e.target.value)} />
+              <Input size="sm" placeholder="https://backend.example.com" value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} />
             </Field.Root>
             <HStack>
-              <Input size="sm" w="200px" value={db} onChange={(e) => setDb(e.target.value)} />
-              <Button size="sm" colorPalette="brand" onClick={() => configure.mutate({ uri, database: db })} loading={configure.isPending} disabled={!uri}>
-                Configure
+              <Input size="sm" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input size="sm" type="password" placeholder="Password (min 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </HStack>
+            <HStack>
+              <Button
+                size="sm"
+                colorPalette="brand"
+                onClick={() => register.mutate({ backendUrl: backendUrl.trim(), email: email.trim(), password })}
+                loading={register.isPending}
+                disabled={!backendUrl.trim() || !email.trim() || password.length < 8}
+              >
+                Create account &amp; connect
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setMongoSkipped(true)}>
+              <Button size="sm" variant="ghost" onClick={() => setBackendSkipped(true)}>
                 Skip for now
               </Button>
             </HStack>
+            <Text fontSize="xs" color="fg.muted">
+              Already have an account? Sign in from Settings → Backend account instead.
+            </Text>
           </VStack>
         )}
       </Step>
