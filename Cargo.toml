@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "crates/job-hunter-core",
+  "crates/job-hunter-relay",
   "apps/desktop/src-tauri",
 ]
 

@@ -1,0 +1,41 @@
+[package]
+name = "job-hunter-relay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Job Hunter relay: account/device identity, presence and message routing for the mobile companion app. No AI, no job data at rest."
+
+[lib]
+name = "job_hunter_relay"
+path = "src/lib.rs"
+
+[[bin]]
+name = "job-hunter-relay"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+once_cell.workspace = true
+dotenvy = "0.15"
+axum = { version = "0.8", features = ["ws", "macros"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "limit"] }
+rusqlite = { version = "0.40", features = ["bundled", "chrono"] }
+argon2 = "0.6"
+jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto"] }
+getrandom = "0.4"
+sha2 = "0.10"
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+tokio-tungstenite = "0.30"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tempfile = "3"
