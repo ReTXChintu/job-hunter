@@ -1,0 +1,28 @@
+name: job_hunter_mobile
+description: "Job Hunter companion app: review discovered jobs and approve or reject applications from your phone. All AI, browser automation and job data stay on the desktop app -- this is a thin, read-mostly review client for the self-hosted relay (see docs/mobile-protocol.md)."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.5+1
+  go_router: ^18.0.1
+  dio: ^5.11.1
+  web_socket_channel: ^3.0.3
+  flutter_secure_storage: ^11.2.0
+  shared_preferences: ^2.5.5
+  mobile_scanner: ^7.4.2
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
