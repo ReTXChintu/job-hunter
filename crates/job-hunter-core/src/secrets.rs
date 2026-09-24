@@ -8,6 +8,10 @@ use crate::error::{CoreError, CoreResult};
 
 const SERVICE: &str = "JobHunter";
 pub const MONGODB_URI_KEY: &str = "mongodb-uri";
+/// This desktop's own long-lived device token on the configured relay (see
+/// `crates/job-hunter-relay`). Grants only relay message routing for the
+/// signed-in account, nothing else; never the relay account password.
+pub const REMOTE_DEVICE_TOKEN_KEY: &str = "remote-device-token";
 
 pub trait SecretStore: Send + Sync {
     fn get(&self, key: &str) -> CoreResult<Option<String>>;

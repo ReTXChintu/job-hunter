@@ -19,6 +19,7 @@ pub mod error;
 pub mod logging;
 pub mod paths;
 pub mod prompts;
+pub mod remote;
 pub mod secrets;
 pub mod settings;
 pub mod store;

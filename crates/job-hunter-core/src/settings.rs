@@ -36,6 +36,52 @@ pub struct AppSettings {
     pub setup_completed: bool,
     #[serde(default)]
     pub minimum_match_score: u8,
+    #[serde(default)]
+    pub remote: RemoteSettings,
+}
+
+/// Non-secret configuration for the mobile companion app connection. The
+/// device token issued by the relay lives in the OS credential store (see
+/// `secrets::REMOTE_DEVICE_TOKEN_KEY`), never here.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteSettings {
+    /// Base URL of a self-hosted `job-hunter-relay` instance, e.g.
+    /// `https://relay.example.com`. Empty means the mobile companion app is
+    /// not configured.
+    #[serde(default)]
+    pub relay_url: String,
+    /// Display-only: the signed-in account's email, shown in Settings.
+    #[serde(default)]
+    pub account_email: String,
+    /// This desktop's own device id on the relay, once registered.
+    #[serde(default)]
+    pub device_id: Option<String>,
+    /// Name this desktop registered itself under (shown in the phone's
+    /// presence banner and this desktop's own device list).
+    #[serde(default = "default_device_name")]
+    pub device_name: String,
+}
+
+impl Default for RemoteSettings {
+    fn default() -> Self {
+        Self {
+            relay_url: String::new(),
+            account_email: String::new(),
+            device_id: None,
+            device_name: default_device_name(),
+        }
+    }
+}
+
+fn default_device_name() -> String {
+    hostname_or_default()
+}
+
+fn hostname_or_default() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "My Computer".into())
 }
 
 fn default_db_name() -> String {
@@ -76,6 +122,7 @@ impl Default for AppSettings {
             mock_mode: false,
             setup_completed: false,
             minimum_match_score: 60,
+            remote: RemoteSettings::default(),
         }
     }
 }

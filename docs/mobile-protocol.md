@@ -63,20 +63,26 @@ Base path `/v1`. All bodies and responses are JSON. Errors are
 | `POST /auth/refresh` | none | `{refreshToken}` | `{accessToken, refreshToken}` (rotated) |
 | `POST /auth/logout` | none | `{refreshToken}` | `{}` (revokes that refresh token) |
 | `POST /devices/register` | Bearer accessToken | `{name, kind: "desktop"\|"mobile", platform}` | `{deviceId, deviceToken}` |
-| `GET /devices` | Bearer accessToken | — | `{devices: [{id, name, kind, platform, online, lastSeenAt, createdAt}]}` |
-| `DELETE /devices/:id` | Bearer accessToken | — | `{}` (closes any live socket for that device) |
-| `POST /pairing/create` | Bearer accessToken (desktop's) | `{}` | `{code, expiresAt}` |
+| `GET /devices` | Bearer accessToken **or** deviceToken | — | `{devices: [{id, name, kind, platform, online, lastSeenAt, createdAt}]}` |
+| `DELETE /devices/:id` | Bearer accessToken **or** deviceToken | — | `{}` (closes any live socket for that device) |
+| `POST /pairing/create` | Bearer accessToken **or** deviceToken | `{}` | `{code, expiresAt}` |
 | `POST /pairing/redeem` | none | `{code, name, platform}` | `{deviceId, deviceToken, userId}` |
 | `GET /ws` | `?token=<deviceToken>` query param (WebSocket upgrade) | — | — |
 
-`accessToken` is a short-lived JWT (15 minutes) used only for the REST
-calls above; `refreshToken` is a long-lived opaque token (30 days, rotated
-on use, stored hashed) used to mint new access tokens without asking for
-the password again. `deviceToken` is separate again and is what
-authenticates the WebSocket — it is what both apps persist for day-to-day
-use (desktop and mobile do not keep the password or refresh token around
-after initial login/registration; the device token is enough for
-everything the phone needs afterwards).
+`accessToken` is a short-lived JWT (15 minutes) returned only by
+`/auth/register` and `/auth/login`; `refreshToken` is a long-lived opaque
+token (30 days, rotated on use, stored hashed) that can mint a new
+`accessToken` without the password. Neither app keeps either of these
+around past the moment it registers its one device: `/devices/register` is
+the only call that requires a fresh `accessToken`, and every other
+authenticated endpoint (`GET /devices`, `DELETE /devices/:id`,
+`POST /pairing/create`) also accepts the resulting `deviceToken` in the
+same `Authorization: Bearer` header. So in practice, after that one
+register-or-login call, both desktop and mobile persist only their
+`deviceToken` and never see the password, `accessToken` or `refreshToken`
+again. (`/auth/refresh` exists for a future web dashboard or CLI that
+_does_ want a long session without a device; nothing in this project's
+desktop or mobile app currently calls it.)
 
 ## WebSocket envelope
 

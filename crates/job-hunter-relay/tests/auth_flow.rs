@@ -319,3 +319,61 @@ async fn refresh_token_rotates_and_old_token_stops_working() {
         "a rotated-away refresh token must not work again"
     );
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_device_token_alone_authorizes_device_and_pairing_endpoints() {
+    let (http, _ws) = spawn_server().await;
+    let client = reqwest::Client::new();
+    let reg: Value = client
+        .post(format!("{http}/v1/auth/register"))
+        .json(&json!({"email": "device-auth@example.com", "password": "hunter2222"}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let access_token = reg["accessToken"].as_str().unwrap().to_string();
+    let dev: Value = client
+        .post(format!("{http}/v1/devices/register"))
+        .bearer_auth(&access_token)
+        .json(&json!({"name": "PC", "kind": "desktop", "platform": "windows"}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let desktop_token = dev["deviceToken"].as_str().unwrap().to_string();
+
+    // The desktop never uses its access token again: the device token alone
+    // must be able to list devices, revoke a device, and mint a pairing code.
+    let devices: Value = client
+        .get(format!("{http}/v1/devices"))
+        .bearer_auth(&desktop_token)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(devices["devices"].as_array().unwrap().len(), 1);
+
+    let pairing = client
+        .post(format!("{http}/v1/pairing/create"))
+        .bearer_auth(&desktop_token)
+        .json(&json!({}))
+        .send()
+        .await
+        .unwrap();
+    assert!(pairing.status().is_success());
+
+    // A stale/garbage bearer value is rejected outright.
+    let denied = client
+        .get(format!("{http}/v1/devices"))
+        .bearer_auth("not-a-real-token")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), 401);
+}

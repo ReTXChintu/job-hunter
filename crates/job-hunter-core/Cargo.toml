@@ -39,6 +39,9 @@ docx-rs = "0.4"
 genpdf = "0.2"
 tokio-util = { version = "0.7", features = ["rt"] }
 open = "5"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
+base64 = "0.23"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
@@ -51,3 +54,5 @@ keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+job-hunter-relay = { path = "../job-hunter-relay" }
+axum = { version = "0.8", features = ["ws"] }
