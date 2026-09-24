@@ -80,6 +80,7 @@ pub struct RemoteClient {
     app: Arc<AppContext>,
     http: reqwest::Client,
     status: RwLock<RemoteStatus>,
+    status_tx: broadcast::Sender<RemoteStatus>,
     kick: Notify,
     cancel_current: Mutex<Option<CancellationToken>>,
 }
@@ -90,13 +91,22 @@ impl RemoteClient {
             .timeout(Duration::from_secs(20))
             .build()
             .unwrap_or_default();
+        let (status_tx, _) = broadcast::channel(32);
         Arc::new(Self {
             app,
             http,
             status: RwLock::new(RemoteStatus::default()),
+            status_tx,
             kick: Notify::new(),
             cancel_current: Mutex::new(None),
         })
+    }
+
+    /// Live updates whenever the connection or account state changes
+    /// (connected/disconnected, signed in/out, an error) -- the desktop UI
+    /// forwards these as a Tauri event the same way it does `sync:status`.
+    pub fn subscribe(&self) -> broadcast::Receiver<RemoteStatus> {
+        self.status_tx.subscribe()
     }
 
     pub async fn status(&self) -> RemoteStatus {
@@ -107,6 +117,10 @@ impl RemoteClient {
         s.account_email = settings.remote.account_email;
         s.device_name = settings.remote.device_name;
         s
+    }
+
+    async fn publish_status(&self) {
+        let _ = self.status_tx.send(self.status().await);
     }
 
     fn has_device_token(&self) -> bool {
@@ -186,6 +200,7 @@ impl RemoteClient {
         self.app.save_settings(settings).await?;
         tracing::info!("signed in to the mobile relay");
         self.kick();
+        self.publish_status().await;
         Ok(())
     }
 
@@ -257,6 +272,7 @@ impl RemoteClient {
             s.last_error = None;
         }
         self.kick();
+        self.publish_status().await;
         Ok(())
     }
 
@@ -330,17 +346,23 @@ impl RemoteClient {
 
     async fn record_error(&self, e: &CoreError) {
         tracing::warn!(error = %e, "mobile relay connection failed; will retry");
-        let mut s = self.status.write().await;
-        s.connected = false;
-        s.last_error = Some(e.user_message());
+        {
+            let mut s = self.status.write().await;
+            s.connected = false;
+            s.last_error = Some(e.user_message());
+        }
+        self.publish_status().await;
     }
 
     async fn set_connected(&self, connected: bool) {
-        let mut s = self.status.write().await;
-        s.connected = connected;
-        if connected {
-            s.last_error = None;
+        {
+            let mut s = self.status.write().await;
+            s.connected = connected;
+            if connected {
+                s.last_error = None;
+            }
         }
+        self.publish_status().await;
     }
 
     /// Long-running loop: spawn with `tokio::spawn(client.clone().run())`.

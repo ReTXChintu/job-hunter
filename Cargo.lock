@@ -3015,6 +3015,7 @@ dependencies = [
 name = "job-hunter-desktop"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "dotenvy",
  "job-hunter-core",
  "serde",

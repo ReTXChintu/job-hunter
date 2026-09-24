@@ -11,12 +11,15 @@ use job_hunter_core::context::{
 use job_hunter_core::domain::*;
 use job_hunter_core::error::UserFacingError;
 use job_hunter_core::logging::{LogEntry, LogLevel};
+use job_hunter_core::remote::{RemoteClient, RemoteDevice, RemoteStatus};
 use job_hunter_core::settings::AppSettings;
 use job_hunter_core::store::SyncStatus;
 use job_hunter_core::AppContext;
+use serde::Serialize;
 use tauri::State;
 
 type Ctx<'a> = State<'a, Arc<AppContext>>;
+type RemoteCtx<'a> = State<'a, Arc<RemoteClient>>;
 type R<T> = Result<T, UserFacingError>;
 
 // ---- setup / settings -------------------------------------------------------
@@ -468,4 +471,104 @@ pub async fn open_path(ctx: Ctx<'_>, path: String) -> R<()> {
 #[tauri::command]
 pub async fn get_dashboard(ctx: Ctx<'_>) -> R<Dashboard> {
     ctx.dashboard().await.map_err(Into::into)
+}
+
+// ---- mobile companion app (relay) ------------------------------------------------------------
+
+#[derive(Serialize)]
+pub struct PairingCode {
+    code: String,
+    expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+async fn set_device_name(ctx: &Arc<AppContext>, name: Option<String>) -> R<()> {
+    let Some(name) = name.map(|n| n.trim().to_string()).filter(|n| !n.is_empty()) else {
+        return Ok(());
+    };
+    let mut settings = ctx.settings().await;
+    settings.remote.device_name = name;
+    ctx.save_settings(settings)
+        .await
+        .map_err(UserFacingError::from)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_remote_status(remote: RemoteCtx<'_>) -> R<RemoteStatus> {
+    Ok(remote.status().await)
+}
+
+#[tauri::command]
+pub async fn remote_register(
+    ctx: Ctx<'_>,
+    remote: RemoteCtx<'_>,
+    relay_url: String,
+    email: String,
+    password: String,
+    device_name: Option<String>,
+    allow_insecure: Option<bool>,
+) -> R<RemoteStatus> {
+    set_device_name(&ctx, device_name).await?;
+    remote
+        .register(
+            &relay_url,
+            &email,
+            &password,
+            allow_insecure.unwrap_or(false),
+        )
+        .await
+        .map_err(UserFacingError::from)?;
+    Ok(remote.status().await)
+}
+
+#[tauri::command]
+pub async fn remote_login(
+    ctx: Ctx<'_>,
+    remote: RemoteCtx<'_>,
+    relay_url: String,
+    email: String,
+    password: String,
+    device_name: Option<String>,
+    allow_insecure: Option<bool>,
+) -> R<RemoteStatus> {
+    set_device_name(&ctx, device_name).await?;
+    remote
+        .login(
+            &relay_url,
+            &email,
+            &password,
+            allow_insecure.unwrap_or(false),
+        )
+        .await
+        .map_err(UserFacingError::from)?;
+    Ok(remote.status().await)
+}
+
+#[tauri::command]
+pub async fn remote_logout(remote: RemoteCtx<'_>) -> R<RemoteStatus> {
+    remote.logout().await.map_err(UserFacingError::from)?;
+    Ok(remote.status().await)
+}
+
+#[tauri::command]
+pub async fn remote_create_pairing_code(remote: RemoteCtx<'_>) -> R<PairingCode> {
+    let (code, expires_at) = remote
+        .create_pairing_code()
+        .await
+        .map_err(UserFacingError::from)?;
+    Ok(PairingCode { code, expires_at })
+}
+
+#[tauri::command]
+pub async fn remote_list_devices(remote: RemoteCtx<'_>) -> R<Vec<RemoteDevice>> {
+    remote.list_devices().await.map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn remote_revoke_device(remote: RemoteCtx<'_>, device_id: String) -> R<RemoteStatus> {
+    remote
+        .revoke_device(&device_id)
+        .await
+        .map_err(UserFacingError::from)?;
+    Ok(remote.status().await)
 }

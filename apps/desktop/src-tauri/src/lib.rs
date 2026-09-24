@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use job_hunter_core::logging::{self, LogBuffer};
 use job_hunter_core::paths::AppPaths;
+use job_hunter_core::remote::RemoteClient;
 use job_hunter_core::AppContext;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -16,6 +17,7 @@ pub const EVENT_AGENT_STATUS: &str = "agent:status";
 pub const EVENT_SYNC_STATUS: &str = "sync:status";
 pub const EVENT_LOG: &str = "log:entry";
 pub const EVENT_DATA_CHANGED: &str = "data:changed";
+pub const EVENT_REMOTE_STATUS: &str = "remote:status";
 
 fn forward_events(app: AppHandle, ctx: Arc<AppContext>) {
     let mut events = ctx.agent.bus.subscribe_events();
@@ -92,6 +94,21 @@ fn forward_events(app: AppHandle, ctx: Arc<AppContext>) {
     });
 }
 
+fn forward_remote_events(app: AppHandle, remote: Arc<RemoteClient>) {
+    let mut status = remote.subscribe();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match status.recv().await {
+                Ok(s) => {
+                    let _ = app.emit(EVENT_REMOTE_STATUS, &s);
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => break,
+            }
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Development convenience: a `.env` in the repo (or any parent directory)
@@ -116,7 +133,11 @@ pub fn run() {
             let ctx =
                 tauri::async_runtime::block_on(AppContext::init(paths.clone(), logs.clone()))?;
             forward_events(handle.clone(), ctx.clone());
+            let remote = RemoteClient::new(ctx.clone());
+            tauri::async_runtime::spawn(remote.clone().run());
+            forward_remote_events(handle.clone(), remote.clone());
             app.manage(ctx);
+            app.manage(remote);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -176,6 +197,13 @@ pub fn run() {
             commands::open_url,
             commands::open_path,
             commands::get_dashboard,
+            commands::get_remote_status,
+            commands::remote_register,
+            commands::remote_login,
+            commands::remote_logout,
+            commands::remote_create_pairing_code,
+            commands::remote_list_devices,
+            commands::remote_revoke_device,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Job Hunter");
