@@ -21,6 +21,8 @@ Data is stored locally under your app data directory and mirrored to MongoDB Atl
 
 An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone. It runs no AI and holds no job data of its own — it's a thin review client that reaches your desktop through a small relay service you self-host, only when you choose to pair it. See [docs/mobile.md](docs/mobile.md) and [docs/relay.md](docs/relay.md).
 
+A self-hosted **Node backend** (`apps/backend`) is also in the repo, built and tested but not yet wired in: it will let the mobile app read jobs and applications directly even when the desktop is offline, and eventually become the one thing that talks to MongoDB Atlas, with the desktop syncing to it the same local-first way it syncs to Atlas today. See [docs/backend.md](docs/backend.md) for what's built and what's still ahead.
+
 ## What it does
 
 1. Import your master resume (PDF/DOCX) and build a candidate profile.
@@ -74,6 +76,8 @@ job-hunter/
 │   ├── src/                 React UI (Vite, Chakra UI, TanStack Query/Router)
 │   └── src-tauri/           Tauri shell: commands + event forwarding
 ├── apps/mobile/             Flutter companion app (review-only, no AI) -- see docs/mobile.md
+├── apps/backend/            Self-hosted Node/Fastify backend (built, not yet wired in) --
+│                            owns MongoDB Atlas data directly -- see docs/backend.md
 ├── crates/job-hunter-core/  Rust core: domain, store + Atlas sync, Claude CLI runner,
 │                            Chrome detection, documents, agent state machine, orchestrator,
 │                            remote/ (dispatches phone requests to the same orchestrator calls)
@@ -106,7 +110,8 @@ job-hunter/
 - [docs/agent.md](docs/agent.md) — state machine, events, commands
 - [docs/workflows.md](docs/workflows.md) — job hunt, approval, application, manual fallback
 - [docs/mobile.md](docs/mobile.md) — the Flutter companion app: what it can/can't do, building it
-- [docs/relay.md](docs/relay.md) — self-hosting the relay the mobile app connects through
+- [docs/relay.md](docs/relay.md) — self-hosting the relay the mobile app connects through today
+- [docs/backend.md](docs/backend.md) — the Node backend that will replace the relay's data path: what's built, what's still ahead
 - [docs/mobile-protocol.md](docs/mobile-protocol.md) — the wire protocol between desktop, relay and phone
 - [docs/security.md](docs/security.md) — what is never stored or logged
 - [docs/development.md](docs/development.md) — commands, mock mode, tests
