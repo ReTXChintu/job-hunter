@@ -476,6 +476,7 @@ pub async fn get_dashboard(ctx: Ctx<'_>) -> R<Dashboard> {
 // ---- mobile companion app (relay) ------------------------------------------------------------
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PairingCode {
     code: String,
     expires_at: chrono::DateTime<chrono::Utc>,

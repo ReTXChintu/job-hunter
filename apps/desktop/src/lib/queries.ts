@@ -2,6 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ResumeDocument } from "@job-hunter/types";
 import { invoke } from "./tauri";
 
+interface RemoteAuthArgs {
+  relayUrl: string;
+  email: string;
+  password: string;
+  deviceName?: string;
+  allowInsecure?: boolean;
+}
+
 export const keys = {
   setup: ["setup"] as const,
   settings: ["settings"] as const,
@@ -22,6 +30,8 @@ export const keys = {
   logs: (level: LogLevel) => ["logs", level] as const,
   dashboard: ["dashboard"] as const,
   file: (path: string) => ["file", path] as const,
+  remoteStatus: ["remoteStatus"] as const,
+  remoteDevices: ["remoteDevices"] as const,
 };
 
 /** Collections → query keys to invalidate when the backend reports a change. */
@@ -242,4 +252,33 @@ export function useOpenUrl() {
 
 export function useOpenPath() {
   return useMutation({ mutationFn: (path: string) => invoke("open_path", { path }) });
+}
+
+// ---- mobile companion app (relay) ------------------------------------------------------------
+
+export const useRemoteStatus = () => useQuery({ queryKey: keys.remoteStatus, queryFn: () => invoke("get_remote_status") });
+export const useRemoteDevices = (enabled: boolean) => useQuery({ queryKey: keys.remoteDevices, queryFn: () => invoke("remote_list_devices"), enabled, refetchInterval: enabled ? 15_000 : false });
+
+export function useRemoteRegister() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (args: RemoteAuthArgs) => invoke("remote_register", args), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
+}
+
+export function useRemoteLogin() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (args: RemoteAuthArgs) => invoke("remote_login", args), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
+}
+
+export function useRemoteLogout() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: () => invoke("remote_logout"), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
+}
+
+export function useRemoteCreatePairingCode() {
+  return useMutation({ mutationFn: () => invoke("remote_create_pairing_code") });
+}
+
+export function useRemoteRevokeDevice() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (deviceId: string) => invoke("remote_revoke_device", { deviceId }), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices]) });
 }

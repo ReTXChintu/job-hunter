@@ -24,7 +24,10 @@ import type {
   LogEntry,
   LogLevel,
   MasterResumeRef,
+  PairingCode,
   Project,
+  RemoteDevice,
+  RemoteStatus,
   Resume,
   ResumeDocument,
   SetupStatus,
@@ -38,6 +41,7 @@ export const EVENTS = {
   syncStatus: "sync:status",
   log: "log:entry",
   dataChanged: "data:changed",
+  remoteStatus: "remote:status",
 } as const;
 
 export interface EventPayloads {
@@ -46,6 +50,7 @@ export interface EventPayloads {
   "sync:status": SyncStatus;
   "log:entry": LogEntry;
   "data:changed": string[];
+  "remote:status": RemoteStatus;
 }
 
 /** Every command: name → { args, result }. */
@@ -114,6 +119,20 @@ export interface Commands {
   open_url: { args: { url: string }; result: null };
   open_path: { args: { path: string }; result: null };
   get_dashboard: { args: Record<string, never>; result: Dashboard };
+
+  get_remote_status: { args: Record<string, never>; result: RemoteStatus };
+  remote_register: {
+    args: { relayUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
+    result: RemoteStatus;
+  };
+  remote_login: {
+    args: { relayUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
+    result: RemoteStatus;
+  };
+  remote_logout: { args: Record<string, never>; result: RemoteStatus };
+  remote_create_pairing_code: { args: Record<string, never>; result: PairingCode };
+  remote_list_devices: { args: Record<string, never>; result: RemoteDevice[] };
+  remote_revoke_device: { args: { deviceId: string }; result: RemoteStatus };
 }
 
 export type CommandName = keyof Commands;

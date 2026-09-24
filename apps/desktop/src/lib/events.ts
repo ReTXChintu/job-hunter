@@ -32,6 +32,11 @@ export function BackendEvents() {
     );
     unlisteners.push(listen("log:entry", (entry) => logFeed.push(entry)));
     unlisteners.push(
+      listen("remote:status", (status) => {
+        qc.setQueryData(keys.remoteStatus, status);
+      }),
+    );
+    unlisteners.push(
       listen("data:changed", (collections) => {
         for (const c of collections) {
           for (const key of COLLECTION_KEYS[c] ?? []) void qc.invalidateQueries({ queryKey: key });

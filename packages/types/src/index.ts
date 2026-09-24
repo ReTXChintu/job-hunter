@@ -632,3 +632,29 @@ export interface JobHuntOptions {
   discoverOnly?: boolean;
   sources?: string[];
 }
+
+// ---- mobile companion app (relay) -----------------------------------------------------
+
+export interface RemoteStatus {
+  configured: boolean;
+  connected: boolean;
+  relayUrl: string;
+  accountEmail: string;
+  deviceName: string;
+  lastError: string | null;
+}
+
+export interface RemoteDevice {
+  id: string;
+  name: string;
+  kind: "desktop" | "mobile";
+  platform: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+  online: boolean;
+}
+
+export interface PairingCode {
+  code: string;
+  expiresAt: string;
+}

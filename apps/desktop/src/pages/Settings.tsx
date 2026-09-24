@@ -4,6 +4,7 @@ import type { AppSettings } from "@job-hunter/types";
 import { Database, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ErrorBanner, InfoBanner, PageHeader, Panel } from "../components/common";
+import { MobileAppSettings } from "../components/MobileAppSettings";
 import { LogViewer } from "./Agent";
 import { useClearMongo, useConfigureMongo, useSaveSettings, useSettings, useSetupStatus, useSyncStatus, useTestMongo } from "../lib/queries";
 
@@ -45,6 +46,7 @@ export function SettingsPage() {
           <Tabs.Trigger value="agent">Agent</Tabs.Trigger>
           <Tabs.Trigger value="resume">Resume</Tabs.Trigger>
           <Tabs.Trigger value="integrations">Claude &amp; Chrome</Tabs.Trigger>
+          <Tabs.Trigger value="mobile">Mobile app</Tabs.Trigger>
           <Tabs.Trigger value="logs">Logs</Tabs.Trigger>
         </Tabs.List>
 
@@ -140,6 +142,10 @@ export function SettingsPage() {
 
         <Tabs.Content value="integrations">
           <IntegrationSettings draft={draft} update={update} />
+        </Tabs.Content>
+
+        <Tabs.Content value="mobile">
+          <MobileAppSettings />
         </Tabs.Content>
 
         <Tabs.Content value="logs">
