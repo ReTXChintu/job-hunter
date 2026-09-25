@@ -83,6 +83,16 @@ export function useSaveSettings() {
 
 export const useServerInfo = () => useQuery({ queryKey: ["serverInfo"], queryFn: () => invoke("get_server_info"), staleTime: Infinity });
 
+export const useAboutInfo = () => useQuery({ queryKey: ["aboutInfo"], queryFn: () => invoke("get_about_info"), staleTime: Infinity });
+
+/** Checked on start and every 6 hours; also refetched by "Check for updates". */
+export const useUpdateCheck = () =>
+  useQuery({ queryKey: ["updateCheck"], queryFn: () => invoke("check_for_update"), staleTime: 60 * 60_000, refetchInterval: 6 * 60 * 60_000, retry: false });
+
+export function useInstallUpdate() {
+  return useMutation({ mutationFn: () => invoke("install_update") });
+}
+
 export function useTestBackend() {
   return useMutation({ mutationFn: () => invoke("test_backend") });
 }

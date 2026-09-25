@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/release-it@21/schema/release-it.json",
+  "git": {
+    "commitMessage": "chore: release v${version}",
+    "tagName": "v${version}",
+    "tagAnnotation": "Release v${version}",
+    "requireBranch": "main",
+    "requireCleanWorkingDir": true,
+    "push": true,
+    "requireUpstream": false
+  },
+  "npm": {
+    "publish": false
+  },
+  "github": {
+    "release": false
+  },
+  "hooks": {
+    "before:init": "node scripts/sync-versions.mjs --check",
+    "after:bump": "node scripts/sync-versions.mjs ${version}",
+    "after:release": "echo Pushed tag v${version}. GitHub Actions is now building the Windows installer and the Android APK, and will publish them as a GitHub Release."
+  }
+}

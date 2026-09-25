@@ -3,8 +3,10 @@
 # http://203.0.113.10:8788). Neither app has a URL field, so a build without
 # the secret would be useless and fails fast instead.
 #
-# Runs on version tags (v1.2.3), which also publish a GitHub Release, and
-# on demand from the Actions tab. See docs/deploy.md for the secrets.
+# Runs on version tags (v1.2.3, created by `pnpm release`), which also
+# publish a GitHub Release, and on demand from the Actions tab. With the
+# DEPLOY_* secrets set, the builds are also copied to the server, where the
+# desktop and mobile apps' update checks find them. See docs/deploy.md.
 name: Build apps
 
 on:
@@ -21,17 +23,34 @@ jobs:
     name: Desktop (Windows)
     runs-on: windows-latest
     timeout-minutes: 60
+    env:
+      HAS_UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
-      - name: Require BACKEND_URL secret
-        shell: bash
+      - name: Check secrets and versions
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
         run: |
           if [ -z "$BACKEND_URL" ]; then
             echo "::error::Set the BACKEND_URL repository secret, e.g. http://203.0.113.10:8788"
             exit 1
+          fi
+          if [ "$HAS_UPDATER_KEY" = "true" ] && [ -z "$UPDATER_PUBKEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is set but TAURI_UPDATER_PUBKEY isn't. Add the matching public key."
+            exit 1
+          fi
+          node scripts/sync-versions.mjs --check
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version=$(node -p "require('./package.json').version")
+            if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} doesn't match package.json version ${version}. Release with 'pnpm release'."
+              exit 1
+            fi
           fi
 
       - uses: pnpm/action-setup@v4
@@ -48,10 +67,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build installer
-        run: pnpm tauri build
         env:
-          # Read at compile time by crates/job-hunter-core/src/backend_url.rs.
+          # Both read at compile time: crates/job-hunter-core/src/backend_url.rs
+          # and apps/desktop/src-tauri/src/updates.rs.
           JOB_HUNTER_BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          JOB_HUNTER_UPDATER_PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ "$HAS_UPDATER_KEY" = "true" ]; then
+            # Also writes <installer>.sig, which lets the app install updates
+            # itself. The bundler checks the key pair against the public key
+            # in the config, so pass it in (as JSON built by node, for safe quoting).
+            config=$(node -e 'console.log(JSON.stringify({bundle:{createUpdaterArtifacts:true},plugins:{updater:{pubkey:process.env.JOB_HUNTER_UPDATER_PUBKEY}}}))')
+            pnpm tauri build --config "$config"
+          else
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set: this build can find updates but not install them in-app (users download the installer instead). See docs/deploy.md."
+            pnpm tauri build
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -59,6 +92,7 @@ jobs:
           if-no-files-found: error
           path: |
             target/release/bundle/nsis/*.exe
+            target/release/bundle/nsis/*.sig
             target/release/bundle/msi/*.msi
 
   android:
@@ -70,7 +104,6 @@ jobs:
         working-directory: apps/mobile
     env:
       HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      HAS_DEPLOY_TARGET: ${{ secrets.DEPLOY_SSH_KEY != '' && secrets.DEPLOY_HOST != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -116,12 +149,14 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          # The build number must increase for Android to accept an update.
+          # The build number must increase for Android to accept an update,
+          # and the in-app update check compares it too.
           flutter build apk --release \
             --dart-define=BACKEND_URL="$BACKEND_URL" \
             --build-number=${{ github.run_number }}
           VERSION=$(grep '^version:' pubspec.yaml | sed -E 's/version: *([^+]+).*/\1/')
           mkdir -p dist
+          # The server reads version and build number from this name.
           cp build/app/outputs/flutter-apk/app-release.apk "dist/job-hunter-${VERSION}-${{ github.run_number }}.apk"
 
       - uses: actions/upload-artifact@v4
@@ -130,9 +165,26 @@ jobs:
           if-no-files-found: error
           path: apps/mobile/dist/*.apk
 
-      # Optional: copy the APK straight to the server's downloads folder, so
-      # http://<server>/downloads/android serves it immediately.
-      - name: Upload APK to server
+  # Optional: copy the new builds to the server's downloads folder, where
+  # /downloads/* serves them and the apps' update checks find them.
+  deploy:
+    name: Upload builds to server
+    needs: [desktop-windows, android]
+    runs-on: ubuntu-latest
+    env:
+      HAS_DEPLOY_TARGET: ${{ secrets.DEPLOY_SSH_KEY != '' && secrets.DEPLOY_HOST != '' }}
+    steps:
+      - name: Skip notice
+        if: env.HAS_DEPLOY_TARGET != 'true'
+        run: echo "DEPLOY_HOST / DEPLOY_SSH_KEY not set; copy the builds to the server's apps/backend/downloads/ by hand (docs/deploy.md)."
+
+      - uses: actions/download-artifact@v4
+        if: env.HAS_DEPLOY_TARGET == 'true'
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Copy APK and Windows installer to the server
         if: env.HAS_DEPLOY_TARGET == 'true'
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -145,10 +197,15 @@ jobs:
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
           chmod 600 "$key"
           port="${DEPLOY_PORT:-22}"
-          dest="${DEPLOY_PATH:-~/job-hunter}/apps/backend/downloads"
-          ssh_opts="-i $key -p $port -o StrictHostKeyChecking=accept-new"
-          ssh $ssh_opts "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p $dest && rm -f $dest/*.apk"
-          scp -i "$key" -P "$port" -o StrictHostKeyChecking=accept-new dist/*.apk "$DEPLOY_USER@$DEPLOY_HOST:$dest/"
+          # Relative paths are resolved against the SSH user's home on the server.
+          dest="${DEPLOY_PATH:-job-hunter}/apps/backend/downloads"
+          ssh_opts=(-i "$key" -o StrictHostKeyChecking=accept-new)
+          # Null-delimited: Windows installer names contain spaces.
+          mapfile -d '' files < <(find artifacts \( -name '*.apk' -o -name '*-setup.exe' -o -name '*-setup.exe.sig' \) -print0)
+          printf 'Uploading: %s\n' "${files[@]}"
+          ssh "${ssh_opts[@]}" -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$dest' && rm -f '$dest'/*.apk '$dest'/*-setup.exe '$dest'/*-setup.exe.sig"
+          scp "${ssh_opts[@]}" -P "$port" "${files[@]}" "$DEPLOY_USER@$DEPLOY_HOST:$dest/"
           rm -f "$key"
 
   release:

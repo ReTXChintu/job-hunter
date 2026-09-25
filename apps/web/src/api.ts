@@ -27,6 +27,8 @@ export interface Device {
 
 export interface DownloadInfo {
   fileName: string;
+  version: string | null;
+  build: number | null;
   sizeBytes: number;
   updatedAt: string;
   url: string;
@@ -159,8 +161,8 @@ export class ApiClient {
     return (await this.get<{ documents: JobAnalysis[] }>("/v1/data/job_analyses")).documents;
   }
 
-  async androidDownload(): Promise<DownloadInfo | null> {
-    return (await this.get<{ android: DownloadInfo | null }>("/v1/downloads")).android;
+  downloads(): Promise<{ android: DownloadInfo | null; windows: DownloadInfo | null }> {
+    return this.get("/v1/downloads");
   }
 }
 

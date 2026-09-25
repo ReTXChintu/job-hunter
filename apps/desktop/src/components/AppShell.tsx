@@ -6,6 +6,7 @@ import { AgentStatusBar } from "./AgentStatusBar";
 import { useSetupStatus } from "../lib/queries";
 import { isTauri } from "../lib/tauri";
 import { NotInTauri } from "./NotInTauri";
+import { UpdateBanner } from "./UpdateNotifier";
 
 export function AppShell() {
   const setup = useSetupStatus();
@@ -25,6 +26,7 @@ export function AppShell() {
     <Flex h="100vh" w="100vw" overflow="hidden" bg="bg">
       <Sidebar />
       <Flex direction="column" flex="1" minW={0}>
+        <UpdateBanner />
         <Box flex="1" overflowY="auto" bg="bg.canvas">
           <Box maxW="1400px" mx="auto" px={8} py={6}>
             <Outlet />

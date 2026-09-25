@@ -10,6 +10,7 @@ import { ResumesPage } from "./pages/Resumes";
 import { AgentPage } from "./pages/Agent";
 import { SettingsPage } from "./pages/Settings";
 import { SetupPage } from "./pages/Setup";
+import { AboutPage } from "./pages/About";
 
 const rootRoute = createRootRoute({ component: AppShell });
 
@@ -22,6 +23,7 @@ export const candidateRoute = createRoute({ getParentRoute: () => rootRoute, pat
 export const resumesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/resumes", component: ResumesPage });
 export const agentRoute = createRoute({ getParentRoute: () => rootRoute, path: "/agent", component: AgentPage });
 export const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage });
+export const aboutRoute = createRoute({ getParentRoute: () => rootRoute, path: "/about", component: AboutPage });
 export const setupRoute = createRoute({ getParentRoute: () => rootRoute, path: "/setup", component: SetupPage });
 
 const routeTree = rootRoute.addChildren([
@@ -35,6 +37,7 @@ const routeTree = rootRoute.addChildren([
   agentRoute,
   settingsRoute,
   setupRoute,
+  aboutRoute,
 ]);
 
 export const router = createRouter({ routeTree, history: createHashHistory(), defaultPreload: "intent" });

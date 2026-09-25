@@ -157,6 +157,17 @@ and `/v1/downloads`. It never approves, rejects or applies; those stay in
 the desktop and mobile apps. It uses hash routes (`#/applications/<id>`),
 so the backend serves it as plain static files.
 
+## Downloads and updates
+
+`GET /v1/downloads` lists the newest APK and Windows installer in the
+downloads folder, with the version (and Android build number) read from
+their file names. `/downloads/android` and `/downloads/windows` serve them.
+`/updates/windows/latest.json` is the manifest `tauri-plugin-updater` reads,
+served only when the installer's `.sig` is present. The desktop
+(`apps/desktop/src-tauri/src/updates.rs`) and mobile
+(`apps/mobile/lib/state/update_controller.dart`) apps compare these against
+their own versions. See [`deploy.md`](deploy.md) for the release flow.
+
 ## What's left
 
 1. **Mobile reads without the desktop.** The mobile app now connects to

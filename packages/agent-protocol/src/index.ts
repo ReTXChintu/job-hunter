@@ -51,6 +51,35 @@ export interface EventPayloads {
   "log:entry": LogEntry;
   "data:changed": string[];
   "remote:status": RemoteStatus;
+  "update:progress": UpdateProgress;
+}
+
+export interface AboutInfo {
+  name: string;
+  version: string;
+  serverUrl: string;
+  serverBuiltIn: boolean;
+  /** This build carries the updater's public key and can install updates itself. */
+  updaterEnabled: boolean;
+  dataDir: string;
+  platform: string;
+}
+
+/** Mirrors `job_hunter_core::updates::UpdateCheck`. */
+export interface UpdateCheck {
+  currentVersion: string;
+  latestVersion: string | null;
+  available: boolean;
+  downloadUrl: string | null;
+  canInstallInApp: boolean;
+  sizeBytes: number | null;
+  publishedAt: string | null;
+}
+
+export interface UpdateProgress {
+  downloaded: number;
+  total: number | null;
+  finished: boolean;
 }
 
 /** The server this build talks to; fixed when the app is built. */
@@ -65,6 +94,9 @@ export interface Commands {
   get_settings: { args: Record<string, never>; result: AppSettings };
   save_settings: { args: { settings: AppSettings }; result: AppSettings };
   get_server_info: { args: Record<string, never>; result: ServerInfo };
+  get_about_info: { args: Record<string, never>; result: AboutInfo };
+  check_for_update: { args: Record<string, never>; result: UpdateCheck };
+  install_update: { args: Record<string, never>; result: null };
   test_backend: { args: Record<string, never>; result: null };
   backend_register: { args: { email: string; password: string; deviceName?: string }; result: SyncStatus };
   backend_login: { args: { email: string; password: string; deviceName?: string }; result: SyncStatus };

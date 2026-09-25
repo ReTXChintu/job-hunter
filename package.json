@@ -24,9 +24,16 @@
     "server:logs": "pm2 logs job-hunter-backend --lines 200",
     "server:status": "pm2 status",
     "server:delete": "pm2 delete ecosystem.config.cjs",
-    "server:update": "git pull --ff-only && pnpm install --frozen-lockfile && pnpm server:build && pnpm server:start"
+    "server:update": "git pull --ff-only && pnpm install --frozen-lockfile && pnpm server:build && pnpm server:start",
+    "release": "release-it",
+    "release:patch": "release-it patch --ci",
+    "release:minor": "release-it minor --ci",
+    "release:major": "release-it major --ci",
+    "release:dry": "release-it --dry-run --ci",
+    "versions:check": "node scripts/sync-versions.mjs --check"
   },
   "devDependencies": {
-    "pm2": "^7.0.4"
+    "pm2": "^7.0.4",
+    "release-it": "^21.1.0"
   }
 }

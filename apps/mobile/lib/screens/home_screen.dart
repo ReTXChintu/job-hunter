@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'about_screen.dart';
 import 'applications_list_screen.dart';
 import 'settings_screen.dart';
 
@@ -20,7 +21,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final pages = const [ApplicationsListScreen(), SettingsScreen()];
     return Scaffold(
-      body: IndexedStack(index: _index, children: pages),
+      body: Column(
+        children: [
+          const UpdateBanner(),
+          Expanded(child: IndexedStack(index: _index, children: pages)),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

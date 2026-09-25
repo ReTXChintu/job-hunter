@@ -39,10 +39,25 @@
     "shortDescription": "Personal AI-powered job hunting assistant",
     "longDescription": "Job Hunter discovers jobs, tailors resumes and applies through your own Claude Code and Chrome, with every submission approved by you.",
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
     },
     "linux": {
-      "deb": { "depends": [] }
+      "deb": {
+        "depends": []
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [],
+      "dangerousInsecureTransportProtocol": true,
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

@@ -3,6 +3,7 @@
 //! change notifications as Tauri events.
 
 mod commands;
+mod updates;
 
 use std::sync::Arc;
 
@@ -128,6 +129,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let handle = app.handle().clone();
             let ctx =
@@ -145,6 +147,9 @@ pub fn run() {
             commands::get_settings,
             commands::save_settings,
             commands::get_server_info,
+            updates::get_about_info,
+            updates::check_for_update,
+            updates::install_update,
             commands::test_backend,
             commands::backend_register,
             commands::backend_login,

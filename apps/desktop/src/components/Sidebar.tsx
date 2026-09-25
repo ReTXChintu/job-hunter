@@ -3,7 +3,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
 import { Bot, Briefcase, FileText, LayoutDashboard, Moon, Send, Settings, Sun, UserRound, Crosshair } from "lucide-react";
 import type { ReactNode } from "react";
-import { useDashboard } from "../lib/queries";
+import { useAboutInfo, useDashboard, useUpdateCheck } from "../lib/queries";
 
 const NAV: { to: string; label: string; icon: ReactNode; badge?: (n: { awaiting: number; manual: number }) => number }[] = [
   { to: "/", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
@@ -19,6 +19,8 @@ export function Sidebar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { resolvedTheme, setTheme } = useTheme();
   const dashboard = useDashboard();
+  const about = useAboutInfo();
+  const update = useUpdateCheck();
   const counts = {
     awaiting: dashboard.data?.total.awaitingApproval ?? 0,
     manual: (dashboard.data?.total.manualAction ?? 0) + (dashboard.data?.total.waitingForUser ?? 0),
@@ -71,9 +73,12 @@ export function Sidebar() {
         })}
       </VStack>
       <HStack px={2} pt={3} justify="space-between">
-        <Text fontSize="xs" color="fg.subtle">
-          v0.1.0
-        </Text>
+<Link to="/about">
+          <HStack gap={1.5} fontSize="xs" color="fg.subtle" _hover={{ color: "fg" }} title="About Job Hunter">
+            <Text>{about.data ? `v${about.data.version}` : "About"}</Text>
+            {update.data?.available ? <Box w={1.5} h={1.5} borderRadius="full" bg="brand.solid" title="Update available" /> : null}
+          </HStack>
+        </Link>
         <IconButton aria-label="Toggle color mode" size="xs" variant="ghost" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
           {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </IconButton>
