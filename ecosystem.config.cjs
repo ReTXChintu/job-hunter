@@ -1,10 +1,10 @@
 /**
  * PM2 process file for the self-hosted backend (see docs/deploy.md).
  *
- * The server's configuration, including its port, lives in
- * apps/backend/.env -- the backend loads it itself on start, so nothing
- * here duplicates it. `cwd` is apps/backend so that file is found and the
- * backend's relative defaults (../web/dist, ./downloads) resolve correctly.
+ * The server's configuration, including its port, lives in the repo's single
+ * root .env -- the backend loads it itself on start (it locates the repo
+ * root from its own file, not the working directory), so nothing here
+ * duplicates it.
  *
  * Use the root package.json scripts rather than calling pm2 directly:
  *   pnpm server:build     build the web app and the backend

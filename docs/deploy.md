@@ -23,10 +23,11 @@ assume Linux; Windows works the same way.
 git clone <your repo> ~/job-hunter
 cd ~/job-hunter
 pnpm install --frozen-lockfile
-cp apps/backend/.env.example apps/backend/.env
+cp .env.example .env
 ```
 
-Edit `apps/backend/.env`. The ones that matter:
+The whole repo shares that one `.env` at its root. On the server, only its
+"Server" section matters:
 
 | Variable | Value |
 | --- | --- |

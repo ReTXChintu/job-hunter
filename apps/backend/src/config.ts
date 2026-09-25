@@ -2,9 +2,11 @@
  * Backend configuration, loaded from environment variables. Mirrors
  * `crates/job-hunter-relay/src/config.rs` in shape (same variable names
  * where the concept carries over) so the deployment story stays familiar.
- * See `.env.example` at the crate root.
+ * See `.env.example` at the repository root: the whole repo shares one `.env`.
  */
 import path from "node:path";
+
+import { REPO_ROOT } from "./paths.js";
 
 export interface BackendConfig {
   port: number;
@@ -54,7 +56,8 @@ export function loadConfig(): BackendConfig {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    webDir: path.resolve(process.env.JOB_HUNTER_BACKEND_WEB_DIR || "../web/dist"),
-    downloadsDir: path.resolve(process.env.JOB_HUNTER_BACKEND_DOWNLOADS_DIR || "./downloads"),
+    // Relative paths are relative to the repository root, like the .env itself.
+    webDir: path.resolve(REPO_ROOT, process.env.JOB_HUNTER_BACKEND_WEB_DIR || "apps/web/dist"),
+    downloadsDir: path.resolve(REPO_ROOT, process.env.JOB_HUNTER_BACKEND_DOWNLOADS_DIR || "apps/backend/downloads"),
   };
 }

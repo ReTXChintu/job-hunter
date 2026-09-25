@@ -6,7 +6,7 @@ export interface JsonDoc {
 
 /**
  * Everything the backend persists. One implementation talks to MongoDB
- * Atlas (`MongoDb`, the production path -- see `.env.example`); tests use
+ * Atlas (`MongoDb`, the production path -- see the root `.env.example`); tests use
  * an in-memory fake (`test/inMemoryDb.ts`) so route logic is exercised
  * without a real database, the same way `crates/job-hunter-relay`'s tests
  * used a real (but trivial, file-backed) SQLite database instead of mocking

@@ -20,9 +20,9 @@ directly.
 4. Copy the connection string: `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/`.
 
 This connection string goes into the **backend's** configuration
-(`apps/backend/.env`, `JOB_HUNTER_BACKEND_MONGODB_URI`) when you deploy it
--- see [`backend.md`](backend.md) and
-[`../apps/backend/.env.example`](../apps/backend/.env.example). It is
+(`JOB_HUNTER_BACKEND_MONGODB_URI` in the repo's single root `.env`) when
+you deploy it -- see [`deploy.md`](deploy.md) and
+[`../.env.example`](../.env.example). It is
 never entered into the desktop app.
 
 ## Connecting the desktop

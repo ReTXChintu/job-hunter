@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
-/// Relay configuration, loaded from environment variables (see `.env.example`
-/// at the crate root). Every value has a safe local-dev default except the
+/// Relay configuration, loaded from environment variables (see the "Legacy
+/// relay" section of the repository's single root `.env.example`; `dotenvy`
+/// finds that `.env` by searching up from the working directory). Every value has a safe local-dev default except the
 /// JWT signing secret, which the process refuses to start without in a
 /// non-debug build.
 #[derive(Debug, Clone)]

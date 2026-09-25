@@ -14,6 +14,7 @@ deployment instructions.
 ## Run it locally
 
 ```bash
+# From the repo root: the whole repo shares one .env there.
 cp .env.example .env   # then set JOB_HUNTER_RELAY_JWT_SECRET
 cargo run -p job-hunter-relay
 ```

@@ -1,9 +1,14 @@
-import "dotenv/config";
+import { config as loadEnvFile } from "dotenv";
 
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { MongoDb } from "./mongoDb.js";
+import { ROOT_ENV_FILE } from "./paths.js";
 import { createAppState } from "./state.js";
+
+// The repo has a single `.env`, at its root. Real environment variables
+// (PM2, Docker, CI) still win: dotenv never overrides one that's already set.
+loadEnvFile({ path: ROOT_ENV_FILE });
 
 async function main(): Promise<void> {
   const config = loadConfig();

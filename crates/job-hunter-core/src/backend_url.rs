@@ -8,9 +8,10 @@
 //!
 //! Resolution order:
 //! 1. `JOB_HUNTER_BACKEND_URL` at **compile time** (release builds).
-//! 2. `JOB_HUNTER_BACKEND_URL` at **run time** (a repo-level `.env` in
-//!    development, loaded by `AppContext::init`).
-//! 3. [`DEV_DEFAULT`], a backend running locally.
+//! 2. `JOB_HUNTER_BACKEND_URL` at **run time** (the repo's single root
+//!    `.env` in development, loaded by `AppContext::init`).
+//! 3. A backend running locally: `http://127.0.0.1:<JOB_HUNTER_BACKEND_PORT>`
+//!    (the same `.env` setting the backend listens on), else [`DEV_DEFAULT`].
 //!
 //! The address is chosen by whoever builds the app, so it is trusted as-is:
 //! plain `http://<ip>:<port>` is allowed, with no per-user "allow insecure"
@@ -26,12 +27,20 @@ fn clean(url: &str) -> Option<String> {
     (!url.is_empty()).then(|| url.to_string())
 }
 
+fn local_backend() -> String {
+    std::env::var("JOB_HUNTER_BACKEND_PORT")
+        .ok()
+        .and_then(|p| p.trim().parse::<u16>().ok())
+        .map(|port| format!("http://127.0.0.1:{port}"))
+        .unwrap_or_else(|| DEV_DEFAULT.to_string())
+}
+
 /// The backend base URL, without a trailing slash.
 pub fn configured() -> String {
     option_env!("JOB_HUNTER_BACKEND_URL")
         .and_then(clean)
         .or_else(|| std::env::var(ENV_KEY).ok().as_deref().and_then(clean))
-        .unwrap_or_else(|| DEV_DEFAULT.to_string())
+        .unwrap_or_else(local_backend)
 }
 
 /// True when the address was fixed at build time (a CI/release build).

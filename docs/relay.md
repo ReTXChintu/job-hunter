@@ -27,8 +27,8 @@ Job Hunter relay run by anyone else.
 ## Configuration
 
 All configuration is environment variables — see
-[`crates/job-hunter-relay/.env.example`](../crates/job-hunter-relay/.env.example)
-for the full list with defaults. The only one you must set yourself:
+the "Legacy relay" section of the repository's single root
+[`.env.example`](../.env.example) for the full list with defaults. The only one you must set yourself:
 
 | Variable | Purpose |
 |---|---|
@@ -71,8 +71,7 @@ supervisord, a container orchestrator) so it restarts on crash/reboot.
 running on your own machine):
 
 ```bash
-cd crates/job-hunter-relay
-cp .env.example .env   # then edit JOB_HUNTER_RELAY_JWT_SECRET
+cp .env.example .env   # at the repo root; then edit JOB_HUNTER_RELAY_JWT_SECRET
 cargo run -p job-hunter-relay
 ```
 

@@ -16,6 +16,7 @@ wire format this preserves.
 ## Run it locally
 
 ```bash
+# From the repo root: the whole repo shares one .env there.
 cp .env.example .env   # then set JOB_HUNTER_BACKEND_MONGODB_URI and _JWT_SECRET
 pnpm --filter @job-hunter/backend dev
 ```
