@@ -144,6 +144,7 @@ pub fn run() {
             commands::get_setup_status,
             commands::get_settings,
             commands::save_settings,
+            commands::get_server_info,
             commands::test_backend,
             commands::backend_register,
             commands::backend_login,

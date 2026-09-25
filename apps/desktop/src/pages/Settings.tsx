@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox, Field, Heading, HStack, Input, SegmentGroup, SimpleGrid, Spinner, Switch, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, Heading, HStack, Input, SegmentGroup, SimpleGrid, Spinner, Switch, Tabs, Text, VStack } from "@chakra-ui/react";
 import { formatDateTime } from "@job-hunter/shared";
 import type { AppSettings } from "@job-hunter/types";
 import { LogIn, LogOut, Save, UserPlus } from "lucide-react";
@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { ErrorBanner, InfoBanner, PageHeader, Panel } from "../components/common";
 import { MobileAppSettings } from "../components/MobileAppSettings";
 import { LogViewer } from "./Agent";
-import { useBackendLogin, useBackendLogout, useBackendRegister, useSaveSettings, useSettings, useSetupStatus, useSyncStatus, useTestBackend } from "../lib/queries";
+import { useBackendLogin, useBackendLogout, useBackendRegister, useSaveSettings, useSettings, useSetupStatus, useServerInfo, useSyncStatus, useTestBackend } from "../lib/queries";
 
 export function SettingsPage() {
   const settingsQ = useSettings();
@@ -165,38 +165,32 @@ function BackendSettingsPanel() {
 
 function BackendSignInForm({ defaultDeviceName }: { defaultDeviceName: string }) {
   const [mode, setMode] = useState<"register" | "login">("register");
-  const [backendUrl, setBackendUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [deviceName, setDeviceName] = useState(defaultDeviceName);
-  const [allowInsecure, setAllowInsecure] = useState(false);
   const register = useBackendRegister();
   const login = useBackendLogin();
   const test = useTestBackend();
+  const server = useServerInfo();
   const active = mode === "register" ? register : login;
-  const isInsecureUrl = backendUrl.trim().length > 0 && backendUrl.trim().startsWith("http://");
 
-  const submit = () => {
-    const args = { backendUrl: backendUrl.trim(), email: email.trim(), password, deviceName: deviceName.trim() || undefined, allowInsecure };
-    active.mutate(args);
-  };
+  const submit = () => active.mutate({ email: email.trim(), password, deviceName: deviceName.trim() || undefined });
 
   return (
     <Panel title="Backend account">
       <Text fontSize="sm" color="fg.muted" mb={4}>
-        Sign in to your self-hosted <code>@job-hunter/backend</code> (see <code>apps/backend</code> and <code>docs/backend.md</code>). It owns your MongoDB Atlas data directly, so the mobile app can read your jobs and applications even when this desktop is offline. Data is always kept locally first and synced when the backend is reachable; you can skip this entirely and stay local-only.
+        Sign in to your Job Hunter server so the mobile and web apps can see your jobs and applications even when this computer is off. Data is always kept locally first and synced when the server is reachable. You can skip this entirely and stay local-only.
       </Text>
       <ErrorBanner error={register.error ?? login.error ?? test.error} />
-      {test.isSuccess ? <InfoBanner status="success">Backend reachable.</InfoBanner> : null}
+      {test.isSuccess ? <InfoBanner status="success">Server reachable.</InfoBanner> : null}
       <VStack align="stretch" gap={3} maxW="480px">
+        <Text fontSize="xs" color="fg.muted">
+          Server: <Text as="span" fontFamily="mono" color="fg">{server.data?.url ?? "…"}</Text>
+        </Text>
         <SegmentGroup.Root value={mode} onValueChange={(e) => setMode((e.value as "register" | "login") ?? "register")} size="sm">
           <SegmentGroup.Indicator />
           <SegmentGroup.Items items={[{ value: "register", label: "Create account" }, { value: "login", label: "Sign in" }]} />
         </SegmentGroup.Root>
-        <Field.Root>
-          <Field.Label>Backend server address</Field.Label>
-          <Input placeholder="https://backend.example.com" value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} />
-        </Field.Root>
         <Field.Root>
           <Field.Label>Email</Field.Label>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -209,18 +203,11 @@ function BackendSignInForm({ defaultDeviceName }: { defaultDeviceName: string })
           <Field.Label>This computer&apos;s name</Field.Label>
           <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="e.g. Work Laptop" />
         </Field.Root>
-        {isInsecureUrl ? (
-          <Checkbox.Root checked={allowInsecure} onCheckedChange={(e) => setAllowInsecure(!!e.checked)} size="sm">
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label>This address is not encrypted (http://). I understand and want to use it anyway (local testing only).</Checkbox.Label>
-          </Checkbox.Root>
-        ) : null}
         <HStack>
-          <Button variant="outline" onClick={() => test.mutate({ backendUrl: backendUrl.trim(), allowInsecure })} loading={test.isPending} disabled={!backendUrl.trim() || (isInsecureUrl && !allowInsecure)}>
+          <Button variant="outline" onClick={() => test.mutate()} loading={test.isPending}>
             Test connection
           </Button>
-          <Button colorPalette="brand" onClick={submit} loading={active.isPending} disabled={!backendUrl.trim() || !email.trim() || password.length < 8 || (isInsecureUrl && !allowInsecure)}>
+          <Button colorPalette="brand" onClick={submit} loading={active.isPending} disabled={!email.trim() || password.length < 8}>
             {mode === "register" ? <UserPlus size={14} /> : <LogIn size={14} />}
             {mode === "register" ? "Create account & connect" : "Sign in & connect"}
           </Button>

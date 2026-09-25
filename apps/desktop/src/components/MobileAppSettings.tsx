@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox, Field, HStack, Image, Input, SegmentGroup, Spinner, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Image, Input, SegmentGroup, Spinner, Table, Text, VStack } from "@chakra-ui/react";
 import { formatDateTime, timeAgo } from "@job-hunter/shared";
 import type { RemoteDevice } from "@job-hunter/types";
 import QRCode from "qrcode";
@@ -21,26 +21,19 @@ export function MobileAppSettings() {
 
 function SignInForm({ defaultDeviceName }: { defaultDeviceName: string }) {
   const [mode, setMode] = useState<"register" | "login">("register");
-  const [relayUrl, setRelayUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [deviceName, setDeviceName] = useState(defaultDeviceName);
-  const [allowInsecure, setAllowInsecure] = useState(false);
   const register = useRemoteRegister();
   const login = useRemoteLogin();
   const active = mode === "register" ? register : login;
-  const isInsecureUrl = relayUrl.trim().length > 0 && relayUrl.trim().startsWith("http://");
 
-  const submit = () => {
-    const args = { relayUrl: relayUrl.trim(), email: email.trim(), password, deviceName: deviceName.trim() || undefined, allowInsecure };
-    active.mutate(args);
-  };
+  const submit = () => active.mutate({ email: email.trim(), password, deviceName: deviceName.trim() || undefined });
 
   return (
     <Panel title="Mobile app">
       <Text fontSize="sm" color="fg.muted" mb={4}>
-        Review and approve applications from your phone, wherever you are. This connects to your own self-hosted relay server (see <code>crates/job-hunter-relay</code> and{" "}
-        <code>docs/relay.md</code>) — it only routes messages between this desktop and your phone and never sees job data, resumes or Claude activity. Nothing here runs any AI.
+        Review and approve applications from your phone, wherever you are. This connects to your own Job Hunter server, which only routes messages between this computer and your phone. Nothing here runs any AI. Use the same account as Settings → Backend account.
       </Text>
       <ErrorBanner error={register.error ?? login.error} />
       <VStack align="stretch" gap={3} maxW="480px">
@@ -48,10 +41,6 @@ function SignInForm({ defaultDeviceName }: { defaultDeviceName: string }) {
           <SegmentGroup.Indicator />
           <SegmentGroup.Items items={[{ value: "register", label: "Create account" }, { value: "login", label: "Sign in" }]} />
         </SegmentGroup.Root>
-        <Field.Root>
-          <Field.Label>Relay server address</Field.Label>
-          <Input placeholder="https://relay.example.com" value={relayUrl} onChange={(e) => setRelayUrl(e.target.value)} />
-        </Field.Root>
         <Field.Root>
           <Field.Label>Email</Field.Label>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -65,15 +54,8 @@ function SignInForm({ defaultDeviceName }: { defaultDeviceName: string }) {
           <Input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="e.g. Work Laptop" />
           <Field.HelperText>Shown to your phone and in the paired-devices list below.</Field.HelperText>
         </Field.Root>
-        {isInsecureUrl ? (
-          <Checkbox.Root checked={allowInsecure} onCheckedChange={(e) => setAllowInsecure(!!e.checked)} size="sm">
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label>This address is not encrypted (http://). I understand and want to use it anyway (local testing only).</Checkbox.Label>
-          </Checkbox.Root>
-        ) : null}
         <HStack>
-          <Button colorPalette="brand" onClick={submit} loading={active.isPending} disabled={!relayUrl.trim() || !email.trim() || password.length < 8 || (isInsecureUrl && !allowInsecure)}>
+          <Button colorPalette="brand" onClick={submit} loading={active.isPending} disabled={!email.trim() || password.length < 8}>
             {mode === "register" ? <UserPlus size={14} /> : <LogIn size={14} />}
             {mode === "register" ? "Create account & connect" : "Sign in & connect"}
           </Button>

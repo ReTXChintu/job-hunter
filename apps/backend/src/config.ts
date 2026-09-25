@@ -4,6 +4,8 @@
  * where the concept carries over) so the deployment story stays familiar.
  * See `.env.example` at the crate root.
  */
+import path from "node:path";
+
 export interface BackendConfig {
   port: number;
   mongoUri: string;
@@ -13,6 +15,10 @@ export interface BackendConfig {
   refreshTokenTtlDays: number;
   pairingCodeTtlSecs: number;
   corsOrigins: string[];
+  /** Built web app (`apps/web/dist`) served at `/`. Skipped if missing. */
+  webDir: string;
+  /** Directory holding downloadable app builds (the Android APK). */
+  downloadsDir: string;
 }
 
 function envInt(key: string, fallback: number): number {
@@ -48,5 +54,7 @@ export function loadConfig(): BackendConfig {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    webDir: path.resolve(process.env.JOB_HUNTER_BACKEND_WEB_DIR || "../web/dist"),
+    downloadsDir: path.resolve(process.env.JOB_HUNTER_BACKEND_DOWNLOADS_DIR || "./downloads"),
   };
 }

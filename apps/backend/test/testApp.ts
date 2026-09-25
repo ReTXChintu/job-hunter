@@ -13,6 +13,8 @@ export function testConfig(overrides: Partial<BackendConfig> = {}): BackendConfi
     refreshTokenTtlDays: 30,
     pairingCodeTtlSecs: 300,
     corsOrigins: [],
+    webDir: "/nonexistent/job-hunter-web",
+    downloadsDir: "/nonexistent/job-hunter-downloads",
     ...overrides,
   };
 }

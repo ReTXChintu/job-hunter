@@ -1,8 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need these explicitly (Flutter only adds INTERNET to
+         the debug/profile manifests). Cleartext is allowed because the
+         server is reached as plain http://<ip>:<port>, with no domain. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
-        android:label="job_hunter_mobile"
+        android:label="Job Hunter"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

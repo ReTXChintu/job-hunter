@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../config.dart';
 import '../services/api_client.dart';
 import '../services/secure_store.dart';
 
@@ -27,6 +28,11 @@ class AuthController extends ChangeNotifier {
   Future<void> loadPersisted() async {
     final token = await _store.deviceToken;
     relayUrl = await _store.relayUrl;
+    // The server address is fixed per build: if this phone signed in under
+    // an older build's address, follow the current one.
+    if (hasBuiltInServer && relayUrl != null && relayUrl!.isNotEmpty) {
+      relayUrl = ApiClient.normalizeRelayUrl(kBuiltInServerUrl);
+    }
     accountEmail = await _store.accountEmail;
     deviceName = await _store.deviceName;
     deviceToken = token;

@@ -114,7 +114,17 @@ impl AppContext {
     /// installed so early messages are captured too.
     pub async fn init(paths: AppPaths, logs: Arc<LogBuffer>) -> CoreResult<Arc<Self>> {
         let _ = dotenvy::dotenv();
-        let settings = AppSettings::load(&paths.settings_file())?;
+        let mut settings = AppSettings::load(&paths.settings_file())?;
+        // The server address is fixed per build (see `backend_url`). If this
+        // desktop signed in under an earlier build's address, follow the
+        // current one: a new server IP must not strand a signed-in device.
+        let server_url = crate::backend_url::configured();
+        if !settings.backend.backend_url.is_empty() {
+            settings.backend.backend_url = server_url.clone();
+        }
+        if !settings.remote.relay_url.is_empty() {
+            settings.remote.relay_url = server_url;
+        }
         let store = Arc::new(LocalStore::open(&paths.database_dir())?);
         let secrets: Arc<dyn SecretStore> =
             if settings.mock_mode && std::env::var("JOB_HUNTER_USE_KEYRING").is_err() {

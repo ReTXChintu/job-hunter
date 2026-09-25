@@ -71,7 +71,9 @@ pub async fn register_account(
         .send()
         .await
         .map_err(|e| CoreError::Network(e.to_string()))?;
-    Ok(parse_backend_response::<AuthResponse>(resp).await?.access_token)
+    Ok(parse_backend_response::<AuthResponse>(resp)
+        .await?
+        .access_token)
 }
 
 pub async fn login_account(
@@ -86,7 +88,9 @@ pub async fn login_account(
         .send()
         .await
         .map_err(|e| CoreError::Network(e.to_string()))?;
-    Ok(parse_backend_response::<AuthResponse>(resp).await?.access_token)
+    Ok(parse_backend_response::<AuthResponse>(resp)
+        .await?
+        .access_token)
 }
 
 #[derive(Deserialize)]
@@ -135,7 +139,12 @@ pub struct BackendClientHandle {
 }
 
 impl BackendClientHandle {
-    pub fn new(http: reqwest::Client, base_url: String, device_token: String, label: String) -> Self {
+    pub fn new(
+        http: reqwest::Client,
+        base_url: String,
+        device_token: String,
+        label: String,
+    ) -> Self {
         Self {
             http,
             base_url,
@@ -196,7 +205,9 @@ impl BackendClientHandle {
             .send()
             .await
             .map_err(|e| CoreError::Network(e.to_string()))?;
-        Ok(parse_backend_response::<FetchAllResponse>(resp).await?.documents)
+        Ok(parse_backend_response::<FetchAllResponse>(resp)
+            .await?
+            .documents)
     }
 }
 
@@ -262,6 +273,9 @@ mod tests {
             label_for("https://backend.example.com", "alice@example.com"),
             "alice@example.com @ https://backend.example.com"
         );
-        assert_eq!(label_for("https://backend.example.com", ""), "https://backend.example.com");
+        assert_eq!(
+            label_for("https://backend.example.com", ""),
+            "https://backend.example.com"
+        );
     }
 }

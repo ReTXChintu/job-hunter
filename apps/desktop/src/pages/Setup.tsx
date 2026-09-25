@@ -1,4 +1,4 @@
-import { Box, Button, Field, Heading, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useNavigate } from "@tanstack/react-router";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Check, ChevronRight, CircleAlert, RefreshCw } from "lucide-react";
@@ -32,7 +32,6 @@ export function SetupPage() {
   const start = useStartJobHunt();
   const openUrl = useOpenUrl();
   const navigate = useNavigate();
-  const [backendUrl, setBackendUrl] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [backendSkipped, setBackendSkipped] = useState(false);
@@ -144,11 +143,8 @@ export function SetupPage() {
         ) : (
           <VStack align="stretch" gap={2} maxW="560px">
             <Text fontSize="sm" color="fg.muted">
-              Sign in to your self-hosted <code>@job-hunter/backend</code> (see <code>docs/backend.md</code>) so the mobile app can read your data even when this desktop is offline. Your password is kept in the OS credential store, never in a file. You can skip this and stay local-only for now, and set it up later in Settings.
+              Create an account on your Job Hunter server so the mobile and web apps can see your data even when this computer is off. Your password is never stored; only a device token, in the OS credential store. You can skip this and stay local-only for now, and set it up later in Settings.
             </Text>
-            <Field.Root>
-              <Input size="sm" placeholder="https://backend.example.com" value={backendUrl} onChange={(e) => setBackendUrl(e.target.value)} />
-            </Field.Root>
             <HStack>
               <Input size="sm" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
               <Input size="sm" type="password" placeholder="Password (min 8 characters)" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -157,9 +153,9 @@ export function SetupPage() {
               <Button
                 size="sm"
                 colorPalette="brand"
-                onClick={() => register.mutate({ backendUrl: backendUrl.trim(), email: email.trim(), password })}
+                onClick={() => register.mutate({ email: email.trim(), password })}
                 loading={register.isPending}
-                disabled={!backendUrl.trim() || !email.trim() || password.length < 8}
+                disabled={!email.trim() || password.length < 8}
               >
                 Create account &amp; connect
               </Button>

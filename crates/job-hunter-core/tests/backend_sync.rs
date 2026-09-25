@@ -40,7 +40,12 @@ fn authorized(headers: &HeaderMap, fake: &FakeBackend) -> bool {
     };
     // Accept the fixed access token used by /auth/* in this fake, or any
     // minted device token.
-    token == "fake-access-token" || fake.valid_tokens.lock().unwrap().contains(&token.to_string())
+    token == "fake-access-token"
+        || fake
+            .valid_tokens
+            .lock()
+            .unwrap()
+            .contains(&token.to_string())
 }
 
 async fn register(State(_fake): State<SharedFake>) -> Json<Value> {
@@ -60,7 +65,9 @@ async fn register_device(
     }
     let token = "fake-device-token".to_string();
     fake.valid_tokens.lock().unwrap().push(token.clone());
-    Ok(Json(json!({ "deviceId": "device-1", "deviceToken": token })))
+    Ok(Json(
+        json!({ "deviceId": "device-1", "deviceToken": token }),
+    ))
 }
 
 async fn list_devices(State(fake): State<SharedFake>, headers: HeaderMap) -> StatusCode {
@@ -133,20 +140,27 @@ async fn spawn_fake_backend() -> (String, SharedFake) {
         .route("/v1/auth/login", post(login))
         .route("/v1/devices/register", post(register_device))
         .route("/v1/devices", get(list_devices))
-        .route("/v1/data/{collection}/{id}", put(upsert_doc).delete(delete_doc))
+        .route(
+            "/v1/data/{collection}/{id}",
+            put(upsert_doc).delete(delete_doc),
+        )
         .route("/v1/data/{collection}", get(fetch_all))
         .with_state(fake.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
-        axum::serve(listener, app.into_make_service()).await.unwrap();
+        axum::serve(listener, app.into_make_service())
+            .await
+            .unwrap();
     });
     (format!("http://{addr}"), fake)
 }
 
 async fn desktop() -> Arc<AppContext> {
     let dir = tempfile::tempdir().unwrap();
-    let ctx = AppContext::init_mock(dir.path().join("data")).await.unwrap();
+    let ctx = AppContext::init_mock(dir.path().join("data"))
+        .await
+        .unwrap();
     std::mem::forget(dir); // keep the temp dir alive for the test's lifetime
     ctx
 }
@@ -164,12 +178,25 @@ async fn signing_in_pushes_local_data_and_pulls_remote_data() {
 
     // A real local write, made before signing in, exactly like a user who
     // used the app offline first.
-    let job = Job::new(LOCAL_USER_ID, "linkedin", "https://example.com/job/1", "Acme", "Staff Engineer");
+    let job = Job::new(
+        LOCAL_USER_ID,
+        "linkedin",
+        "https://example.com/job/1",
+        "Acme",
+        "Staff Engineer",
+    );
     ctx.store.put(&job).unwrap();
 
     let status = ctx
         .sync
-        .configure(&base_url, "alice@example.com", "password1234", true, "Test Desktop", true)
+        .configure(
+            &base_url,
+            "alice@example.com",
+            "password1234",
+            true,
+            "Test Desktop",
+            true,
+        )
         .await
         .unwrap();
     assert!(status.configured);
@@ -178,7 +205,13 @@ async fn signing_in_pushes_local_data_and_pulls_remote_data() {
     // flush() pushes everything enqueue_everything() queued during configure().
     let flushed = ctx.sync.flush().await.unwrap();
     assert!(flushed >= 1, "expected at least the job to be pushed");
-    let pushed_jobs = fake.docs.lock().unwrap().get("jobs").cloned().unwrap_or_default();
+    let pushed_jobs = fake
+        .docs
+        .lock()
+        .unwrap()
+        .get("jobs")
+        .cloned()
+        .unwrap_or_default();
     assert_eq!(pushed_jobs.len(), 1);
     assert_eq!(pushed_jobs.values().next().unwrap()["company"], "Acme");
 
@@ -204,7 +237,13 @@ async fn signing_in_pushes_local_data_and_pulls_remote_data() {
     // Deleting locally and flushing removes it on the backend too.
     ctx.store.delete::<Job>(&job.id).unwrap();
     ctx.sync.flush().await.unwrap();
-    let pushed_jobs_after = fake.docs.lock().unwrap().get("jobs").cloned().unwrap_or_default();
+    let pushed_jobs_after = fake
+        .docs
+        .lock()
+        .unwrap()
+        .get("jobs")
+        .cloned()
+        .unwrap_or_default();
     assert!(!pushed_jobs_after.contains_key(&job.id));
 
     ctx.sync.sign_out().await.unwrap();
@@ -217,7 +256,14 @@ async fn a_revoked_or_wrong_token_surfaces_as_a_clean_error_not_a_panic() {
     let ctx = desktop().await;
     ctx.sync.set_enabled(false).await;
     ctx.sync
-        .configure(&base_url, "bob@example.com", "password1234", true, "Test Desktop", true)
+        .configure(
+            &base_url,
+            "bob@example.com",
+            "password1234",
+            true,
+            "Test Desktop",
+            true,
+        )
         .await
         .unwrap();
 
@@ -225,7 +271,10 @@ async fn a_revoked_or_wrong_token_surfaces_as_a_clean_error_not_a_panic() {
     // dropped so the next call re-reads it from secrets (the same thing a
     // fresh process start after a revoked token would do).
     ctx.secrets
-        .set(job_hunter_core::secrets::BACKEND_DEVICE_TOKEN_KEY, "not-a-real-token")
+        .set(
+            job_hunter_core::secrets::BACKEND_DEVICE_TOKEN_KEY,
+            "not-a-real-token",
+        )
         .unwrap();
     ctx.sync.set_backend_url(base_url).await;
     let result = ctx.sync.flush().await;
@@ -237,5 +286,9 @@ async fn test_connection_pings_without_requiring_credentials() {
     let (base_url, _fake) = spawn_fake_backend().await;
     let ctx = desktop().await;
     ctx.sync.test_connection(&base_url, true).await.unwrap();
-    assert!(ctx.sync.test_connection("http://127.0.0.1:1", true).await.is_err());
+    assert!(ctx
+        .sync
+        .test_connection("http://127.0.0.1:1", true)
+        .await
+        .is_err());
 }

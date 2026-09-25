@@ -9,6 +9,7 @@
 //! tested with plain `cargo test`.
 
 pub mod agent;
+pub mod backend_url;
 pub mod chrome;
 pub mod claude;
 pub mod context;

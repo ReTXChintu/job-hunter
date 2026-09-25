@@ -34,3 +34,9 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# Uploaded app builds served by the backend
+apps/backend/downloads/
+
+# PM2 runtime files
+.pm2/

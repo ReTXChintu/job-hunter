@@ -7,6 +7,7 @@ import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDataRoutes } from "./routes/data.js";
 import { registerDeviceRoutes } from "./routes/devices.js";
 import { registerPairingRoutes } from "./routes/pairing.js";
+import { registerStaticRoutes } from "./routes/static.js";
 import { registerWsRoute } from "./routes/ws.js";
 import type { AppState } from "./state.js";
 
@@ -45,6 +46,7 @@ export async function buildApp(state: AppState): Promise<FastifyInstance> {
   registerPairingRoutes(app, state);
   registerDataRoutes(app, state);
   registerWsRoute(app, state);
+  await registerStaticRoutes(app, state);
 
   return app;
 }

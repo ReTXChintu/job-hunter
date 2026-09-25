@@ -5,14 +5,15 @@ directly, so the mobile app can read jobs and applications without the
 desktop being online, and so the desktop's own persistence eventually goes
 through one place instead of talking to MongoDB directly from Rust.
 
-**Status: the desktop app signs in to this backend and syncs its local
-data through it (Settings → Backend account, or Setup step 4) instead of
-talking to MongoDB directly.** This is entirely optional -- skip it and
-the app stays local-only, exactly as before. The **mobile app is not yet**
-pointed at this backend: it still uses
-[`job-hunter-relay`](../crates/job-hunter-relay) (see
-[`relay.md`](relay.md)) for accounts, pairing and presence. See "Rollout
-plan" below for what's left.
+**Status: this is the one server in a deployment.** It serves the API, the
+read-only web app (`apps/web`) at `/`, and the Android APK at
+`/downloads/android`, reached as plain `http://<ip>:<port>` and run under
+PM2 (see [`deploy.md`](deploy.md)). The desktop app syncs its local data
+through it (Settings → Backend account) and routes the mobile app's live
+connection through it too (Settings → Mobile app), since it speaks the
+relay's protocol. Its address is baked into the desktop and mobile builds;
+neither has a URL field. Signing in stays optional: without it the desktop
+is local-only, exactly as before.
 
 ## Why this exists
 
@@ -129,27 +130,45 @@ against a real minimal HTTP server (not a mock) implementing the same
 routes this backend exposes: sign-in, push a local write, pull a
 remote-only write down, delete-and-sync, and a revoked-token failure path.
 
+## Build-time server address
+
+`crates/job-hunter-core/src/backend_url.rs` resolves the address the desktop
+uses: `JOB_HUNTER_BACKEND_URL` at compile time (CI, from the `BACKEND_URL`
+secret), else the same variable at run time (the root `.env` in
+development), else `http://127.0.0.1:8788`. The Tauri commands pass it to
+both `SyncWorker::configure` and `RemoteClient::register`/`login`, so there
+is no way to point a release build anywhere else. A plain `http://` address
+is accepted because the builder chose it. On start, `AppContext::init`
+rewrites any previously saved address to the current one, so a signed-in
+desktop follows the server to a new IP after an update.
+
+The mobile app does the same with `--dart-define=BACKEND_URL=...`
+(`apps/mobile/lib/config.dart`).
+
+## The web app
+
+`apps/web` is a small, read-only React app for checking on things from any
+browser: an overview (counts, what needs you, whether the desktop is
+online, the APK download), the application list and detail, and the job
+list. It signs in with the same email and password (access token plus
+refresh token, refreshed transparently) and reads only
+`/v1/applications`, `/v1/data/jobs`, `/v1/data/job_analyses`, `/v1/devices`
+and `/v1/downloads`. It never approves, rejects or applies; those stay in
+the desktop and mobile apps. It uses hash routes (`#/applications/<id>`),
+so the backend serves it as plain static files.
+
 ## What's left
 
-1. **Mobile app.** Point `ApiClient`/`RelayClient` at this backend's URL
-   instead of the relay's, and add direct calls to `GET /v1/applications`
-   / `GET /v1/applications/:id` for the read side, so the app works even
-   when the desktop is unreachable -- exactly the capability this backend
-   was built to add. Approve/reject/apply/answer-questions can stay live
-   WebSocket requests to a connected desktop (unchanged), or move to plain
-   writes through the data API that the desktop's own sync worker already
-   picks up and reacts to next time it's running -- a real design choice
-   to make deliberately, not something already committed to.
-2. **Retire `job-hunter-relay`.** Once the mobile app is pointed here, the
-   relay crate's accounts/devices/pairing/WebSocket-hub role is fully
-   superseded by this backend (whose `auth.ts`/`hub.ts` are direct ports
-   of the relay's own `auth.rs`/`hub.rs`) -- it can be removed rather than
-   run alongside it.
+1. **Mobile reads without the desktop.** The mobile app now connects to
+   this server, but still fetches data by asking a connected desktop over
+   the WebSocket. Pointing its read side at `GET /v1/applications` (as the
+   web app does) would let it show data while the desktop is off.
+2. **Retire `job-hunter-relay`.** Nothing in a deployment uses the relay
+   crate any more; this backend's `auth.ts`/`hub.ts` are direct ports of
+   its `auth.rs`/`hub.rs`. It can be removed once nobody runs one.
+3. **One sign-in on the desktop.** Backend account and Mobile app are
+   still two separate sign-ins to the same account; they could share one.
 
 ## Deploying it
 
-See [`../apps/backend/README.md`](../apps/backend/README.md) for local
-development and [`../apps/backend/.env.example`](../apps/backend/.env.example)
-for configuration. Deployment shape mirrors [`relay.md`](relay.md) --
-Docker image, HTTPS via a reverse proxy, point it at the same MongoDB
-Atlas cluster the desktop app already uses.
+See [`deploy.md`](deploy.md).

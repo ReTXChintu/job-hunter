@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../config.dart';
 import '../state/auth_controller.dart';
 import 'pairing_scan_screen.dart';
 
@@ -34,12 +35,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
+  String get _serverUrl => hasBuiltInServer ? kBuiltInServerUrl : _relayCtrl.text;
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthController>();
     final ok = _isRegister
-        ? await auth.signUp(relayUrl: _relayCtrl.text, email: _emailCtrl.text, password: _passwordCtrl.text, deviceName: _deviceNameCtrl.text)
-        : await auth.signIn(relayUrl: _relayCtrl.text, email: _emailCtrl.text, password: _passwordCtrl.text, deviceName: _deviceNameCtrl.text);
+        ? await auth.signUp(relayUrl: _serverUrl, email: _emailCtrl.text, password: _passwordCtrl.text, deviceName: _deviceNameCtrl.text)
+        : await auth.signIn(relayUrl: _serverUrl, email: _emailCtrl.text, password: _passwordCtrl.text, deviceName: _deviceNameCtrl.text);
     if (ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Signed in.')));
     }
@@ -65,16 +68,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 8),
-                  Text('This connects to the relay you host yourself, not a service we run.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  Text('This connects to the Job Hunter server you host yourself, not a service we run.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 20),
-                  TextFormField(
-                    controller: _relayCtrl,
-                    decoration: const InputDecoration(labelText: 'Relay URL', hintText: 'https://relay.example.com'),
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
+                  if (!hasBuiltInServer) ...[
+                    TextFormField(
+                      controller: _relayCtrl,
+                      decoration: const InputDecoration(labelText: 'Server URL', hintText: 'http://192.168.1.10:8788'),
+                      keyboardType: TextInputType.url,
+                      autocorrect: false,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextFormField(
                     controller: _emailCtrl,
                     decoration: const InputDecoration(labelText: 'Email'),

@@ -2,12 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ResumeDocument } from "@job-hunter/types";
 import { invoke } from "./tauri";
 
-interface RemoteAuthArgs {
-  relayUrl: string;
+interface AuthArgs {
   email: string;
   password: string;
   deviceName?: string;
-  allowInsecure?: boolean;
 }
 
 export const keys = {
@@ -83,26 +81,20 @@ export function useSaveSettings() {
   return useMutation({ mutationFn: (settings: AppSettings) => invoke("save_settings", { settings }), onSuccess: () => inv([keys.settings, keys.setup, keys.dashboard]) });
 }
 
-interface BackendAuthArgs {
-  backendUrl: string;
-  email: string;
-  password: string;
-  deviceName?: string;
-  allowInsecure?: boolean;
-}
+export const useServerInfo = () => useQuery({ queryKey: ["serverInfo"], queryFn: () => invoke("get_server_info"), staleTime: Infinity });
 
 export function useTestBackend() {
-  return useMutation({ mutationFn: (args: { backendUrl: string; allowInsecure?: boolean }) => invoke("test_backend", args) });
+  return useMutation({ mutationFn: () => invoke("test_backend") });
 }
 
 export function useBackendRegister() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: BackendAuthArgs) => invoke("backend_register", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
+  return useMutation({ mutationFn: (args: AuthArgs) => invoke("backend_register", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
 }
 
 export function useBackendLogin() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: BackendAuthArgs) => invoke("backend_login", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
+  return useMutation({ mutationFn: (args: AuthArgs) => invoke("backend_login", args), onSuccess: () => inv([keys.setup, keys.sync, keys.settings, keys.dashboard]) });
 }
 
 export function useBackendLogout() {
@@ -274,12 +266,12 @@ export const useRemoteDevices = (enabled: boolean) => useQuery({ queryKey: keys.
 
 export function useRemoteRegister() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: RemoteAuthArgs) => invoke("remote_register", args), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
+  return useMutation({ mutationFn: (args: AuthArgs) => invoke("remote_register", args), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
 }
 
 export function useRemoteLogin() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: RemoteAuthArgs) => invoke("remote_login", args), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
+  return useMutation({ mutationFn: (args: AuthArgs) => invoke("remote_login", args), onSuccess: () => inv([keys.remoteStatus, keys.remoteDevices, keys.setup]) });
 }
 
 export function useRemoteLogout() {

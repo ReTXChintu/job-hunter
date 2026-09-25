@@ -19,7 +19,7 @@ Claude ──► Claude in Chrome ──► Google Chrome ──► job websites
 
 Data is stored locally under your app data directory. Mirroring it to MongoDB Atlas is optional and goes through a self-hosted **Node backend** (`apps/backend`, see [docs/backend.md](docs/backend.md)) — sign in from Settings → Backend account or the setup wizard, or skip it and stay local-only.
 
-An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone. It runs no AI and holds no job data of its own — it's a thin review client that reaches your desktop through a small relay service you self-host, only when you choose to pair it. See [docs/mobile.md](docs/mobile.md) and [docs/relay.md](docs/relay.md). The relay's accounts/pairing/presence role will eventually move onto the same backend so the mobile app can read your data even when the desktop is offline — see [docs/backend.md](docs/backend.md) for what's already wired in and what's left.
+An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone, and a read-only **web app** (`apps/web`) shows your jobs and applications in any browser. Neither runs AI or holds job data of its own; both reach your data through the same self-hosted server, reached as `http://<ip>:<port>`. See [docs/mobile.md](docs/mobile.md), [docs/backend.md](docs/backend.md) and [docs/deploy.md](docs/deploy.md).
 
 ## What it does
 
@@ -74,6 +74,7 @@ job-hunter/
 │   ├── src/                 React UI (Vite, Chakra UI, TanStack Query/Router)
 │   └── src-tauri/           Tauri shell: commands + event forwarding
 ├── apps/mobile/             Flutter companion app (review-only, no AI) -- see docs/mobile.md
+├── apps/web/                Read-only web app, served by the backend -- see docs/backend.md
 ├── apps/backend/            Self-hosted Node/Fastify backend the desktop app can sign
 │                            into (Settings → Backend account) -- owns MongoDB Atlas
 │                            data directly -- see docs/backend.md
@@ -109,8 +110,9 @@ job-hunter/
 - [docs/agent.md](docs/agent.md) — state machine, events, commands
 - [docs/workflows.md](docs/workflows.md) — job hunt, approval, application, manual fallback
 - [docs/mobile.md](docs/mobile.md) — the Flutter companion app: what it can/can't do, building it
-- [docs/relay.md](docs/relay.md) — self-hosting the relay the mobile app connects through today
-- [docs/backend.md](docs/backend.md) — the Node backend that will replace the relay's data path: what's built, what's still ahead
+- [docs/deploy.md](docs/deploy.md) — running the server under PM2, GitHub secrets, building the Windows and Android apps
+- [docs/backend.md](docs/backend.md) — the self-hosted server: API, web app, APK downloads, build-time server address
+- [docs/relay.md](docs/relay.md) — the older standalone relay, superseded by the backend
 - [docs/mobile-protocol.md](docs/mobile-protocol.md) — the wire protocol between desktop, relay and phone
 - [docs/security.md](docs/security.md) — what is never stored or logged
 - [docs/development.md](docs/development.md) — commands, mock mode, tests

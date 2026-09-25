@@ -53,20 +53,21 @@ export interface EventPayloads {
   "remote:status": RemoteStatus;
 }
 
+/** The server this build talks to; fixed when the app is built. */
+export interface ServerInfo {
+  url: string;
+  builtIn: boolean;
+}
+
 /** Every command: name → { args, result }. */
 export interface Commands {
   get_setup_status: { args: Record<string, never>; result: SetupStatus };
   get_settings: { args: Record<string, never>; result: AppSettings };
   save_settings: { args: { settings: AppSettings }; result: AppSettings };
-  test_backend: { args: { backendUrl: string; allowInsecure?: boolean }; result: null };
-  backend_register: {
-    args: { backendUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
-    result: SyncStatus;
-  };
-  backend_login: {
-    args: { backendUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
-    result: SyncStatus;
-  };
+  get_server_info: { args: Record<string, never>; result: ServerInfo };
+  test_backend: { args: Record<string, never>; result: null };
+  backend_register: { args: { email: string; password: string; deviceName?: string }; result: SyncStatus };
+  backend_login: { args: { email: string; password: string; deviceName?: string }; result: SyncStatus };
   backend_logout: { args: Record<string, never>; result: SyncStatus };
   get_sync_status: { args: Record<string, never>; result: SyncStatus };
 
@@ -128,14 +129,8 @@ export interface Commands {
   get_dashboard: { args: Record<string, never>; result: Dashboard };
 
   get_remote_status: { args: Record<string, never>; result: RemoteStatus };
-  remote_register: {
-    args: { relayUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
-    result: RemoteStatus;
-  };
-  remote_login: {
-    args: { relayUrl: string; email: string; password: string; deviceName?: string; allowInsecure?: boolean };
-    result: RemoteStatus;
-  };
+  remote_register: { args: { email: string; password: string; deviceName?: string }; result: RemoteStatus };
+  remote_login: { args: { email: string; password: string; deviceName?: string }; result: RemoteStatus };
   remote_logout: { args: Record<string, never>; result: RemoteStatus };
   remote_create_pairing_code: { args: Record<string, never>; result: PairingCode };
   remote_list_devices: { args: Record<string, never>; result: RemoteDevice[] };

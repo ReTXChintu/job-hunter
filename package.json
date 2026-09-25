@@ -16,6 +16,17 @@
     "test": "pnpm -r test",
     "test:rust": "cargo test --workspace",
     "check:rust": "cargo clippy --workspace --all-targets -- -D warnings",
-    "fmt:rust": "cargo fmt --all"
+    "fmt:rust": "cargo fmt --all",
+    "server:build": "pnpm --filter @job-hunter/web build && pnpm --filter @job-hunter/backend build",
+    "server:start": "pm2 startOrReload ecosystem.config.cjs --update-env",
+    "server:stop": "pm2 stop ecosystem.config.cjs",
+    "server:restart": "pm2 restart ecosystem.config.cjs --update-env",
+    "server:logs": "pm2 logs job-hunter-backend --lines 200",
+    "server:status": "pm2 status",
+    "server:delete": "pm2 delete ecosystem.config.cjs",
+    "server:update": "git pull --ff-only && pnpm install --frozen-lockfile && pnpm server:build && pnpm server:start"
+  },
+  "devDependencies": {
+    "pm2": "^7.0.4"
   }
 }

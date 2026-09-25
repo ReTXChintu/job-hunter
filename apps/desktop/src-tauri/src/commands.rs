@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use job_hunter_core::agent::orchestrator::{self, JobHuntOptions};
+use job_hunter_core::backend_url;
 use job_hunter_core::context::{
     ApplicationDetail, ApplicationListItem, Dashboard, JobDetail, JobListItem, SetupStatus,
 };
@@ -62,52 +63,74 @@ async fn set_backend_account_email(ctx: &Arc<AppContext>, email: &str) -> R<()> 
     Ok(())
 }
 
+/// The server this build talks to (fixed at build time, see
+/// `job_hunter_core::backend_url`). Shown read-only in Settings.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerInfo {
+    url: String,
+    built_in: bool,
+}
+
 #[tauri::command]
-pub async fn test_backend(ctx: Ctx<'_>, backend_url: String, allow_insecure: Option<bool>) -> R<()> {
+pub async fn get_server_info() -> R<ServerInfo> {
+    Ok(ServerInfo {
+        url: backend_url::configured(),
+        built_in: backend_url::is_built_in(),
+    })
+}
+
+#[tauri::command]
+pub async fn test_backend(ctx: Ctx<'_>) -> R<()> {
     ctx.sync
-        .test_connection(&backend_url, allow_insecure.unwrap_or(false))
+        .test_connection(&backend_url::configured(), true)
         .await
         .map_err(Into::into)
+}
+
+async fn backend_sign_in(
+    ctx: &Arc<AppContext>,
+    email: String,
+    password: String,
+    device_name: Option<String>,
+    is_register: bool,
+) -> R<SyncStatus> {
+    set_backend_device_name(ctx, device_name).await?;
+    let device_name = ctx.settings().await.backend.device_name;
+    let status = ctx
+        .sync
+        .configure(
+            &backend_url::configured(),
+            &email,
+            &password,
+            is_register,
+            &device_name,
+            true,
+        )
+        .await
+        .map_err(UserFacingError::from)?;
+    set_backend_account_email(ctx, &email).await?;
+    Ok(status)
 }
 
 #[tauri::command]
 pub async fn backend_register(
     ctx: Ctx<'_>,
-    backend_url: String,
     email: String,
     password: String,
     device_name: Option<String>,
-    allow_insecure: Option<bool>,
 ) -> R<SyncStatus> {
-    set_backend_device_name(&ctx, device_name).await?;
-    let device_name = ctx.settings().await.backend.device_name;
-    let status = ctx
-        .sync
-        .configure(&backend_url, &email, &password, true, &device_name, allow_insecure.unwrap_or(false))
-        .await
-        .map_err(UserFacingError::from)?;
-    set_backend_account_email(&ctx, &email).await?;
-    Ok(status)
+    backend_sign_in(&ctx, email, password, device_name, true).await
 }
 
 #[tauri::command]
 pub async fn backend_login(
     ctx: Ctx<'_>,
-    backend_url: String,
     email: String,
     password: String,
     device_name: Option<String>,
-    allow_insecure: Option<bool>,
 ) -> R<SyncStatus> {
-    set_backend_device_name(&ctx, device_name).await?;
-    let device_name = ctx.settings().await.backend.device_name;
-    let status = ctx
-        .sync
-        .configure(&backend_url, &email, &password, false, &device_name, allow_insecure.unwrap_or(false))
-        .await
-        .map_err(UserFacingError::from)?;
-    set_backend_account_email(&ctx, &email).await?;
-    Ok(status)
+    backend_sign_in(&ctx, email, password, device_name, false).await
 }
 
 #[tauri::command]
@@ -555,20 +578,15 @@ pub async fn get_remote_status(remote: RemoteCtx<'_>) -> R<RemoteStatus> {
 pub async fn remote_register(
     ctx: Ctx<'_>,
     remote: RemoteCtx<'_>,
-    relay_url: String,
     email: String,
     password: String,
     device_name: Option<String>,
-    allow_insecure: Option<bool>,
 ) -> R<RemoteStatus> {
     set_device_name(&ctx, device_name).await?;
+    // The mobile app connects through the same server as data sync: the
+    // backend speaks the relay's protocol.
     remote
-        .register(
-            &relay_url,
-            &email,
-            &password,
-            allow_insecure.unwrap_or(false),
-        )
+        .register(&backend_url::configured(), &email, &password, true)
         .await
         .map_err(UserFacingError::from)?;
     Ok(remote.status().await)
@@ -578,20 +596,15 @@ pub async fn remote_register(
 pub async fn remote_login(
     ctx: Ctx<'_>,
     remote: RemoteCtx<'_>,
-    relay_url: String,
     email: String,
     password: String,
     device_name: Option<String>,
-    allow_insecure: Option<bool>,
 ) -> R<RemoteStatus> {
     set_device_name(&ctx, device_name).await?;
+    // The mobile app connects through the same server as data sync: the
+    // backend speaks the relay's protocol.
     remote
-        .login(
-            &relay_url,
-            &email,
-            &password,
-            allow_insecure.unwrap_or(false),
-        )
+        .login(&backend_url::configured(), &email, &password, true)
         .await
         .map_err(UserFacingError::from)?;
     Ok(remote.status().await)

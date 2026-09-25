@@ -83,9 +83,15 @@ or emulator the normal Flutter way:
 
 ```bash
 flutter run                 # whatever device/emulator is connected
-flutter build apk           # Android
+flutter build apk --release --dart-define=BACKEND_URL=http://<server-ip>:<port>
 flutter build ios           # iOS (on macOS, with signing configured)
 ```
+
+The server address is compiled in with `--dart-define=BACKEND_URL=...`
+(see `lib/config.dart`). With it, the app has no server URL field; without
+it (a plain `flutter run`), the sign-in and pairing screens ask for one,
+which is only meant for development. Release APKs are normally built by CI
+from the `BACKEND_URL` secret: see [deploy.md](deploy.md).
 
 A Windows desktop build also works as a quick sanity check without a
 phone or emulator (`flutter create --platforms=windows .` once, then

@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
+import '../config.dart';
 import '../state/auth_controller.dart';
 
 /// Pairs this phone using a one-time code minted on the desktop (Settings
 /// > Mobile app > Generate pairing code). The QR just encodes
 /// `{"code": "..."}` -- see `apps/desktop/src/components/MobileAppSettings.tsx`
-/// -- so the relay URL is always typed here once and remembered by the
-/// desktop's own display, never assumed from the QR.
+/// -- and the server URL is built into the app (see `lib/config.dart`),
+/// never taken from the QR.
 class PairingScanScreen extends StatefulWidget {
   const PairingScanScreen({super.key});
 
@@ -68,12 +69,14 @@ class _PairingScanScreenState extends State<PairingScanScreen> {
     _submit();
   }
 
+  String get _serverUrl => hasBuiltInServer ? kBuiltInServerUrl : _relayCtrl.text;
+
   Future<void> _submit() async {
-    if (_relayCtrl.text.trim().isEmpty || _codeCtrl.text.trim().isEmpty) {
+    if (_serverUrl.trim().isEmpty || _codeCtrl.text.trim().isEmpty) {
       if (!_formKey.currentState!.validate()) return;
     }
     final auth = context.read<AuthController>();
-    final ok = await auth.pairWithCode(relayUrl: _relayCtrl.text, code: _codeCtrl.text, deviceName: _deviceNameCtrl.text);
+    final ok = await auth.pairWithCode(relayUrl: _serverUrl, code: _codeCtrl.text, deviceName: _deviceNameCtrl.text);
     if (ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Paired.')));
     }
@@ -92,14 +95,16 @@ class _PairingScanScreenState extends State<PairingScanScreen> {
             const SizedBox(height: 8),
             Text('Scan the QR code, or type the code shown in Settings > Mobile app on your desktop.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 20),
-            TextFormField(
-              controller: _relayCtrl,
-              decoration: const InputDecoration(labelText: 'Relay URL', hintText: 'https://relay.example.com'),
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
+            if (!hasBuiltInServer) ...[
+              TextFormField(
+                controller: _relayCtrl,
+                decoration: const InputDecoration(labelText: 'Server URL', hintText: 'http://192.168.1.10:8788'),
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+            ],
             if (_scanning)
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
