@@ -6,6 +6,7 @@ import { InMemoryDb } from "./inMemoryDb.js";
 export function testConfig(overrides: Partial<BackendConfig> = {}): BackendConfig {
   return {
     port: 0,
+    webPort: null,
     mongoUri: "unused-in-tests",
     mongoDatabase: "unused-in-tests",
     jwtSecret: "test-secret",

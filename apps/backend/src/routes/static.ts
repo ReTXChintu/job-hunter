@@ -106,7 +106,7 @@ async function dirHasIndex(dir: string): Promise<boolean> {
   return !!s?.isFile();
 }
 
-export async function registerStaticRoutes(app: FastifyInstance, state: AppState): Promise<void> {
+export async function registerStaticRoutes(app: FastifyInstance, state: AppState, { serveWeb = true }: { serveWeb?: boolean } = {}): Promise<void> {
   const { downloadsDir, webDir } = state.config;
 
   app.get("/v1/downloads", async () => {
@@ -134,6 +134,7 @@ export async function registerStaticRoutes(app: FastifyInstance, state: AppState
     };
   });
 
+  if (!serveWeb) return;
   if (await dirHasIndex(webDir)) {
     await app.register(fastifyStatic, { root: webDir, prefix: "/" });
     app.log.info({ webDir }, "serving the web app");

@@ -11,7 +11,12 @@ import { registerStaticRoutes } from "./routes/static.js";
 import { registerWsRoute } from "./routes/ws.js";
 import type { AppState } from "./state.js";
 
-export async function buildApp(state: AppState): Promise<FastifyInstance> {
+export interface BuildAppOptions {
+  /** Serve the web app at `/`. Off for the API-only listener. Default true. */
+  serveWeb?: boolean;
+}
+
+export async function buildApp(state: AppState, options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   await app.register(cors, {
@@ -46,7 +51,7 @@ export async function buildApp(state: AppState): Promise<FastifyInstance> {
   registerPairingRoutes(app, state);
   registerDataRoutes(app, state);
   registerWsRoute(app, state);
-  await registerStaticRoutes(app, state);
+  await registerStaticRoutes(app, state, { serveWeb: options.serveWeb ?? true });
 
   return app;
 }

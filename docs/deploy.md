@@ -3,12 +3,13 @@
 One server runs everything that isn't the desktop app: the backend API
 (accounts, data sync, mobile connectivity), the read-only web app, and the
 Android APK download. It is reached as plain `http://<server-ip>:<port>`;
-no domain or TLS certificate is needed.
+no domain or TLS certificate is needed. It can use one port for everything,
+or, as in this setup, two:
 
 ```
-http://<ip>:<port>/                    web app (sign in, view jobs and applications)
-http://<ip>:<port>/downloads/android   the latest Android APK
-http://<ip>:<port>/v1/...              API used by the desktop, mobile and web apps
+http://187.127.179.114:50007/v1/...              API: desktop and mobile apps (BACKEND_URL)
+http://187.127.179.114:50007/downloads/android   the latest Android APK
+http://187.127.179.114:50006/                    web app (sign in, view jobs and applications)
 ```
 
 The desktop installer and the APK are built by GitHub Actions with that
@@ -31,13 +32,15 @@ The whole repo shares that one `.env` at its root. On the server, only its
 
 | Variable | Value |
 | --- | --- |
-| `JOB_HUNTER_BACKEND_PORT` | The port clients use, e.g. `8788`. |
+| `JOB_HUNTER_BACKEND_PORT` | The API port the desktop and mobile apps use, e.g. `50007`. `BACKEND_URL` must point here. |
+| `JOB_HUNTER_BACKEND_WEB_PORT` | Optional. A separate port for the web app, e.g. `50006`. Leave empty to serve the web app on the API port. |
+| `JOB_HUNTER_BACKEND_CORS_ORIGINS` | With a separate web port, set this to the web app's address, e.g. `http://187.127.179.114:50006`, so only it may call the API from a browser. |
 | `JOB_HUNTER_BACKEND_MONGODB_URI` | Your MongoDB Atlas connection string. If `mongodb+srv://` fails with `querySrv ETIMEOUT`, use Atlas's non-SRV (`mongodb://host1,host2,host3/...`) string. |
 | `JOB_HUNTER_BACKEND_JWT_SECRET` | **Required.** A long random value: `openssl rand -hex 32`. The server refuses to start without it. |
 
-Allow the server's public IP in Atlas → Network Access, and open the port
-in the server's firewall (for example `sudo ufw allow 8788/tcp`, plus your
-cloud provider's security group).
+Allow the server's public IP in Atlas → Network Access, and open the ports
+in the server's firewall (for example `sudo ufw allow 50006/tcp` and
+`sudo ufw allow 50007/tcp`, plus your cloud provider's security group).
 
 Build and start:
 
@@ -46,8 +49,8 @@ pnpm server:build     # builds the web app and the backend
 pnpm server:start     # starts it under PM2 (reloads it if already running)
 ```
 
-Check it: `curl http://<ip>:<port>/healthz` should print `ok`, and the
-web app should load in a browser.
+Check it: `curl http://<ip>:<api-port>/healthz` should print `ok`, and the
+web app should load in a browser at `http://<ip>:<web-port>/`.
 
 ### Day-to-day commands
 
@@ -80,7 +83,7 @@ secret.
 
 | Secret | Required | Value |
 | --- | --- | --- |
-| `BACKEND_URL` | Yes | `http://<server-ip>:<port>`, e.g. `http://203.0.113.10:8788`. Baked into both apps. |
+| `BACKEND_URL` | Yes | The API address, `http://<server-ip>:<api-port>`: here `http://187.127.179.114:50007`. Baked into both apps. Not the web port. |
 | `ANDROID_KEYSTORE_BASE64` | Strongly recommended | Your release signing key, base64-encoded (see below). |
 | `ANDROID_KEYSTORE_PASSWORD` | With the keystore | The keystore password. |
 | `ANDROID_KEY_ALIAS` | With the keystore | The key alias, e.g. `job-hunter`. |

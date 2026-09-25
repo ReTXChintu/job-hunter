@@ -9,7 +9,15 @@ import path from "node:path";
 import { REPO_ROOT } from "./paths.js";
 
 export interface BackendConfig {
+  /** API port: what the desktop and mobile apps are built to talk to. */
   port: number;
+  /**
+   * Optional separate port for the web app. When set (and different from
+   * `port`), the web app is served there instead of on the API port; that
+   * listener also answers the API calls the page makes, so the page stays
+   * same-origin. Unset: the web app is served on the API port.
+   */
+  webPort: number | null;
   mongoUri: string;
   mongoDatabase: string;
   jwtSecret: string;
@@ -46,6 +54,7 @@ export function loadConfig(): BackendConfig {
   }
   return {
     port: envInt("JOB_HUNTER_BACKEND_PORT", 8788),
+    webPort: envInt("JOB_HUNTER_BACKEND_WEB_PORT", 0) || null,
     mongoUri,
     mongoDatabase: process.env.JOB_HUNTER_BACKEND_MONGODB_DATABASE ?? "job_hunter",
     jwtSecret: jwtSecret || "dev-only-insecure-secret-change-me",
