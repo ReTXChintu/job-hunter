@@ -8,6 +8,8 @@ export interface AppState {
   db: Db;
   hub: Hub;
   authLimiter: RateLimiter;
+  /** deviceId -> when its "last seen" was last written (see presence.ts). */
+  lastTouched: Map<string, number>;
 }
 
 export function createAppState(config: BackendConfig, db: Db): AppState {
@@ -16,5 +18,6 @@ export function createAppState(config: BackendConfig, db: Db): AppState {
     db,
     hub: new Hub(),
     authLimiter: new RateLimiter(10, 60_000),
+    lastTouched: new Map(),
   };
 }

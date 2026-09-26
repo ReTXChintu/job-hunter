@@ -11,6 +11,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { sha256Hex, verifyAccessToken } from "../auth.js";
 import { Errors } from "../errors.js";
+import { markSeen } from "../presence.js";
 import type { AppState } from "../state.js";
 
 export async function requireAuth(state: AppState, request: FastifyRequest, reply: FastifyReply): Promise<string | undefined> {
@@ -24,7 +25,10 @@ export async function requireAuth(state: AppState, request: FastifyRequest, repl
   const fromJwt = await verifyAccessToken(state.config.jwtSecret, token);
   if (fromJwt) return fromJwt;
   const device = await state.db.findDeviceByTokenHash(sha256Hex(token));
-  if (device) return device.userId;
+  if (device) {
+    markSeen(state, device.id);
+    return device.userId;
+  }
   const err = Errors.unauthorized();
   reply.status(err.status).send(err.toBody());
   return undefined;

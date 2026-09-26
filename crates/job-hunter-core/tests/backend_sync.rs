@@ -27,6 +27,8 @@ use job_hunter_core::AppContext;
 struct FakeBackend {
     docs: Mutex<HashMap<String, HashMap<String, Value>>>,
     valid_tokens: Mutex<Vec<String>>,
+    /// Authorised GET /v1/devices calls: what the idle heartbeat sends.
+    device_pings: Mutex<usize>,
 }
 
 type SharedFake = Arc<FakeBackend>;
@@ -72,6 +74,7 @@ async fn register_device(
 
 async fn list_devices(State(fake): State<SharedFake>, headers: HeaderMap) -> StatusCode {
     if authorized(&headers, &fake) {
+        *fake.device_pings.lock().unwrap() += 1;
         StatusCode::OK
     } else {
         StatusCode::UNAUTHORIZED
@@ -291,4 +294,36 @@ async fn test_connection_pings_without_requiring_credentials() {
         .test_connection("http://127.0.0.1:1", true)
         .await
         .is_err());
+}
+
+#[tokio::test]
+async fn the_idle_heartbeat_checks_in_with_the_device_token() {
+    let (base_url, fake) = spawn_fake_backend().await;
+    let ctx = desktop().await;
+    ctx.sync.set_enabled(false).await;
+    ctx.sync
+        .configure(
+            &base_url,
+            "carol@example.com",
+            "password1234",
+            true,
+            "Test Desktop",
+            true,
+        )
+        .await
+        .unwrap();
+
+    ctx.sync.heartbeat().await.unwrap();
+    ctx.sync.heartbeat().await.unwrap();
+    assert_eq!(*fake.device_pings.lock().unwrap(), 2);
+
+    // A revoked token turns the heartbeat into an error the status bar shows.
+    ctx.secrets
+        .set(
+            job_hunter_core::secrets::BACKEND_DEVICE_TOKEN_KEY,
+            "revoked",
+        )
+        .unwrap();
+    ctx.sync.set_backend_url(base_url).await;
+    assert!(ctx.sync.heartbeat().await.is_err());
 }

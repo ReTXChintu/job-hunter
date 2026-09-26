@@ -237,6 +237,19 @@ impl SyncWorker {
         Ok(flushed)
     }
 
+    /// A lightweight authenticated request that tells the server this
+    /// desktop is running (see `apps/backend/src/presence.ts`), and confirms
+    /// the server is reachable and the device token still valid. The run
+    /// loop sends one whenever a cycle has nothing else to send, i.e. about
+    /// once a minute while idle.
+    pub async fn heartbeat(&self) -> CoreResult<()> {
+        let result = self.client().await?.ping().await;
+        if result.is_err() {
+            *self.client.lock().await = None;
+        }
+        result
+    }
+
     /// Long-running loop. Spawn with `tokio::spawn(worker.run())`.
     pub async fn run(self: Arc<Self>) {
         let mut pulled_once = false;
@@ -263,7 +276,14 @@ impl SyncWorker {
                     }
                 }
                 if ok {
-                    match self.flush().await {
+                    let result = match self.flush().await {
+                        // Nothing to send: check in anyway, so the server
+                        // knows this desktop is running (sync holds no open
+                        // connection that would show it otherwise).
+                        Ok(0) => self.heartbeat().await.map(|()| 0),
+                        other => other,
+                    };
+                    match result {
                         Ok(n) => {
                             let mut s = self.status.write().await;
                             s.connected = true;

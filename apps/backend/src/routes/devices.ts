@@ -5,6 +5,7 @@ import { Errors } from "../errors.js";
 import type { DeviceKind } from "../models.js";
 import { requireAuth } from "../plugins/auth.js";
 import type { AppState } from "../state.js";
+import { recentlySeen } from "../presence.js";
 
 function parseDeviceKind(kind: unknown): DeviceKind {
   if (kind === "desktop" || kind === "mobile") return kind;
@@ -42,7 +43,8 @@ export function registerDeviceRoutes(app: FastifyInstance, state: AppState): voi
     if (!userId) return;
     const devices = await state.db.listDevices(userId);
     reply.send({
-      devices: devices.map((d) => ({ ...d, online: state.hub.isOnline(userId, d.id) })),
+      // Online: a live socket (mobile-app connection) or a recent request (desktop sync).
+      devices: devices.map((d) => ({ ...d, online: state.hub.isOnline(userId, d.id) || recentlySeen(d.lastSeenAt) })),
     });
   });
 

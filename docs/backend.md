@@ -157,6 +157,16 @@ and `/v1/downloads`. It never approves, rejects or applies; those stay in
 the desktop and mobile apps. It uses hash routes (`#/applications/<id>`),
 so the backend serves it as plain static files.
 
+## Device presence
+
+A device counts as online (the web app's "Desktop online", the device lists)
+if it holds a live WebSocket (the mobile-app connection) or has made a
+request with its device token in the last 2.5 minutes
+(`src/presence.ts`). The desktop's data sync holds no socket, so it sends a
+heartbeat about once a minute while it has nothing else to send
+(`SyncWorker::heartbeat`). A desktop that's closed shows offline within
+2.5 minutes.
+
 ## Downloads and updates
 
 `GET /v1/downloads` lists the newest APK and Windows installer in the
