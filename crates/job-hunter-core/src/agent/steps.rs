@@ -243,19 +243,24 @@ pub async fn preflight(step: &StepCtx, needs_browser: bool) -> CoreResult<Prefli
 // Discovery
 // ---------------------------------------------------------------------------
 
+/// Upper bound on search phrases per source, to keep one discovery run within
+/// its turn and budget limits. Target roles beyond it are dropped, not merged.
+pub const MAX_QUERIES: usize = 10;
+
+/// One search phrase per target role (all of them, up to [`MAX_QUERIES`]),
+/// falling back to the current title when no target roles are set.
 pub fn build_queries(profile: &CandidateProfile) -> Vec<String> {
-    let mut q: Vec<String> = profile
-        .preferences
-        .target_roles
-        .iter()
-        .map(|r| r.trim().to_string())
-        .filter(|r| !r.is_empty())
-        .collect();
+    let mut q: Vec<String> = Vec::new();
+    for role in &profile.preferences.target_roles {
+        let role = role.trim();
+        if !role.is_empty() && !q.iter().any(|r| r.eq_ignore_ascii_case(role)) {
+            q.push(role.to_string());
+        }
+    }
     if q.is_empty() && !profile.personal.current_title.trim().is_empty() {
         q.push(profile.personal.current_title.trim().to_string());
     }
-    q.dedup();
-    q.truncate(4);
+    q.truncate(MAX_QUERIES);
     q
 }
 
@@ -1130,4 +1135,46 @@ pub fn record_apply_result(
     step.app.store.put(application)?;
     step.app.store.put(job)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_target_role_becomes_a_query() {
+        let mut p = CandidateProfile::new("u");
+        p.preferences.target_roles = [
+            "Full Stack Developer",
+            "Technical Team Lead",
+            "MERN Stack Developer",
+            "Node Js. Developer",
+            "Backend Developer",
+            " backend developer ",
+            "Backend Engineer",
+            "",
+            "SDE",
+        ]
+        .map(String::from)
+        .to_vec();
+        assert_eq!(
+            build_queries(&p),
+            [
+                "Full Stack Developer",
+                "Technical Team Lead",
+                "MERN Stack Developer",
+                "Node Js. Developer",
+                "Backend Developer",
+                "Backend Engineer",
+                "SDE"
+            ]
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_current_title() {
+        let mut p = CandidateProfile::new("u");
+        p.personal.current_title = "Technical Team Lead".into();
+        assert_eq!(build_queries(&p), ["Technical Team Lead"]);
+    }
 }

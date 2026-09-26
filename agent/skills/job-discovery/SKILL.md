@@ -13,9 +13,11 @@ Find recent job postings on one job source using Claude in Chrome.
 
 1. Call `tabs_context_mcp` with `createIfEmpty: true`, then open **one** new tab with `tabs_create_mcp` and work in it.
 2. Navigate to the search URL for the source (recipes below). Prefer URL parameters over typing into search boxes.
-3. Read the results with `get_page_text` (or `read_page` when structure matters). Scroll or paginate only as needed to collect up to `maxJobs` postings within the recency window.
+3. Run **every** query in `queries`, not just the first few. Read the results with `get_page_text` (or `read_page` when structure matters). Scroll or paginate only as needed to collect up to `maxJobs` postings in total within the recency window, spreading them across the queries rather than filling the quota from the first one.
 4. For each candidate posting that matches the queries, open the posting (same tab or the results detail pane) and extract the full description, requirements, responsibilities and skills. Set `detailsComplete: true` only when the full description was read.
 5. Skip postings older than `recencyDays`, postings already in `seenUrls`, and obviously irrelevant roles (different discipline, wrong seniority by title such as "Director" or "Intern" when not targeted).
+   - A posting is relevant when its title matches **any** query or a common synonym of one: "Backend Engineer" and "Backend Developer" are the same role, "SDE" means Software Development Engineer / Software Engineer, "Node.js Developer" matches "Node Js. Developer". Do not treat a role as off-target just because another query already produced results.
+   - "Different discipline" means things like sales, support, QA-only, design or data entry — not a sibling engineering title.
 6. Return the structured result. Keep `url` exactly as shown in the address bar or link; do not shorten or rewrite it.
 7. If the site shows a login wall, CAPTCHA, "unusual activity" notice, or the page never loads: return what you have with `blocked: true` and `blockedReason`.
 

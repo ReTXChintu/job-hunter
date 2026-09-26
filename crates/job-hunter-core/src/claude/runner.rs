@@ -98,12 +98,13 @@ impl ClaudeRunner for CliClaudeRunner {
     ) -> CoreResult<ClaudeResponse> {
         std::fs::create_dir_all(&req.cwd)?;
         let args = Self::build_args(&req);
+        let stem = file_stem(&req.label);
         let log_path: PathBuf = req.cwd.join(format!(
             "{}-{}.ndjson",
-            req.label,
+            stem,
             chrono::Utc::now().format("%Y%m%dT%H%M%S")
         ));
-        let prompt_path = req.cwd.join(format!("{}-prompt.md", req.label));
+        let prompt_path = req.cwd.join(format!("{stem}-prompt.md"));
         std::fs::write(&prompt_path, &req.prompt)?;
 
         tracing::info!(label = %req.label, chrome = req.chrome, max_turns = req.max_turns, "starting claude");
@@ -256,10 +257,39 @@ impl ClaudeRunner for CliClaudeRunner {
 /// Shared handle type used throughout the agent.
 pub type SharedRunner = Arc<dyn ClaudeRunner>;
 
+/// Labels like `discover:linkedin` are fine in logs but not in file names: on
+/// Windows a `:` makes NTFS write an alternate data stream on a file named
+/// `discover` instead, hiding the transcript.
+fn file_stem(label: &str) -> String {
+    let stem: String = label
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    if stem.is_empty() {
+        "claude".into()
+    } else {
+        stem
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn transcript_file_names_have_no_colons() {
+        assert_eq!(file_stem("discover:linkedin"), "discover-linkedin");
+        assert_eq!(file_stem("parse_profile"), "parse_profile");
+        assert_eq!(file_stem("extract:acme/co"), "extract-acme-co");
+        assert_eq!(file_stem(""), "claude");
+    }
 
     #[test]
     fn args_are_locked_down() {
