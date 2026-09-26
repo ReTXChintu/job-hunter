@@ -26,6 +26,7 @@
     "@types/node": "^20.19.43",
     "@types/ws": "^8.18.1",
     "eslint": "^9.39.0",
+    "mongodb-memory-server": "^11.3.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.48.0",

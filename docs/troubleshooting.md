@@ -9,7 +9,7 @@
 | "Claude did not finish within N seconds" | Increase the timeout or reduce `Max jobs per source` / `Max browser turns`. Check the run transcript under `runs/<run-id>/` in the data directory. |
 | "Claude hit the budget limit" | Raise `Max spend per Claude call` in Settings or set it to 0 (unlimited). |
 | Resume PDF says "built-in renderer" | Chrome headless export failed (Chrome missing or busy). The fallback PDF is still ATS-friendly; install Chrome or set its path to restore the higher-fidelity output. |
-| "The backend is unreachable" | Check the backend server is running and reachable, and the address in Settings → Backend account is correct. Data is safe locally and syncs when the connection returns; pending count is shown in the status bar. |
+| "Couldn't sync with the server: …" | The message after the colon says why. A network error means the server is down or unreachable: check `pnpm server:status` and the firewall. "internal error" means the server hit a bug: check `pnpm server:logs` on the server. Data is safe locally and syncs once it's resolved; the pending count is in the status bar. |
 | "The candidate profile is incomplete" | Name, email, at least one target role and some skills are required. |
 | Application stuck in "Applying" after a crash | Restart the app; the run is finalised as manual action. Open the application and use Retry automatically or Apply Manually. |
 | Nothing happens when clicking buttons in the browser | You opened the Vite dev server in a browser. Job Hunter must run inside Tauri (`pnpm tauri dev`). |

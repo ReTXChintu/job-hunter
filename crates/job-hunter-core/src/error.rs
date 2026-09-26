@@ -114,7 +114,7 @@ impl CoreError {
                 "Not signed in to a Job Hunter backend account. Sign in from Settings. Data is kept locally until then.".into()
             }
             CoreError::BackendUnavailable { message } => {
-                format!("The backend is unreachable ({message}). Your data is safe locally and will sync when the connection returns.")
+                format!("Couldn't sync with the server: {message}. Your data is safe on this computer and will sync once that's resolved.")
             }
             other => other.to_string(),
         }

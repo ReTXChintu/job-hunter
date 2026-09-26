@@ -1,7 +1,7 @@
 import { MongoClient, type Collection, type Db as MongoDatabase } from "mongodb";
 
 import type { Db, JsonDoc } from "./db.js";
-import type { DeviceKind, DeviceRecord, UserRecord } from "./models.js";
+import { DOMAIN_COLLECTIONS, type DeviceKind, type DeviceRecord, type UserRecord } from "./models.js";
 
 // Internal collections, prefixed with `_` so they never collide with a
 // domain collection name (see models.ts's DOMAIN_COLLECTIONS) even though
@@ -45,8 +45,20 @@ interface RefreshTokenDoc {
 }
 
 interface DomainDoc extends JsonDoc {
+  /** `<userId>:<id>`, see {@link scopedId}. */
   _id: string;
   userId: string;
+  id: string;
+}
+
+/**
+ * The Mongo key for a domain document. Scoped by account because ids are
+ * only unique within one account: every desktop's user record, for one, is
+ * "local-user". Keying by the bare id made a second account's write collide
+ * with the first account's document (duplicate key -> 500).
+ */
+export function scopedId(userId: string, id: string): string {
+  return `${userId}:${id}`;
 }
 
 export class MongoDb implements Db {
@@ -62,7 +74,36 @@ export class MongoDb implements Db {
     await database.command({ ping: 1 });
     const db = new MongoDb(client, database);
     await db.ensureIndexes();
+    const migrated = await db.migrateLegacyDomainIds();
+    if (migrated > 0) console.info(`Re-keyed ${migrated} document(s) to per-account ids.`);
     return db;
+  }
+
+  /**
+   * One-time fix for documents written before ids were account-scoped:
+   * re-insert each under `scopedId(userId, id)` and drop the old copy.
+   * Idempotent; a no-op once nothing is left to move.
+   */
+  async migrateLegacyDomainIds(): Promise<number> {
+    let moved = 0;
+    for (const name of DOMAIN_COLLECTIONS) {
+      const collection = this.domain(name);
+      const docs = await collection.find({}).toArray();
+      for (const doc of docs) {
+        if (typeof doc.userId !== "string" || doc._id.startsWith(`${doc.userId}:`)) continue;
+        const id = typeof doc.id === "string" && doc.id ? doc.id : doc._id;
+        const rekeyed: DomainDoc = { ...doc, id, _id: scopedId(doc.userId, id) };
+        try {
+          await collection.insertOne(rekeyed);
+        } catch (err) {
+          // Already re-keyed by an earlier, interrupted run: keep that copy.
+          if (!isDuplicateKeyError(err)) throw err;
+        }
+        await collection.deleteOne({ _id: doc._id });
+        moved += 1;
+      }
+    }
+    return moved;
   }
 
   private async ensureIndexes(): Promise<void> {
@@ -180,12 +221,12 @@ export class MongoDb implements Db {
   }
 
   async upsertDoc(collection: string, userId: string, id: string, value: JsonDoc): Promise<void> {
-    const doc: DomainDoc = { ...value, _id: id, userId };
-    await this.domain(collection).replaceOne({ _id: id, userId }, doc, { upsert: true });
+    const doc: DomainDoc = { ...value, id, _id: scopedId(userId, id), userId };
+    await this.domain(collection).replaceOne({ _id: doc._id }, doc, { upsert: true });
   }
 
   async deleteDoc(collection: string, userId: string, id: string): Promise<void> {
-    await this.domain(collection).deleteOne({ _id: id, userId });
+    await this.domain(collection).deleteOne({ _id: scopedId(userId, id) });
   }
 
   async fetchAllDocs(collection: string, userId: string): Promise<JsonDoc[]> {
@@ -194,7 +235,7 @@ export class MongoDb implements Db {
   }
 
   async fetchDoc(collection: string, userId: string, id: string): Promise<JsonDoc | null> {
-    const doc = await this.domain(collection).findOne({ _id: id, userId });
+    const doc = await this.domain(collection).findOne({ _id: scopedId(userId, id) });
     return doc ? stripMongoId(doc) : null;
   }
 
