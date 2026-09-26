@@ -7,6 +7,7 @@ pub mod answers;
 pub mod application;
 pub mod candidate;
 pub mod job;
+pub mod platform;
 pub mod resume;
 
 pub use agent::*;
@@ -14,6 +15,7 @@ pub use answers::*;
 pub use application::*;
 pub use candidate::*;
 pub use job::*;
+pub use platform::*;
 pub use resume::*;
 
 /// Documents that can live in a store collection.
@@ -21,9 +23,15 @@ pub trait Entity:
     serde::Serialize + serde::de::DeserializeOwned + Clone + Send + Sync + 'static
 {
     const COLLECTION: &'static str;
+    /// Whether writes are queued for the backend. Local-only collections are
+    /// listed in [`LOCAL_COLLECTIONS`] instead of [`COLLECTIONS`].
+    const SYNCED: bool = true;
     fn id(&self) -> &str;
     fn updated_at(&self) -> chrono::DateTime<chrono::Utc>;
 }
+
+/// Collections kept on this computer only (never sent to the backend).
+pub const LOCAL_COLLECTIONS: &[&str] = &["platform_profiles", "publishing_plans"];
 
 /// Names of every persisted collection (local store and MongoDB share them).
 pub const COLLECTIONS: &[&str] = &[

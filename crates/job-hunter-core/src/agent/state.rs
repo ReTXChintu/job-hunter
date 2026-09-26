@@ -14,6 +14,7 @@ pub fn can_transition(from: AgentState, to: AgentState) -> bool {
                 | S::Analyzing
                 | S::PreparingApplications
                 | S::Applying
+                | S::UpdatingProfile
                 | S::Failed
                 | S::Stopping
                 | S::Completed
@@ -42,6 +43,7 @@ pub fn can_transition(from: AgentState, to: AgentState) -> bool {
             to,
             S::Completed | S::ManualActionRequired | S::WaitingForUser | S::Failed | S::Stopping
         ),
+        S::UpdatingProfile => matches!(to, S::Completed | S::Failed | S::Stopping),
         S::Paused => matches!(
             to,
             S::Discovering

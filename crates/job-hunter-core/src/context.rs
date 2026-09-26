@@ -342,6 +342,73 @@ impl AppContext {
         Ok(profile)
     }
 
+    /// The candidate says they know skills a job analysis listed as missing:
+    /// add them to the profile (under `group`, unless already listed in any
+    /// group) and count them as matched in every analysis that missed them.
+    /// Resumes pick them up the next time they're generated.
+    pub fn mark_skills_known(
+        &self,
+        skills: &[String],
+        group: &str,
+    ) -> CoreResult<CandidateProfile> {
+        let skills: Vec<String> = skills
+            .iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if skills.is_empty() {
+            return Err(CoreError::Validation("Choose at least one skill".into()));
+        }
+        let mut profile = self.profile()?;
+        let known = profile.skills.all();
+        let target = match group {
+            "frontend" => &mut profile.skills.frontend,
+            "backend" => &mut profile.skills.backend,
+            "database" => &mut profile.skills.database,
+            "devops" => &mut profile.skills.devops,
+            "cloud" => &mut profile.skills.cloud,
+            "testing" => &mut profile.skills.testing,
+            "other" => &mut profile.skills.other,
+            other => {
+                return Err(CoreError::Validation(format!(
+                    "unknown skill group {other}"
+                )));
+            }
+        };
+        for skill in &skills {
+            if !known.iter().any(|k| k.eq_ignore_ascii_case(skill))
+                && !target.iter().any(|k| k.eq_ignore_ascii_case(skill))
+            {
+                target.push(skill.clone());
+            }
+        }
+        profile.updated_at = now();
+        self.store.put(&profile)?;
+
+        let is_marked = |s: &String| skills.iter().any(|k| k.eq_ignore_ascii_case(s.trim()));
+        for mut analysis in self.store.list::<JobAnalysis>()? {
+            if !analysis.missing_skills.iter().any(is_marked) {
+                continue;
+            }
+            let (now_known, still_missing): (Vec<String>, Vec<String>) =
+                analysis.missing_skills.drain(..).partition(is_marked);
+            analysis.missing_skills = still_missing;
+            for s in now_known {
+                if !analysis
+                    .matched_skills
+                    .iter()
+                    .any(|m| m.eq_ignore_ascii_case(&s))
+                {
+                    analysis.matched_skills.push(s);
+                }
+            }
+            analysis.updated_at = now();
+            self.store.put(&analysis)?;
+        }
+        tracing::info!(count = skills.len(), group, "skills marked as known");
+        Ok(profile)
+    }
+
     pub fn experiences(&self) -> CoreResult<Vec<Experience>> {
         let mut v = self
             .store

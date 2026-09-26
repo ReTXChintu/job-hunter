@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::broadcast;
 
-use crate::domain::{Entity, COLLECTIONS};
+use crate::domain::{Entity, COLLECTIONS, LOCAL_COLLECTIONS};
 use crate::error::{CoreError, CoreResult};
 use crate::util::now;
 
@@ -47,7 +47,7 @@ impl LocalStore {
     pub fn open(dir: &Path) -> CoreResult<Self> {
         std::fs::create_dir_all(dir)?;
         let mut collections = HashMap::new();
-        for name in COLLECTIONS {
+        for name in COLLECTIONS.iter().chain(LOCAL_COLLECTIONS) {
             let path = dir.join(format!("{name}.json"));
             let docs = if path.exists() {
                 let raw = std::fs::read_to_string(&path)?;
@@ -210,7 +210,7 @@ impl LocalStore {
 
     pub fn put<T: Entity>(&self, doc: &T) -> CoreResult<()> {
         let value = serde_json::to_value(doc)?;
-        self.upsert_raw(T::COLLECTION, value, true)
+        self.upsert_raw(T::COLLECTION, value, T::SYNCED)
     }
 
     pub fn get<T: Entity>(&self, id: &str) -> CoreResult<Option<T>> {
@@ -245,7 +245,7 @@ impl LocalStore {
     }
 
     pub fn delete<T: Entity>(&self, id: &str) -> CoreResult<bool> {
-        self.delete_raw(T::COLLECTION, id, true)
+        self.delete_raw(T::COLLECTION, id, T::SYNCED)
     }
 
     pub fn count(&self, collection: &str) -> usize {
@@ -290,7 +290,14 @@ impl LocalStore {
     /// configured so existing local data reaches Atlas).
     pub fn enqueue_everything(&self) -> CoreResult<usize> {
         let mut n = 0;
-        let names: Vec<String> = self.collections.read().unwrap().keys().cloned().collect();
+        let names: Vec<String> = self
+            .collections
+            .read()
+            .unwrap()
+            .keys()
+            .filter(|name| COLLECTIONS.contains(&name.as_str()))
+            .cloned()
+            .collect();
         for name in names {
             for id in self
                 .collections
@@ -372,5 +379,22 @@ mod tests {
         assert_eq!(got.company, "Newer");
         // remote merges are not re-queued
         assert_eq!(store.pending_count(), 1);
+    }
+
+    #[test]
+    fn local_only_collections_persist_but_never_queue() {
+        use crate::domain::PlatformProfile;
+        let dir = tempfile::tempdir().unwrap();
+        let store = LocalStore::open(dir.path()).unwrap();
+        store.put(&PlatformProfile::new("u", "LinkedIn")).unwrap();
+        assert_eq!(store.pending_count(), 0);
+        let reopened = LocalStore::open(dir.path()).unwrap();
+        assert!(reopened
+            .get::<PlatformProfile>("linkedin")
+            .unwrap()
+            .is_some());
+        assert_eq!(reopened.enqueue_everything().unwrap(), 0);
+        assert!(reopened.delete::<PlatformProfile>("linkedin").unwrap());
+        assert_eq!(reopened.pending_count(), 0);
     }
 }

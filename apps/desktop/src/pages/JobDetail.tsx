@@ -6,6 +6,7 @@ import { ArrowLeft, Bookmark, BookmarkCheck, Check, ExternalLink, FileText, Refr
 import { useState } from "react";
 import { BulletList, Chips, ConfirmDialog, ErrorBanner, InfoBanner, Panel } from "../components/common";
 import { FileLinks, HtmlPreview } from "../components/DocumentPreview";
+import { MissingSkills } from "../components/MissingSkills";
 import { useAgentStatus, useAnalyzeJob, useApproveApplication, useGenerateResume, useJob, useOpenUrl, useRejectJob, useSetJobSaved } from "../lib/queries";
 
 export function JobDetailPage() {
@@ -203,7 +204,7 @@ export function JobDetailPage() {
                   <Chips items={analysis.matchedSkills} palette="green" max={20} />
                 </KeyValue>
                 <KeyValue label="Missing skills">
-                  <Chips items={analysis.missingSkills} palette="orange" max={20} />
+                  <MissingSkills skills={analysis.missingSkills} />
                 </KeyValue>
                 <KeyValue label="Important keywords">
                   <Chips items={analysis.importantKeywords} palette="gray" max={20} />

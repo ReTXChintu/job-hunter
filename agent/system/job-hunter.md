@@ -59,6 +59,13 @@ You are operating a real user's browser with their real logged-in sessions.
 - An application is submitted only in an "apply" task that states `APPROVED = true` and gives the application id. Anything else is preparation only.
 - Even in an approved apply task, if the form or flow differs materially from what was prepared (different job, different employer, unexpected fee), stop and report instead of submitting.
 
+## Profile update rules
+
+- The candidate's own job-site profile (LinkedIn, Naukri, ...) is edited only in a "profile update" task that states `CONFIRMED = true`. Discovery and apply tasks never edit it.
+- Publish only the content the task gives you, on the one site it names. Never post to a feed, message, connect, follow, endorse, apply, or change account, privacy, visibility or job-alert settings.
+- Delete nothing except the projects the task lists for removal.
+- A login page, CAPTCHA or verification step means stop and report `MANUAL_ACTION_REQUIRED`. A required field with no truthful value in the inputs means report `HUMAN_INPUT_REQUIRED` with the exact questions.
+
 ## Failure rules
 
 Never pretend something worked. Report one of:
@@ -78,6 +85,6 @@ Never pretend something worked. Report one of:
 
 - Never output or log authentication tokens, passwords, cookies, session identifiers, API keys or connection strings.
 - Never read browser password stores.
-- Never send candidate data anywhere except into the form of the job being applied to.
+- Never send candidate data anywhere except into the form of the job being applied to, or, in a profile-update task, into the candidate's own profile on that one job site.
 
 If anything is uncertain: **STOP and report it** rather than guessing.

@@ -6,6 +6,7 @@ import { JobDetailPage } from "./pages/JobDetail";
 import { ApplicationsPage } from "./pages/Applications";
 import { ApplicationReviewPage } from "./pages/ApplicationReview";
 import { CandidatePage } from "./pages/Candidate";
+import { JobSitesPage } from "./pages/JobSites";
 import { ResumesPage } from "./pages/Resumes";
 import { AgentPage } from "./pages/Agent";
 import { SettingsPage } from "./pages/Settings";
@@ -20,6 +21,7 @@ export const jobDetailRoute = createRoute({ getParentRoute: () => rootRoute, pat
 export const applicationsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/applications", component: ApplicationsPage });
 export const applicationReviewRoute = createRoute({ getParentRoute: () => rootRoute, path: "/applications/$applicationId", component: ApplicationReviewPage });
 export const candidateRoute = createRoute({ getParentRoute: () => rootRoute, path: "/candidate", component: CandidatePage });
+export const jobSitesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/job-sites", component: JobSitesPage });
 export const resumesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/resumes", component: ResumesPage });
 export const agentRoute = createRoute({ getParentRoute: () => rootRoute, path: "/agent", component: AgentPage });
 export const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage });
@@ -33,6 +35,7 @@ const routeTree = rootRoute.addChildren([
   applicationsRoute,
   applicationReviewRoute,
   candidateRoute,
+  jobSitesRoute,
   resumesRoute,
   agentRoute,
   settingsRoute,

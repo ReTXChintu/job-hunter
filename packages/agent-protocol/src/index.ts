@@ -25,14 +25,22 @@ import type {
   LogLevel,
   MasterResumeRef,
   PairingCode,
+  PlatformProfile,
+  PlatformProfileView,
   Project,
+  ProjectPick,
+  PublishingPlan,
   RemoteDevice,
   RemoteStatus,
   Resume,
   ResumeDocument,
   SetupStatus,
+  SkillGroups,
   SyncStatus,
 } from "@job-hunter/types";
+
+/** A key of the candidate's skill groups ("frontend", "backend", ...). */
+export type SkillGroup = keyof SkillGroups;
 
 /** Tauri events emitted by the backend. */
 export const EVENTS = {
@@ -115,6 +123,15 @@ export interface Commands {
   import_master_resume: { args: { path: string }; result: MasterResumeRef };
   parse_master_resume: { args: Record<string, never>; result: CandidateProfile };
   get_master_resume_text: { args: Record<string, never>; result: string | null };
+  mark_skills_known: { args: { skills: string[]; group: SkillGroup }; result: CandidateProfile };
+
+  list_platform_profiles: { args: Record<string, never>; result: PlatformProfileView[] };
+  get_publishing_plan: { args: Record<string, never>; result: PublishingPlan };
+  suggest_project_picks: { args: Record<string, never>; result: ProjectPick[] };
+  save_publishing_plan: { args: { featuredProjectIds: string[]; picks: ProjectPick[] }; result: PublishingPlan };
+  sync_platform_profile: { args: { platform: string }; result: AgentRun };
+  answer_platform_questions: { args: { platform: string; answers: ApplicationAnswer[] }; result: AgentRun };
+  set_platform_auto_sync: { args: { platform: string; enabled: boolean }; result: PlatformProfile };
 
   list_jobs: { args: Record<string, never>; result: JobListItem[] };
   get_job: { args: { id: string }; result: JobDetail };
@@ -187,6 +204,7 @@ export const EVENT_KINDS = [
   "RESUME_GENERATED",
   "APPLICATION_READY",
   "APPLICATION_UPDATED",
+  "PROFILE_UPDATED",
   "CLAUDE_ACTIVITY",
   "RUN_FINISHED",
 ] as const;

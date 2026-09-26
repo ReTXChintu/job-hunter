@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use job_hunter_core::agent::orchestrator::{self, JobHuntOptions};
+use job_hunter_core::agent::profile_sync::{self, PlatformProfileView};
 use job_hunter_core::backend_url;
 use job_hunter_core::context::{
     ApplicationDetail, ApplicationListItem, Dashboard, JobDetail, JobListItem, SetupStatus,
@@ -209,6 +210,75 @@ pub async fn save_project(ctx: Ctx<'_>, project: Project) -> R<Project> {
 #[tauri::command]
 pub async fn delete_project(ctx: Ctx<'_>, id: String) -> R<()> {
     ctx.delete_project(&id).map_err(Into::into)
+}
+
+/// "I know this": add skills a job analysis listed as missing to the profile.
+#[tauri::command]
+pub async fn mark_skills_known(
+    ctx: Ctx<'_>,
+    skills: Vec<String>,
+    group: String,
+) -> R<CandidateProfile> {
+    ctx.mark_skills_known(&skills, &group).map_err(Into::into)
+}
+
+// ---- job-site profiles -------------------------------------------------------------
+
+#[tauri::command]
+pub async fn list_platform_profiles(ctx: Ctx<'_>) -> R<Vec<PlatformProfileView>> {
+    profile_sync::platform_profiles(&ctx)
+        .await
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn get_publishing_plan(ctx: Ctx<'_>) -> R<PublishingPlan> {
+    profile_sync::publishing_plan(&ctx).map_err(Into::into)
+}
+
+/// Claude's suggestion of projects to feature; nothing is saved.
+#[tauri::command]
+pub async fn suggest_project_picks(ctx: Ctx<'_>) -> R<Vec<ProjectPick>> {
+    profile_sync::suggest_project_picks(ctx.inner())
+        .await
+        .map_err(Into::into)
+}
+
+/// The user confirmed which projects to feature ("Proceed").
+#[tauri::command]
+pub async fn save_publishing_plan(
+    ctx: Ctx<'_>,
+    featured_project_ids: Vec<String>,
+    picks: Vec<ProjectPick>,
+) -> R<PublishingPlan> {
+    profile_sync::save_publishing_plan(&ctx, featured_project_ids, picks).map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn sync_platform_profile(ctx: Ctx<'_>, platform: String) -> R<AgentRun> {
+    profile_sync::start_profile_sync(ctx.inner().clone(), &platform, vec![])
+        .await
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn answer_platform_questions(
+    ctx: Ctx<'_>,
+    platform: String,
+    answers: Vec<ApplicationAnswer>,
+) -> R<AgentRun> {
+    profile_sync::answer_platform_questions(ctx.inner().clone(), &platform, answers)
+        .await
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn set_platform_auto_sync(
+    ctx: Ctx<'_>,
+    platform: String,
+    enabled: bool,
+) -> R<PlatformProfile> {
+    profile_sync::set_auto_sync(&ctx, &platform, enabled).map_err(Into::into)
 }
 
 #[tauri::command]

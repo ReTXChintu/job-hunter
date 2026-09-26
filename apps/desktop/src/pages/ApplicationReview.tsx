@@ -1,12 +1,14 @@
-import { Box, Button, Checkbox, Grid, GridItem, Heading, HStack, Input, NativeSelect, SimpleGrid, Spinner, Tabs, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Box, Button, Checkbox, Grid, GridItem, Heading, HStack, Input, SimpleGrid, Spinner, Tabs, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { applicationActions, formatDateTime, isAgentRunning } from "@job-hunter/shared";
-import type { ApplicationAnswer, ApplicationStatus, PendingQuestion, ResumeDocument } from "@job-hunter/types";
+import type { ApplicationAnswer, ApplicationStatus, ResumeDocument } from "@job-hunter/types";
 import { KeyValue, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { ArrowLeft, Check, ExternalLink, Pencil, Play, RefreshCw, Send, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BulletList, Chips, ConfirmDialog, ErrorBanner, InfoBanner } from "../components/common";
 import { FileLinks, HtmlPreview } from "../components/DocumentPreview";
+import { MissingSkills } from "../components/MissingSkills";
+import { QuestionField } from "../components/QuestionField";
 import { ResumeEditor } from "../components/ResumeEditor";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { useActivity } from "../lib/activity";
@@ -37,6 +39,7 @@ export function ApplicationReviewPage() {
   const [coverDraft, setCoverDraft] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [saveForReuse, setSaveForReuse] = useState(true);
+  const [markedSkills, setMarkedSkills] = useState<string[]>([]);
 
   useEffect(() => {
     if (detail.data?.coverLetter) setCoverDraft(detail.data.coverLetter.text);
@@ -239,7 +242,7 @@ export function ApplicationReviewPage() {
                   <Chips items={analysis.matchedSkills} palette="green" max={15} />
                   {analysis.missingSkills.length ? (
                     <Box mt={1.5}>
-                      <Chips items={analysis.missingSkills} palette="orange" max={15} />
+                      <MissingSkills skills={analysis.missingSkills} max={15} onMarked={(s) => setMarkedSkills((m) => [...m, ...s])} />
                     </Box>
                   ) : null}
                 </KeyValue>
@@ -287,11 +290,23 @@ export function ApplicationReviewPage() {
                     />
                   ) : (
                     <VStack align="stretch" gap={3}>
+                      {markedSkills.length ? (
+                        <InfoBanner status="success" title={`Added ${markedSkills.join(", ")} to your skills`}>
+                          <HStack justify="space-between" gap={3} wrap="wrap">
+                            <Text fontSize="sm">This resume was written before. Regenerate it so it can include {markedSkills.length === 1 ? "it" : "them"}.</Text>
+                            <Button size="xs" colorPalette="brand" onClick={() => regenerate.mutate(job.id, { onSuccess: () => setMarkedSkills([]) })} loading={regenerate.isPending} disabled={busy || application.status === "APPLIED"}>
+                              <RefreshCw size={12} /> Regenerate resume
+                            </Button>
+                          </HStack>
+                        </InfoBanner>
+                      ) : null}
                       {resume.validation ? (
                         <SimpleGrid columns={3} gap={2} fontSize="xs">
                           <KeyValue label="Keyword coverage">{resume.validation.keywordCoverage}%</KeyValue>
                           <KeyValue label="Unsupported claims">{resume.validation.unsupportedClaims.length === 0 ? "None" : resume.validation.unsupportedClaims.join("; ")}</KeyValue>
-                          <KeyValue label="Missing keywords">{resume.validation.missingKeywords.length === 0 ? "None" : resume.validation.missingKeywords.join(", ")}</KeyValue>
+                          <KeyValue label="Missing keywords">
+                            <MissingSkills skills={resume.validation.missingKeywords.filter((k) => !markedSkills.some((m) => m.toLowerCase() === k.toLowerCase()))} onMarked={(s) => setMarkedSkills((m) => [...m, ...s])} />
+                          </KeyValue>
                         </SimpleGrid>
                       ) : null}
                       {resume.validation?.unsupportedClaims.length ? (
@@ -424,58 +439,6 @@ export function ApplicationReviewPage() {
         <Input mt={3} placeholder="Reason (optional)" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
       </ConfirmDialog>
       <ConfirmDialog open={confirm === "applied"} onOpenChange={(o) => !o && setConfirm(null)} title="Mark as applied?" description="Only confirm this after you submitted the application yourself." confirmLabel="Mark as Applied" loading={markApplied.isPending} onConfirm={() => markApplied.mutate({ id: application.id }, { onSuccess: () => setConfirm(null) })} />
-    </Box>
-  );
-}
-
-function QuestionField({ q, value, onChange }: { q: PendingQuestion; value: string; onChange: (v: string) => void }) {
-  const label = (
-    <Text fontSize="sm" fontWeight="medium" mb={1}>
-      {q.question}
-      {q.required ? (
-        <Text as="span" color="red.fg">
-          {" "}
-          *
-        </Text>
-      ) : null}
-      {q.context ? (
-        <Text as="span" color="fg.muted" fontWeight="normal">
-          {" "}
-          — {q.context}
-        </Text>
-      ) : null}
-    </Text>
-  );
-  if ((q.fieldType === "select" || q.fieldType === "radio") && q.options.length) {
-    return (
-      <Box>
-        {label}
-        <NativeSelect.Root size="sm">
-          <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
-            <option value="">Choose…</option>
-            {q.options.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </Box>
-    );
-  }
-  if (q.fieldType === "textarea") {
-    return (
-      <Box>
-        {label}
-        <Textarea size="sm" rows={3} value={value} onChange={(e) => onChange(e.target.value)} />
-      </Box>
-    );
-  }
-  return (
-    <Box>
-      {label}
-      <Input size="sm" type={q.fieldType === "number" ? "number" : q.fieldType === "date" ? "date" : "text"} value={value} onChange={(e) => onChange(e.target.value)} />
     </Box>
   );
 }

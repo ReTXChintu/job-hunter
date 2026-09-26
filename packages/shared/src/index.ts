@@ -1,4 +1,4 @@
-import type { AgentState, ApplicationStatus, JobListItem, JobStatus, ApplicationListItem, CandidateProfile } from "@job-hunter/types";
+import type { AgentState, ApplicationStatus, JobListItem, JobStatus, ApplicationListItem, CandidateProfile, SkillGroups } from "@job-hunter/types";
 
 export type JobFilter =
   | "ALL"
@@ -122,6 +122,7 @@ export const AGENT_STATE_LABELS: Record<AgentState, string> = {
   PREPARING_APPLICATIONS: "Preparing applications",
   WAITING_FOR_APPROVAL: "Waiting for your approval",
   APPLYING: "Applying",
+  UPDATING_PROFILE: "Updating a job-site profile",
   COMPLETED: "Completed",
   FAILED: "Failed",
   MANUAL_ACTION_REQUIRED: "Manual action required",
@@ -131,7 +132,7 @@ export const AGENT_STATE_LABELS: Record<AgentState, string> = {
 };
 
 export function isAgentRunning(state: AgentState): boolean {
-  return ["INITIALIZING", "DISCOVERING", "EXTRACTING", "DEDUPLICATING", "ANALYZING", "PREPARING_APPLICATIONS", "APPLYING", "STOPPING", "PAUSED"].includes(state);
+  return ["INITIALIZING", "DISCOVERING", "EXTRACTING", "DEDUPLICATING", "ANALYZING", "PREPARING_APPLICATIONS", "APPLYING", "UPDATING_PROFILE", "STOPPING", "PAUSED"].includes(state);
 }
 
 /** Which user actions make sense for an application in a given status. */
@@ -228,4 +229,24 @@ export function fileName(path: string | null | undefined): string {
   if (!path) return "";
   const parts = path.split(/[\\/]/);
   return parts[parts.length - 1] ?? path;
+}
+
+export type SkillGroupKey = keyof SkillGroups;
+
+export const SKILL_GROUPS: SkillGroupKey[] = ["frontend", "backend", "database", "devops", "cloud", "testing", "other"];
+
+/** Checked in order; the first match wins, so specific rules come first. */
+const SKILL_GROUP_RULES: [SkillGroupKey, RegExp][] = [
+  ["testing", /\b(jest|mocha|chai|cypress|playwright|selenium|vitest|testing|tdd|qa)\b/i],
+  ["database", /(sql|mongo|postgres|redis|dynamo|cassandra|elasticsearch|neo4j|firebase|supabase|prisma|graph database|database)/i],
+  ["cloud", /\b(aws|azure|gcp|google cloud|lambda|beanstalk|cloudwatch|s3|ec2|heroku|vercel|netlify|cloud)\b/i],
+  ["devops", /\b(docker|kubernetes|k8s|jenkins|ci\/cd|ci|cd|github actions|gitlab|terraform|ansible|nginx|pm2|linux|git)\b/i],
+  ["frontend", /(react|next\.?js|angular|vue|svelte|redux|html|css|sass|tailwind|bootstrap|webpack|vite|frontend|front-end|\bui\b)/i],
+  ["backend", /(node|express|nest\.?js|graphql|\brest\b|\bapis?\b|sockets?|django|flask|fastapi|spring|\bjava\b|python|golang|\bgo\b|php|laravel|ruby|rails|\.net|c#|kafka|rabbitmq|microservice|backend|back-end)/i],
+];
+
+/** A best guess at which skill group a skill belongs to (the user can change it). */
+export function guessSkillGroup(skill: string): SkillGroupKey {
+  for (const [group, pattern] of SKILL_GROUP_RULES) if (pattern.test(skill)) return group;
+  return "other";
 }

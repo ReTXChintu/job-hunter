@@ -4,6 +4,7 @@
 pub mod events;
 pub mod handle;
 pub mod orchestrator;
+pub mod profile_sync;
 pub mod state;
 pub mod steps;
 

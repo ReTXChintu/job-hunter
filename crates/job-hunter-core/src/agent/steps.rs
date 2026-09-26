@@ -128,7 +128,10 @@ impl StepCtx {
     }
 }
 
-fn structured<T: serde::de::DeserializeOwned>(resp: &ClaudeResponse, what: &str) -> CoreResult<T> {
+pub(crate) fn structured<T: serde::de::DeserializeOwned>(
+    resp: &ClaudeResponse,
+    what: &str,
+) -> CoreResult<T> {
     let value = resp
         .structured
         .clone()

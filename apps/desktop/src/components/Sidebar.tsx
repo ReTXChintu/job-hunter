@@ -1,7 +1,7 @@
 import { Box, Flex, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
-import { Bot, Briefcase, FileText, LayoutDashboard, Moon, Send, Settings, Sun, UserRound, Crosshair } from "lucide-react";
+import { Bot, Briefcase, FileText, Globe, LayoutDashboard, Moon, Send, Settings, Sun, UserRound, Crosshair } from "lucide-react";
 import type { ReactNode } from "react";
 import { useAboutInfo, useDashboard, useUpdateCheck } from "../lib/queries";
 
@@ -10,6 +10,7 @@ const NAV: { to: string; label: string; icon: ReactNode; badge?: (n: { awaiting:
   { to: "/jobs", label: "Jobs", icon: <Briefcase size={18} /> },
   { to: "/applications", label: "Applications", icon: <Send size={18} />, badge: (n) => n.awaiting + n.manual },
   { to: "/candidate", label: "Candidate", icon: <UserRound size={18} /> },
+  { to: "/job-sites", label: "Job sites", icon: <Globe size={18} /> },
   { to: "/resumes", label: "Resumes", icon: <FileText size={18} /> },
   { to: "/agent", label: "Agent", icon: <Bot size={18} /> },
   { to: "/settings", label: "Settings", icon: <Settings size={18} /> },

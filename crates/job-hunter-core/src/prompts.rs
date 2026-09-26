@@ -38,6 +38,9 @@ pub mod skills {
         include_str!("../../../agent/skills/application-tracking/SKILL.md");
     pub const MANUAL_FALLBACK: &str =
         include_str!("../../../agent/skills/manual-fallback/SKILL.md");
+    pub const PROJECT_SELECTION: &str =
+        include_str!("../../../agent/skills/project-selection/SKILL.md");
+    pub const PROFILE_SYNC: &str = include_str!("../../../agent/skills/profile-sync/SKILL.md");
 }
 
 pub mod schemas {
@@ -99,6 +102,22 @@ pub mod schemas {
     pub fn project_draft() -> Value {
         PROJECT_DRAFT.clone()
     }
+    static PROJECT_SELECTION: Lazy<Value> = Lazy::new(|| {
+        serde_json::from_str(include_str!(
+            "../../../agent/schemas/project-selection.json"
+        ))
+        .expect("project-selection schema")
+    });
+    pub fn project_selection() -> Value {
+        PROJECT_SELECTION.clone()
+    }
+    static PROFILE_SYNC: Lazy<Value> = Lazy::new(|| {
+        serde_json::from_str(include_str!("../../../agent/schemas/profile-sync.json"))
+            .expect("profile-sync schema")
+    });
+    pub fn profile_sync() -> Value {
+        PROFILE_SYNC.clone()
+    }
 }
 
 /// Claude in Chrome tools allowed during read-only discovery/extraction.
@@ -137,7 +156,9 @@ pub fn chrome_tools(apply: bool) -> Vec<String> {
 pub fn write_system_prompt(run_dir: &Path) -> CoreResult<PathBuf> {
     std::fs::create_dir_all(run_dir)?;
     let path = run_dir.join("system-prompt.md");
-    if !path.exists() {
+    // Rewrite when stale: fixed task dirs (profile-parse, ...) outlive app
+    // upgrades that change the system prompt.
+    if std::fs::read_to_string(&path).ok().as_deref() != Some(SYSTEM) {
         std::fs::write(&path, SYSTEM)?;
     }
     Ok(path)
@@ -458,6 +479,74 @@ Follow the project-drafting skill exactly. Use only what the description states.
         "
 
 Return only the structured output.",
+    );
+    s
+}
+
+/// Prompt for choosing which projects to feature on job-site profiles.
+pub fn project_selection_prompt(truth: &CandidateTruth) -> String {
+    let mut s = String::from(
+        "# Task: choose the projects to feature on the candidate's job-site profiles
+
+Follow the project-selection skill exactly. Judge only from the data below.",
+    );
+    s.push_str(&section("Skill", skills::PROJECT_SELECTION));
+    let p = &truth.profile;
+    let input = json!({
+        "targetRoles": p.preferences.target_roles,
+        "skills": p.skills.all(),
+        "experiences": truth.experiences.iter().map(|e| json!({
+            "id": e.id, "company": e.company, "role": e.role, "startDate": e.start_date, "endDate": e.end_date,
+        })).collect::<Vec<_>>(),
+        "projects": truth.projects.iter().map(|pr| json!({
+            "id": pr.id, "name": pr.name, "description": pr.description, "role": pr.role,
+            "employer": pr.experience_id.as_ref().and_then(|id| truth.experiences.iter().find(|e| &e.id == id)).map(|e| e.company.clone()),
+            "technologies": pr.technologies, "responsibilities": pr.responsibilities, "achievements": pr.achievements, "url": pr.url,
+        })).collect::<Vec<_>>(),
+    });
+    s.push_str(&section("Inputs", &json_block(&input)));
+    s.push_str(
+        "
+
+Return one pick per project using the structured output schema.",
+    );
+    s
+}
+
+pub struct ProfileSyncParams<'a> {
+    pub platform: &'a str,
+    /// The content to publish (see `agent::profile_sync::platform_content`).
+    pub profile: &'a Value,
+    pub remove_projects: &'a [String],
+    pub known_answers: &'a [AnswerRecord],
+    pub previously_answered: &'a [ApplicationAnswer],
+    pub resume_path: Option<&'a str>,
+}
+
+/// Prompt for filling in the candidate's own profile on one job site.
+pub fn profile_sync_prompt(p: &ProfileSyncParams<'_>) -> String {
+    let mut s = format!(
+        "# Task: profile update on {}
+
+CONFIRMED = true (the candidate asked for this update and approved the content)
+
+Follow the profile-sync skill exactly.",
+        p.platform
+    );
+    s.push_str(&section("Skill: profile-sync", skills::PROFILE_SYNC));
+    let input = json!({
+        "platform": p.platform,
+        "profile": p.profile,
+        "removeProjects": p.remove_projects,
+        "knownAnswers": p.known_answers.iter().map(|a| json!({"question": a.question, "answer": a.answer})).collect::<Vec<_>>(),
+        "previouslyAnswered": p.previously_answered,
+        "resumePath": p.resume_path,
+    });
+    s.push_str(&section("Inputs", &json_block(&input)));
+    s.push_str(
+        "
+
+Return only the structured output. Report only changes you saw saved.",
     );
     s
 }

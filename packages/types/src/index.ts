@@ -406,6 +406,7 @@ export type AgentState =
   | "PREPARING_APPLICATIONS"
   | "WAITING_FOR_APPROVAL"
   | "APPLYING"
+  | "UPDATING_PROFILE"
   | "COMPLETED"
   | "FAILED"
   | "MANUAL_ACTION_REQUIRED"
@@ -439,7 +440,7 @@ export interface RunStats {
   claudeCostUsd: number;
 }
 
-export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS";
+export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC";
 
 export interface AgentRun {
   id: string;
@@ -644,6 +645,52 @@ export interface Dashboard {
   lastRun: AgentRun | null;
   agent: AgentStatus;
   sync: SyncStatus;
+}
+
+// ---- job-site profiles ---------------------------------------------------------------
+
+export type PlatformSyncStatus = "NEVER_SYNCED" | "SYNCING" | "SYNCED" | "NEEDS_INPUT" | "MANUAL_ACTION_REQUIRED" | "FAILED";
+
+export interface PlatformProfile {
+  id: string;
+  userId: string;
+  platform: string;
+  status: PlatformSyncStatus;
+  autoSync: boolean;
+  profileUrl: string;
+  lastSyncedAt: string | null;
+  lastAttemptAt: string | null;
+  syncedHash: string | null;
+  syncedProjectNames: string[];
+  changes: string[];
+  skipped: string[];
+  message: string;
+  pendingQuestions: PendingQuestion[];
+  runId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Mirrors `agent::profile_sync::PlatformProfileView`. */
+export interface PlatformProfileView {
+  profile: PlatformProfile;
+  outOfDate: boolean;
+}
+
+export interface ProjectPick {
+  projectId: string;
+  selected: boolean;
+  reason: string;
+}
+
+export interface PublishingPlan {
+  id: string;
+  userId: string;
+  featuredProjectIds: string[];
+  picks: ProjectPick[];
+  confirmedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface JobHuntOptions {

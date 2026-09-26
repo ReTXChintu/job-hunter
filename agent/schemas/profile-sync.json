@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": { "type": "string", "enum": ["UPDATED", "HUMAN_INPUT_REQUIRED", "MANUAL_ACTION_REQUIRED", "FAILED"] },
+    "reason": { "type": "string" },
+    "profileUrl": { "type": "string" },
+    "changes": { "type": "array", "items": { "type": "string" } },
+    "skipped": { "type": "array", "items": { "type": "string" } },
+    "projectsOnSite": { "type": "array", "items": { "type": "string" } },
+    "unknownQuestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "fieldType": { "type": "string" },
+          "options": { "type": "array", "items": { "type": "string" } },
+          "required": { "type": "boolean" },
+          "context": { "type": "string" }
+        },
+        "required": ["question"]
+      }
+    }
+  },
+  "required": ["outcome", "reason", "changes"]
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApplicationListItem, CandidateProfile, JobListItem } from "@job-hunter/types";
-import { applicationActions, filterJobs, pendingApplications, profileIssues, sortJobs, splitList, statusTone } from "./index";
+import { applicationActions, filterJobs, guessSkillGroup, isAgentRunning, pendingApplications, profileIssues, sortJobs, splitList, statusTone } from "./index";
 
 function job(over: Partial<JobListItem["job"]>, analysis: Partial<NonNullable<JobListItem["analysis"]>> | null = null): JobListItem {
   const base: JobListItem["job"] = {
@@ -136,5 +136,32 @@ describe("candidate profile", () => {
 
   it("splits comma and newline lists without duplicates", () => {
     expect(splitList("React, Node.js\nReact,, ")).toEqual(["React", "Node.js"]);
+  });
+});
+
+describe("guessSkillGroup", () => {
+  it("files the skills a job analysis typically reports as missing", () => {
+    const cases: [string, string][] = [
+      ["NextJS", "frontend"],
+      ["Angular", "frontend"],
+      ["MySQL", "database"],
+      ["graph database", "database"],
+      ["GraphQL", "backend"],
+      ["Sockets", "backend"],
+      ["Python", "backend"],
+      ["AWS (Beanstalk, CloudWatch)", "cloud"],
+      ["Docker", "devops"],
+      ["Jest", "testing"],
+      ["Agile", "other"],
+      ["Scrum", "other"],
+    ];
+    for (const [skill, group] of cases) expect([skill, guessSkillGroup(skill)]).toEqual([skill, group]);
+  });
+});
+
+describe("isAgentRunning", () => {
+  it("treats a job-site profile update as running", () => {
+    expect(isAgentRunning("UPDATING_PROFILE")).toBe(true);
+    expect(isAgentRunning("COMPLETED")).toBe(false);
   });
 });

@@ -476,6 +476,59 @@ impl MockClaudeRunner {
         })
     }
 
+    /// Features the first four projects, in the given order.
+    fn select_projects(ctx: &Value) -> Value {
+        let ids: Vec<Value> = ctx
+            .get("projectIds")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        json!({
+            "picks": ids.iter().enumerate().map(|(i, id)| json!({
+                "projectId": id,
+                "selected": i < 4,
+                "reason": if i < 4 { "Mock: among the strongest projects." } else { "Mock: similar to a stronger pick." },
+            })).collect::<Vec<_>>()
+        })
+    }
+
+    /// Naukri asks for the current CTC until an answer about it is known;
+    /// every other site updates. Nothing real is touched either way.
+    fn profile_sync(ctx: &Value) -> Value {
+        let platform = ctx.get("platform").and_then(|p| p.as_str()).unwrap_or("");
+        let projects = ctx.get("projects").cloned().unwrap_or(json!([]));
+        let knows_ctc = ctx
+            .get("knownQuestions")
+            .and_then(|q| q.as_array())
+            .map(|qs| {
+                qs.iter()
+                    .any(|q| q.as_str().unwrap_or("").to_lowercase().contains("ctc"))
+            })
+            .unwrap_or(false);
+        if platform == "Naukri" && !knows_ctc {
+            return json!({
+                "outcome": "HUMAN_INPUT_REQUIRED",
+                "reason": "Naukri requires your current CTC to save the employment section.",
+                "profileUrl": "https://www.naukri.com/mnjuser/profile",
+                "changes": ["Updated headline (mock)"],
+                "skipped": [],
+                "projectsOnSite": [],
+                "unknownQuestions": [
+                    { "question": "What is your current annual CTC?", "fieldType": "number", "options": [], "required": true, "context": "Employment section" }
+                ],
+            });
+        }
+        json!({
+            "outcome": "UPDATED",
+            "reason": "Mock update: no real website was touched.",
+            "profileUrl": format!("https://example.com/{}/me", platform.to_lowercase()),
+            "changes": ["Updated headline (mock)", "Updated skills (mock)"],
+            "skipped": ["Certifications: none to add (mock)"],
+            "projectsOnSite": projects,
+            "unknownQuestions": [],
+        })
+    }
+
     fn parse_profile() -> Value {
         let c = FIXTURE_CANDIDATE.clone();
         let profile = c.get("profile").cloned().unwrap_or(json!({}));
@@ -565,6 +618,18 @@ impl ClaudeRunner for MockClaudeRunner {
                 self.step(&sink, &cancel, "Drafting the project (mock)")
                     .await?;
                 Self::draft_project()
+            }
+            "select_projects" => {
+                self.step(&sink, &cancel, "Choosing projects to feature (mock)")
+                    .await?;
+                Self::select_projects(ctx)
+            }
+            "profile_sync" => {
+                self.step(&sink, &cancel, "Opening your profile (mock)")
+                    .await?;
+                self.step(&sink, &cancel, "Updating profile sections (mock)")
+                    .await?;
+                Self::profile_sync(ctx)
             }
             other => {
                 return Err(CoreError::other(format!(

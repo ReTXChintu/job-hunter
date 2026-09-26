@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ResumeDocument } from "@job-hunter/types";
+import type { AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ProjectPick, ResumeDocument } from "@job-hunter/types";
+import type { SkillGroup } from "@job-hunter/agent-protocol";
 import { invoke } from "./tauri";
 
 interface AuthArgs {
@@ -30,6 +31,8 @@ export const keys = {
   file: (path: string) => ["file", path] as const,
   remoteStatus: ["remoteStatus"] as const,
   remoteDevices: ["remoteDevices"] as const,
+  platformProfiles: ["platformProfiles"] as const,
+  publishingPlan: ["publishingPlan"] as const,
 };
 
 /** Collections → query keys to invalidate when the backend reports a change. */
@@ -39,9 +42,11 @@ export const COLLECTION_KEYS: Record<string, readonly (readonly string[])[]> = {
   applications: [keys.applications, keys.jobs, keys.dashboard, ["application"], ["job"]],
   resumes: [keys.resumes, ["job"], ["application"]],
   cover_letters: [["job"], ["application"]],
-  candidate_profiles: [keys.profile, keys.setup],
-  experiences: [keys.experiences],
-  projects: [keys.projects],
+  candidate_profiles: [keys.profile, keys.setup, keys.platformProfiles],
+  experiences: [keys.experiences, keys.platformProfiles],
+  projects: [keys.projects, keys.platformProfiles],
+  platform_profiles: [keys.platformProfiles],
+  publishing_plans: [keys.publishingPlan, keys.platformProfiles],
   application_answers: [keys.answers],
   agent_runs: [keys.runs, keys.dashboard],
   agent_events: [["runEvents"]],
@@ -140,6 +145,51 @@ export function useDraftProject() {
 export function useDeleteProject() {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (id: string) => invoke("delete_project", { id }), onSuccess: () => inv([keys.projects]) });
+}
+
+/** "I know this": add skills an analysis listed as missing to the profile. */
+export function useMarkSkillsKnown() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (args: { skills: string[]; group: SkillGroup }) => invoke("mark_skills_known", args),
+    onSuccess: () => inv([keys.profile, keys.jobs, keys.platformProfiles, ["job"], ["application"]]),
+  });
+}
+
+// ---- job-site profiles ---------------------------------------------------------------------
+
+export const usePlatformProfiles = () => useQuery({ queryKey: keys.platformProfiles, queryFn: () => invoke("list_platform_profiles") });
+export const usePublishingPlan = () => useQuery({ queryKey: keys.publishingPlan, queryFn: () => invoke("get_publishing_plan") });
+
+/** Claude suggests which projects to feature; nothing is saved. */
+export function useSuggestProjectPicks() {
+  return useMutation({ mutationFn: () => invoke("suggest_project_picks") });
+}
+
+export function useSavePublishingPlan() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (args: { featuredProjectIds: string[]; picks: ProjectPick[] }) => invoke("save_publishing_plan", args),
+    onSuccess: () => inv([keys.publishingPlan, keys.platformProfiles]),
+  });
+}
+
+export function useSyncPlatformProfile() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (platform: string) => invoke("sync_platform_profile", { platform }), onSuccess: () => inv([keys.platformProfiles, keys.agentStatus, keys.runs]) });
+}
+
+export function useAnswerPlatformQuestions() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (args: { platform: string; answers: ApplicationAnswer[] }) => invoke("answer_platform_questions", args),
+    onSuccess: () => inv([keys.platformProfiles, keys.answers, keys.agentStatus, keys.runs]),
+  });
+}
+
+export function useSetPlatformAutoSync() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (args: { platform: string; enabled: boolean }) => invoke("set_platform_auto_sync", args), onSuccess: () => inv([keys.platformProfiles]) });
 }
 
 export function useImportMasterResume() {

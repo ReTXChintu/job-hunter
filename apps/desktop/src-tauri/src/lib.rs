@@ -135,6 +135,9 @@ pub fn run() {
             let ctx =
                 tauri::async_runtime::block_on(AppContext::init(paths.clone(), logs.clone()))?;
             forward_events(handle.clone(), ctx.clone());
+            tauri::async_runtime::spawn(job_hunter_core::agent::profile_sync::run_auto_sync(
+                ctx.clone(),
+            ));
             let remote = RemoteClient::new(ctx.clone());
             tauri::async_runtime::spawn(remote.clone().run());
             forward_remote_events(handle.clone(), remote.clone());
@@ -164,6 +167,14 @@ pub fn run() {
             commands::draft_project,
             commands::save_project,
             commands::delete_project,
+            commands::mark_skills_known,
+            commands::list_platform_profiles,
+            commands::get_publishing_plan,
+            commands::suggest_project_picks,
+            commands::save_publishing_plan,
+            commands::sync_platform_profile,
+            commands::answer_platform_questions,
+            commands::set_platform_auto_sync,
             commands::import_master_resume,
             commands::parse_master_resume,
             commands::get_master_resume_text,
