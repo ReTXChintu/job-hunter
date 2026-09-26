@@ -3,4 +3,5 @@ packages:
   - "packages/*"
 allowBuilds:
   esbuild: true
-  mongodb-memory-server: set this to true or false
+  # Only pre-downloads mongod for tests; it downloads on first use anyway.
+  mongodb-memory-server: false
