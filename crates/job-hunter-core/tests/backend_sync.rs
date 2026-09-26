@@ -327,3 +327,30 @@ async fn the_idle_heartbeat_checks_in_with_the_device_token() {
     ctx.sync.set_backend_url(base_url).await;
     assert!(ctx.sync.heartbeat().await.is_err());
 }
+
+#[tokio::test]
+async fn after_a_restart_sync_uses_this_builds_server_even_if_none_was_saved() {
+    use job_hunter_core::paths::AppPaths;
+    use job_hunter_core::settings::AppSettings;
+
+    // What earlier builds left behind after signing in: the account email,
+    // but no server address.
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("data");
+    let paths = AppPaths::at(root.clone()).unwrap();
+    let mut saved = AppSettings::default();
+    saved.backend.account_email = "dana@example.com".into();
+    saved.backend.backend_url = String::new();
+    saved.save(&paths.settings_file()).unwrap();
+
+    let ctx = AppContext::init_mock(root).await.unwrap();
+    assert_eq!(
+        ctx.sync.backend_url().await,
+        job_hunter_core::backend_url::configured()
+    );
+    assert_eq!(
+        ctx.settings().await.backend.backend_url,
+        job_hunter_core::backend_url::configured()
+    );
+    std::mem::forget(dir);
+}

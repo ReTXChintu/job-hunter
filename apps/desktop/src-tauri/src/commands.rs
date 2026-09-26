@@ -52,10 +52,14 @@ async fn set_backend_device_name(ctx: &Arc<AppContext>, name: Option<String>) ->
     Ok(())
 }
 
-async fn set_backend_account_email(ctx: &Arc<AppContext>, email: &str) -> R<()> {
+/// Persist which account and server this desktop signed in to, so both
+/// survive a restart (the device token itself lives in the OS keychain).
+async fn remember_backend_account(ctx: &Arc<AppContext>, email: &str) -> R<()> {
     let mut settings = ctx.settings().await;
-    if settings.backend.account_email != email {
+    let server = backend_url::configured();
+    if settings.backend.account_email != email || settings.backend.backend_url != server {
         settings.backend.account_email = email.to_string();
+        settings.backend.backend_url = server;
         ctx.save_settings(settings)
             .await
             .map_err(UserFacingError::from)?;
@@ -109,7 +113,7 @@ async fn backend_sign_in(
         )
         .await
         .map_err(UserFacingError::from)?;
-    set_backend_account_email(ctx, &email).await?;
+    remember_backend_account(ctx, &email).await?;
     Ok(status)
 }
 

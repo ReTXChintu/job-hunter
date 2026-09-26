@@ -95,6 +95,11 @@ impl SyncWorker {
         self.kick();
     }
 
+    /// The server this worker syncs with ("" when none is known).
+    pub async fn backend_url(&self) -> String {
+        self.backend_url.read().await.clone()
+    }
+
     pub async fn set_backend_url(&self, backend_url: String) {
         *self.backend_url.write().await = backend_url;
         *self.client.lock().await = None;

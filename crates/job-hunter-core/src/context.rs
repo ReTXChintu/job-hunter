@@ -119,9 +119,11 @@ impl AppContext {
         // desktop signed in under an earlier build's address, follow the
         // current one: a new server IP must not strand a signed-in device.
         let server_url = crate::backend_url::configured();
-        if !settings.backend.backend_url.is_empty() {
-            settings.backend.backend_url = server_url.clone();
-        }
+        // Sync always talks to this build's server. Don't rely on a saved
+        // copy of the address: earlier builds never saved it at sign-in,
+        // so after a restart sync found no address and reported "not signed
+        // in" while still holding a valid device token.
+        settings.backend.backend_url = server_url.clone();
         if !settings.remote.relay_url.is_empty() {
             settings.remote.relay_url = server_url;
         }
