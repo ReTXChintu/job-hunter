@@ -55,6 +55,20 @@ describe("ApiClient", () => {
     expect(api.current).toBeNull();
   });
 
+  it("creates an account through /v1/auth/register and signs straight in", async () => {
+    const calls: Call[] = [];
+    const sessions: (Session | null)[] = [];
+    const fetchImpl = async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return json(200, { userId: "u1", accessToken: "a", refreshToken: "r" });
+    };
+    const api = new ApiClient(null, (s) => sessions.push(s), fetchImpl);
+    await api.register(" New@Example.com ", "longenoughpassword");
+    expect(calls[0]!.url).toBe("/v1/auth/register");
+    expect(JSON.parse(String(calls[0]!.init?.body))).toEqual({ email: " New@Example.com ", password: "longenoughpassword" });
+    expect(sessions.at(-1)).toEqual({ email: "new@example.com", accessToken: "a", refreshToken: "r" });
+  });
+
   it("surfaces the backend's error message on a failed login", async () => {
     const fetchImpl = async () => json(401, { error: { code: "INVALID_CREDENTIALS", message: "Wrong email or password." } });
     const api = new ApiClient(null, () => undefined, fetchImpl);

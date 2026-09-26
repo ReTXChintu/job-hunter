@@ -1,8 +1,9 @@
-import { Box, Button, Flex, HStack, Link, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Box, Flex, HStack, Link, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { timeAgo } from "@job-hunter/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Download, Monitor } from "lucide-react";
+import { Monitor } from "lucide-react";
 
+import { AppDownloads, useDownloads } from "../components/AppDownloads";
 import { ApplicationRow } from "../components/ApplicationRow";
 import { ErrorBox, Loading, Panel } from "../components/State";
 import { href } from "../route";
@@ -16,9 +17,6 @@ const TILES: { key: StatusGroupKey; label: string; tone: string }[] = [
   { key: "interviews", label: "Interviews & offers", tone: "green" },
 ];
 
-function formatSize(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function Tile({ label, value, tone, link }: { label: string; value: number | string; tone?: string; link: string }) {
   const highlight = tone && typeof value === "number" && value > 0;
@@ -41,7 +39,7 @@ export function OverviewPage() {
   const applications = useQuery({ queryKey: ["applications"], queryFn: () => api.applications(), refetchInterval: 30_000 });
   const devices = useQuery({ queryKey: ["devices"], queryFn: () => api.devices(), refetchInterval: 30_000 });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.jobs(), refetchInterval: 60_000 });
-  const downloads = useQuery({ queryKey: ["downloads"], queryFn: () => api.downloads(), staleTime: 5 * 60_000 });
+  const downloads = useDownloads();
 
   if (applications.isPending) return <Loading />;
   if (applications.isError) return <ErrorBox error={applications.error} onRetry={() => void applications.refetch()} />;
@@ -125,33 +123,7 @@ export function OverviewPage() {
 
       {downloads.data?.android || downloads.data?.windows ? (
         <Panel title="Apps">
-          <VStack align="stretch" gap={4}>
-            {(
-              [
-                ["Android", "Review and approve applications from your phone.", downloads.data.android],
-                ["Windows", "The desktop app that runs the job hunt.", downloads.data.windows],
-              ] as const
-            ).map(([label, blurb, info]) =>
-              info ? (
-                <Flex key={label} gap={3} align={{ base: "flex-start", md: "center" }} justify="space-between" direction={{ base: "column", md: "row" }}>
-                  <Box>
-                    <Text fontSize="sm" fontWeight="medium">
-                      {label}
-                      {info.version ? ` · v${info.version}` : ""}
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      {blurb} {formatSize(info.sizeBytes)} · updated {timeAgo(info.updatedAt)}
-                    </Text>
-                  </Box>
-                  <Button asChild colorPalette="brand" size="sm" variant={label === "Android" ? "solid" : "outline"} flexShrink={0}>
-                    <a href={info.url} download>
-                      <Download size={14} /> Download {label === "Android" ? "APK" : "installer"}
-                    </a>
-                  </Button>
-                </Flex>
-              ) : null,
-            )}
-          </VStack>
+          <AppDownloads />
         </Panel>
       ) : null}
     </VStack>

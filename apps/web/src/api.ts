@@ -78,8 +78,17 @@ export class ApiClient {
     this.onSessionChange(session);
   }
 
-  async login(email: string, password: string): Promise<Session> {
-    const resp = await this.fetchImpl(`${this.base}/v1/auth/login`, {
+  login(email: string, password: string): Promise<Session> {
+    return this.authenticate("/v1/auth/login", email, password);
+  }
+
+  /** Creates the account and signs in. The desktop and mobile apps sign in to the same account. */
+  register(email: string, password: string): Promise<Session> {
+    return this.authenticate("/v1/auth/register", email, password);
+  }
+
+  private async authenticate(path: string, email: string, password: string): Promise<Session> {
+    const resp = await this.fetchImpl(`${this.base}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -161,6 +170,7 @@ export class ApiClient {
     return (await this.get<{ documents: JobAnalysis[] }>("/v1/data/job_analyses")).documents;
   }
 
+  /** Public: works signed out too, for the login page's download buttons. */
   downloads(): Promise<{ android: DownloadInfo | null; windows: DownloadInfo | null }> {
     return this.get("/v1/downloads");
   }

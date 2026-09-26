@@ -150,7 +150,7 @@ The mobile app does the same with `--dart-define=BACKEND_URL=...`
 `apps/web` is a small, read-only React app for checking on things from any
 browser: an overview (counts, what needs you, whether the desktop is
 online, the APK download), the application list and detail, and the job
-list. It signs in with the same email and password (access token plus
+list. Its login page also offers account creation and the app downloads. It signs in with the same email and password (access token plus
 refresh token, refreshed transparently) and reads only
 `/v1/applications`, `/v1/data/jobs`, `/v1/data/job_analyses`, `/v1/devices`
 and `/v1/downloads`. It never approves, rejects or applies; those stay in

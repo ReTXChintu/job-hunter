@@ -9,13 +9,13 @@ export function Loading() {
   );
 }
 
-export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorBox({ error, onRetry, title = "Couldn't load this" }: { error: unknown; onRetry?: () => void; title?: string }) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
   return (
     <Alert.Root status="error" borderRadius="md" my={4}>
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Title>Couldn&apos;t load this</Alert.Title>
+        <Alert.Title>{title}</Alert.Title>
         <Alert.Description>{message}</Alert.Description>
       </Alert.Content>
       {onRetry ? (
