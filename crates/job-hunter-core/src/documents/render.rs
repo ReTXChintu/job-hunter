@@ -770,6 +770,24 @@ pub fn text_to_pdf_builtin(title: &str, text: &str, path: &Path) -> CoreResult<(
 // Bundles
 // ---------------------------------------------------------------------------
 
+/// File name (without extension) for a generated document, as a recruiter
+/// sees the upload: the candidate's first name and the kind, e.g.
+/// "Biswajit_Resume". Just the kind when the name is unknown.
+pub fn document_file_stem(full_name: &str, kind: &str) -> String {
+    let first: String = full_name
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-')
+        .collect();
+    if first.is_empty() {
+        kind.to_string()
+    } else {
+        format!("{first}_{kind}")
+    }
+}
+
 pub struct RenderOptions<'a> {
     pub dir: &'a Path,
     pub base_name: &'a str,
@@ -926,6 +944,23 @@ mod tests {
         assert!(pdf.metadata().unwrap().len() > 1000);
         let txt = resume_to_plain_text(&sample());
         assert!(txt.contains("EXPERIENCE"));
+    }
+
+    #[test]
+    fn documents_are_named_after_the_candidates_first_name() {
+        assert_eq!(
+            document_file_stem("Biswajit Panda", "Resume"),
+            "Biswajit_Resume"
+        );
+        assert_eq!(
+            document_file_stem("  asha  ", "Cover_Letter"),
+            "asha_Cover_Letter"
+        );
+        assert_eq!(
+            document_file_stem("Dr. Ada Lovelace", "Resume"),
+            "Dr_Resume"
+        );
+        assert_eq!(document_file_stem("", "Resume"), "Resume");
     }
 
     #[tokio::test]

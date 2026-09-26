@@ -100,7 +100,19 @@ async fn full_job_hunt_produces_reviewable_applications_and_never_submits() {
     assert!(std::path::Path::new(resume.pdf_path.as_ref().unwrap()).is_file());
     assert!(std::path::Path::new(resume.docx_path.as_ref().unwrap()).is_file());
     assert_eq!(resume.validation.as_ref().unwrap().status, AtsStatus::Pass);
-    assert!(detail.cover_letter.is_some());
+    // Files carry the candidate's first name, one folder per version.
+    let pdf = std::path::Path::new(resume.pdf_path.as_ref().unwrap());
+    assert_eq!(pdf.file_name().unwrap(), "Asha_Resume.pdf");
+    assert_eq!(pdf.parent().unwrap().file_name().unwrap(), "v1");
+    let cover_letter = detail
+        .cover_letter
+        .as_ref()
+        .expect("cover letter generated");
+    assert!(cover_letter
+        .pdf_path
+        .as_ref()
+        .unwrap()
+        .ends_with("Asha_Cover_Letter.pdf"));
 
     // Applying before approval is refused.
     assert!(

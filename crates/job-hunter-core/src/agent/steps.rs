@@ -11,7 +11,9 @@ use tokio_util::sync::CancellationToken;
 use crate::claude::{ClaudeEvent, ClaudeRequest, ClaudeResponse};
 use crate::context::AppContext;
 use crate::dedup;
-use crate::documents::render::{render_cover_letter_bundle, render_resume_bundle, RenderOptions};
+use crate::documents::render::{
+    document_file_stem, render_cover_letter_bundle, render_resume_bundle, RenderOptions,
+};
 use crate::domain::*;
 use crate::error::{CoreError, CoreResult};
 use crate::prompts;
@@ -680,12 +682,21 @@ pub async fn generate_resume(
         .find::<Resume>(|r| r.job_id.as_deref() == Some(&job.id))?;
     let version = existing.iter().map(|r| r.version).max().unwrap_or(0) + 1;
     let company_slug = slugify(&job.company);
-    let dir = step.app.paths.company_resume_dir(&company_slug);
+    // One folder per version, so every file can carry the plain name a
+    // recruiter sees ("Biswajit_Resume.pdf") without overwriting another.
+    let dir = step
+        .app
+        .paths
+        .company_resume_dir(&company_slug)
+        .join(format!("v{version}"));
+    let candidate_name = &truth.profile.personal.name;
+    let resume_stem = document_file_stem(candidate_name, "Resume");
+    let cover_letter_stem = document_file_stem(candidate_name, "Cover_Letter");
     let chrome = step.app.chrome_path().await;
     let temp = step.app.paths.temp_dir();
     let opts = RenderOptions {
         dir: &dir,
-        base_name: &format!("resume-v{version}"),
+        base_name: &resume_stem,
         chrome: chrome.as_deref(),
         temp_dir: &temp,
         want_pdf: settings.resume.generate_pdf,
@@ -710,7 +721,7 @@ pub async fn generate_resume(
 
     let cover_letter = if include_cl && !out.cover_letter.trim().is_empty() {
         let cl_opts = RenderOptions {
-            base_name: &format!("cover-letter-v{version}"),
+            base_name: &cover_letter_stem,
             ..opts
         };
         let cl_files = render_cover_letter_bundle(
@@ -761,12 +772,16 @@ pub async fn rerender_resume(app: &AppContext, resume: &mut Resume) -> CoreResul
         return Err(CoreError::Validation("resume has no content".into()));
     };
     let settings = app.settings().await;
-    let dir = app.paths.company_resume_dir(&slugify(&resume.company));
+    let dir = app
+        .paths
+        .company_resume_dir(&slugify(&resume.company))
+        .join(format!("v{}", resume.version));
+    let stem = document_file_stem(&app.profile()?.personal.name, "Resume");
     let chrome = app.chrome_path().await;
     let temp = app.paths.temp_dir();
     let opts = RenderOptions {
         dir: &dir,
-        base_name: &format!("resume-v{}", resume.version),
+        base_name: &stem,
         chrome: chrome.as_deref(),
         temp_dir: &temp,
         want_pdf: settings.resume.generate_pdf,
@@ -789,12 +804,16 @@ pub async fn rerender_cover_letter(
     company: &str,
 ) -> CoreResult<()> {
     let settings = app.settings().await;
-    let dir = app.paths.company_resume_dir(&slugify(company));
+    let dir = app
+        .paths
+        .company_resume_dir(&slugify(company))
+        .join(format!("v{}", cl.version));
+    let stem = document_file_stem(&app.profile()?.personal.name, "Cover_Letter");
     let chrome = app.chrome_path().await;
     let temp = app.paths.temp_dir();
     let opts = RenderOptions {
         dir: &dir,
-        base_name: &format!("cover-letter-v{}", cl.version),
+        base_name: &stem,
         chrome: chrome.as_deref(),
         temp_dir: &temp,
         want_pdf: settings.resume.generate_pdf,
