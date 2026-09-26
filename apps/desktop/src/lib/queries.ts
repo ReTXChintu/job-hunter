@@ -132,6 +132,11 @@ export function useSaveProject() {
   return useMutation({ mutationFn: (project: Project) => invoke("save_project", { project }), onSuccess: () => inv([keys.projects]) });
 }
 
+/** Claude drafts a project from the candidate's description; nothing is saved. */
+export function useDraftProject() {
+  return useMutation({ mutationFn: (args: { description: string; experienceId?: string | null }) => invoke("draft_project", args) });
+}
+
 export function useDeleteProject() {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (id: string) => invoke("delete_project", { id }), onSuccess: () => inv([keys.projects]) });

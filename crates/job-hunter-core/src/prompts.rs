@@ -16,6 +16,8 @@ pub const SYSTEM: &str = include_str!("../../../agent/system/job-hunter.md");
 pub mod skills {
     pub const CANDIDATE_PROFILE: &str =
         include_str!("../../../agent/skills/candidate-profile/SKILL.md");
+    pub const PROJECT_DRAFTING: &str =
+        include_str!("../../../agent/skills/project-drafting/SKILL.md");
     pub const JOB_DISCOVERY: &str = include_str!("../../../agent/skills/job-discovery/SKILL.md");
     pub const JOB_EXTRACTION: &str = include_str!("../../../agent/skills/job-extraction/SKILL.md");
     pub const JOB_ANALYSIS: &str = include_str!("../../../agent/skills/job-analysis/SKILL.md");
@@ -89,6 +91,13 @@ pub mod schemas {
     }
     pub fn profile_parse() -> Value {
         PROFILE_PARSE.clone()
+    }
+    static PROJECT_DRAFT: Lazy<Value> = Lazy::new(|| {
+        serde_json::from_str(include_str!("../../../agent/schemas/project-draft.json"))
+            .expect("project-draft schema")
+    });
+    pub fn project_draft() -> Value {
+        PROJECT_DRAFT.clone()
     }
 }
 
@@ -412,6 +421,47 @@ pub fn profile_parse_prompt(resume_text: &str, existing: Option<&CandidateProfil
     s
 }
 
+/// Prompt for turning the candidate's own description of a project into a
+/// structured `Project` (see the project-drafting skill).
+pub fn project_draft_prompt(
+    description: &str,
+    experiences: &[Experience],
+    chosen_employer: Option<&Experience>,
+) -> String {
+    let mut s = String::from(
+        "# Task: turn the candidate's description of a project into a structured project entry
+
+Follow the project-drafting skill exactly. Use only what the description states.",
+    );
+    s.push_str(&section("Skill", skills::PROJECT_DRAFTING));
+    let employers: Vec<Value> = experiences
+        .iter()
+        .map(|e| json!({"company": e.company, "role": e.role, "startDate": e.start_date, "endDate": e.end_date}))
+        .collect();
+    s.push_str(&section("Employers", &json_block(&json!(employers))));
+    if let Some(e) = chosen_employer {
+        s.push_str(&section(
+            "Employer the candidate chose",
+            &json_block(&json!({"company": e.company, "role": e.role})),
+        ));
+    }
+    s.push_str(&section(
+        "Candidate's description",
+        &format!(
+            "```
+{}
+```",
+            truncate(description, 8000)
+        ),
+    ));
+    s.push_str(
+        "
+
+Return only the structured output.",
+    );
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,5 +518,19 @@ mod tests {
             .unwrap();
         app.transition(ApplicationStatus::Approved, "").unwrap();
         assert!(apply_prompt(&make(&app, &job, &truth)).contains("APPROVED = true"));
+    }
+
+    #[test]
+    fn project_draft_prompt_carries_the_rules_the_description_and_the_employers() {
+        let schema = schemas::project_draft();
+        assert!(schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "responsibilities"));
+        let prompt = project_draft_prompt("Built a school management system", &[], None);
+        assert!(prompt.contains("Never invent features, metrics"));
+        assert!(prompt.contains("Built a school management system"));
+        assert!(!prompt.contains("Employer the candidate chose"));
     }
 }

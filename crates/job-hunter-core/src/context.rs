@@ -452,6 +452,102 @@ impl AppContext {
         self.merge_parsed_profile(parsed)
     }
 
+    /// Turn the candidate's own description of a project into a structured,
+    /// **unsaved** `Project` for them to review (the desktop opens it in the
+    /// project editor). `experience_id` pins the employer; otherwise Claude
+    /// links one only when the description makes it clear.
+    pub async fn draft_project(
+        self: &Arc<Self>,
+        description: &str,
+        experience_id: Option<&str>,
+    ) -> CoreResult<Project> {
+        if description.trim().len() < 10 {
+            return Err(CoreError::Validation(
+                "Describe the project in a sentence or two first".into(),
+            ));
+        }
+        let experiences = self.experiences()?;
+        let chosen = experience_id.and_then(|id| experiences.iter().find(|e| e.id == id));
+        let runner = self.runner().await?;
+        let run_dir = self.paths.run_dir("project-draft");
+        std::fs::create_dir_all(&run_dir)?;
+        let settings = self.settings().await;
+        let mut req = crate::claude::ClaudeRequest::new(
+            "draft_project",
+            crate::prompts::project_draft_prompt(description, &experiences, chosen),
+            run_dir.clone(),
+        );
+        req.system_prompt_file = Some(crate::prompts::write_system_prompt(&run_dir)?);
+        req.json_schema = Some(crate::prompts::schemas::project_draft());
+        req.model = settings.claude.model.clone();
+        req.max_budget_usd = settings.claude.max_budget_usd_per_call;
+        req.max_turns = 4;
+        let resp = runner
+            .run(
+                req,
+                crate::claude::protocol::noop_sink(),
+                tokio_util::sync::CancellationToken::new(),
+            )
+            .await?;
+        let parsed = resp.structured.ok_or_else(|| CoreError::ClaudeRunFailed {
+            message: "no structured project returned".into(),
+            details: crate::util::truncate(&resp.text, 500),
+        })?;
+        Self::project_from_draft(parsed, &experiences, chosen)
+    }
+
+    fn project_from_draft(
+        draft: serde_json::Value,
+        experiences: &[Experience],
+        chosen: Option<&Experience>,
+    ) -> CoreResult<Project> {
+        #[derive(Deserialize, Default)]
+        #[serde(rename_all = "camelCase", default)]
+        struct Draft {
+            name: String,
+            description: String,
+            role: String,
+            technologies: Vec<String>,
+            responsibilities: Vec<String>,
+            achievements: Vec<String>,
+            url: String,
+            experience_company: String,
+        }
+        let d: Draft = serde_json::from_value(draft)?;
+        let clean = |v: Vec<String>| -> Vec<String> {
+            v.into_iter()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        };
+        let experience_id = chosen.map(|e| e.id.clone()).or_else(|| {
+            let wanted = d.experience_company.trim();
+            (!wanted.is_empty())
+                .then(|| {
+                    experiences
+                        .iter()
+                        .find(|e| e.company.eq_ignore_ascii_case(wanted))
+                })
+                .flatten()
+                .map(|e| e.id.clone())
+        });
+        let ts = now();
+        Ok(Project {
+            id: String::new(),
+            user_id: LOCAL_USER_ID.into(),
+            experience_id,
+            name: d.name.trim().to_string(),
+            description: d.description.trim().to_string(),
+            role: d.role.trim().to_string(),
+            technologies: clean(d.technologies),
+            responsibilities: clean(d.responsibilities),
+            achievements: clean(d.achievements),
+            url: d.url.trim().to_string(),
+            created_at: ts,
+            updated_at: ts,
+        })
+    }
+
     fn merge_parsed_profile(&self, parsed: serde_json::Value) -> CoreResult<CandidateProfile> {
         #[derive(Deserialize, Default)]
         #[serde(rename_all = "camelCase")]

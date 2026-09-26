@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "role": { "type": "string" },
+    "technologies": { "type": "array", "items": { "type": "string" } },
+    "responsibilities": { "type": "array", "items": { "type": "string" } },
+    "achievements": { "type": "array", "items": { "type": "string" } },
+    "url": { "type": "string" },
+    "experienceCompany": { "type": "string" }
+  },
+  "required": ["name", "description", "role", "technologies", "responsibilities", "achievements"],
+  "additionalProperties": false
+}

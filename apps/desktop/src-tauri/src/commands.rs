@@ -188,6 +188,19 @@ pub async fn list_projects(ctx: Ctx<'_>) -> R<Vec<Project>> {
     ctx.projects().map_err(Into::into)
 }
 
+/// Draft a project from the candidate's own description (not saved; the UI
+/// opens it in the project editor for review).
+#[tauri::command]
+pub async fn draft_project(
+    ctx: Ctx<'_>,
+    description: String,
+    experience_id: Option<String>,
+) -> R<Project> {
+    ctx.draft_project(&description, experience_id.as_deref())
+        .await
+        .map_err(Into::into)
+}
+
 #[tauri::command]
 pub async fn save_project(ctx: Ctx<'_>, project: Project) -> R<Project> {
     ctx.save_project(project).map_err(Into::into)

@@ -6,7 +6,7 @@ import { EmptyState } from "@job-hunter/ui";
 import { FileUp, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ErrorBanner, InfoBanner, LinesInput, PageHeader, Panel, TagInput } from "../components/common";
-import { useDeleteExperience, useDeleteProject, useExperiences, useImportMasterResume, useMasterResumeText, useParseMasterResume, useProfile, useProjects, useSaveExperience, useSaveProfile, useSaveProject } from "../lib/queries";
+import { useDeleteExperience, useDeleteProject, useExperiences, useImportMasterResume, useMasterResumeText, useParseMasterResume, useProfile, useProjects, useSaveExperience, useSaveProfile, useSaveProject, useDraftProject } from "../lib/queries";
 
 const EMPLOYMENT: EmploymentType[] = ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE", "INTERNSHIP"];
 
@@ -333,16 +333,77 @@ function emptyProject(): Project {
   return { id: "", userId: "", experienceId: null, name: "", description: "", role: "", technologies: [], responsibilities: [], achievements: [], url: "", createdAt: now, updatedAt: now };
 }
 
+/**
+ * "Add with Claude": the candidate describes a project in their own words and
+ * Claude drafts a full entry, which then opens in the normal editor for review.
+ */
+function DraftProjectPanel({ onDrafted, onCancel }: { onDrafted: (p: Project) => void; onCancel: () => void }) {
+  const experiences = useExperiences();
+  const draft = useDraftProject();
+  const [description, setDescription] = useState("");
+  const [experienceId, setExperienceId] = useState("");
+  return (
+    <Panel title="Add a project with Claude">
+      <Text fontSize="sm" color="fg.muted" mb={3}>
+        Describe the project in your own words: what it is, your role, what you built, the technologies, and any results. Claude turns it into a full entry
+        using only what you write, and you can review it before saving. Tailored resumes use your projects automatically.
+      </Text>
+      <ErrorBanner error={draft.error} />
+      <Field.Root>
+        <Field.Label>Project description</Field.Label>
+        <Textarea
+          rows={6}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="e.g. At iBoon I led a team of 4 building a hospital appointment app in React and Node.js, with Razorpay payments and WhatsApp reminders…"
+        />
+      </Field.Root>
+      <Field.Root mt={3} maxW="360px">
+        <Field.Label>Employer (optional; Claude picks it up from the description otherwise)</Field.Label>
+        <NativeSelect.Root>
+          <NativeSelect.Field value={experienceId} onChange={(e) => setExperienceId(e.target.value)}>
+            <option value="">From the description</option>
+            {experiences.data?.map((x) => <option key={x.id} value={x.id}>{x.company}</option>)}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
+      <HStack justify="flex-end" mt={4}>
+        <Button variant="ghost" onClick={onCancel} disabled={draft.isPending}>Cancel</Button>
+        <Button
+          colorPalette="brand"
+          loading={draft.isPending}
+          loadingText="Claude is drafting…"
+          disabled={description.trim().length < 10}
+          onClick={() => draft.mutate({ description, experienceId: experienceId || null }, { onSuccess: onDrafted })}
+        >
+          <Sparkles size={14} /> Draft with Claude
+        </Button>
+      </HStack>
+    </Panel>
+  );
+}
+
 function ProjectsTab() {
   const list = useProjects();
   const experiences = useExperiences();
   const save = useSaveProject();
   const del = useDeleteProject();
   const [editing, setEditing] = useState<Project | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const employerName = (id: string | null) => experiences.data?.find((x) => x.id === id)?.company;
   return (
     <VStack align="stretch" gap={4}>
       <ErrorBanner error={save.error ?? del.error ?? list.error} />
-      {editing ? (
+      {drafting ? (
+        <DraftProjectPanel
+          onCancel={() => setDrafting(false)}
+          onDrafted={(p) => {
+            setDrafting(false);
+            setEditing(p);
+          }}
+        />
+      ) : editing ? (
         <Panel title={editing.id ? "Edit project" : "New project"}>
           <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
             <Field.Root><Field.Label>Name</Field.Label><Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></Field.Root>
@@ -373,16 +434,23 @@ function ProjectsTab() {
       ) : (
         <HStack justify="flex-end">
           <Button size="sm" variant="subtle" onClick={() => setEditing(emptyProject())}><Plus size={14} /> Add project</Button>
+          <Button size="sm" colorPalette="brand" onClick={() => setDrafting(true)}><Sparkles size={14} /> Add with Claude</Button>
         </HStack>
       )}
-      {list.data?.length === 0 && !editing ? <EmptyState title="No projects yet" description="Projects help the agent pick relevant work for each resume." /> : null}
+      {list.data?.length === 0 && !editing && !drafting ? <EmptyState title="No projects yet" description="Projects help the agent pick relevant work for each resume." /> : null}
       {list.data?.map((p) => (
         <Panel key={p.id}>
           <HStack justify="space-between" align="flex-start">
             <Box>
               <Heading size="sm">{p.name}{p.role ? <Text as="span" fontWeight="normal" color="fg.muted"> · {p.role}</Text> : null}</Heading>
+              {p.experienceId && employerName(p.experienceId) ? <Text fontSize="xs" color="fg.muted">{employerName(p.experienceId)}</Text> : null}
               {p.description ? <Text fontSize="sm" mt={1} className="selectable">{p.description}</Text> : null}
               {p.technologies.length ? <Text fontSize="xs" color="fg.muted" mt={2}>{p.technologies.join(", ")}</Text> : null}
+              {p.responsibilities.length || p.achievements.length ? (
+                <Box as="ul" fontSize="sm" mt={2} pl={4} className="selectable">
+                  {[...p.responsibilities, ...p.achievements].map((line) => <li key={line}>{line}</li>)}
+                </Box>
+              ) : null}
             </Box>
             <HStack>
               <Button size="xs" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>

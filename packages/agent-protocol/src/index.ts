@@ -109,6 +109,7 @@ export interface Commands {
   save_experience: { args: { experience: Experience }; result: Experience };
   delete_experience: { args: { id: string }; result: null };
   list_projects: { args: Record<string, never>; result: Project[] };
+  draft_project: { args: { description: string; experienceId?: string | null }; result: Project };
   save_project: { args: { project: Project }; result: Project };
   delete_project: { args: { id: string }; result: null };
   import_master_resume: { args: { path: string }; result: MasterResumeRef };

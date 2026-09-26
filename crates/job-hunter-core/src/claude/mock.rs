@@ -462,6 +462,20 @@ impl MockClaudeRunner {
         }
     }
 
+    /// Deterministic stand-in for the project-drafting skill.
+    fn draft_project() -> Value {
+        json!({
+            "name": "School Management System",
+            "description": "A school management system built on the MERN stack.",
+            "role": "MERN Stack Developer",
+            "technologies": ["MongoDB", "Express.js", "React.js", "Node.js"],
+            "responsibilities": ["Built the application across the MERN stack."],
+            "achievements": [],
+            "url": "",
+            "experienceCompany": "Bhavnika Pvt. Ltd."
+        })
+    }
+
     fn parse_profile() -> Value {
         let c = FIXTURE_CANDIDATE.clone();
         let profile = c.get("profile").cloned().unwrap_or(json!({}));
@@ -546,6 +560,11 @@ impl ClaudeRunner for MockClaudeRunner {
                 self.step(&sink, &cancel, "Parsing the master resume (mock)")
                     .await?;
                 Self::parse_profile()
+            }
+            "draft_project" => {
+                self.step(&sink, &cancel, "Drafting the project (mock)")
+                    .await?;
+                Self::draft_project()
             }
             other => {
                 return Err(CoreError::other(format!(

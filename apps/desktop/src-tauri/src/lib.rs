@@ -161,6 +161,7 @@ pub fn run() {
             commands::save_experience,
             commands::delete_experience,
             commands::list_projects,
+            commands::draft_project,
             commands::save_project,
             commands::delete_project,
             commands::import_master_resume,
