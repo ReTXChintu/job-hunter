@@ -2766,7 +2766,7 @@ dependencies = [
 
 [[package]]
 name = "job-hunter-core"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2805,7 +2805,7 @@ dependencies = [
 
 [[package]]
 name = "job-hunter-desktop"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "dotenvy",
@@ -2824,7 +2824,7 @@ dependencies = [
 
 [[package]]
 name = "job-hunter-relay"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "argon2",
  "axum",
