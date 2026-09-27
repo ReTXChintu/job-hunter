@@ -163,7 +163,7 @@ export function ApplicationReviewPage() {
               </Button>
               {application.approvedAt ? (
                 <Button size="sm" variant="ghost" onClick={() => apply.mutate({ id: application.id })} loading={apply.isPending} disabled={busy}>
-                  <RefreshCw size={14} /> Retry automatically
+                  <RefreshCw size={14} /> {application.claudeSessionId ? "Resume where it stopped" : "Retry automatically"}
                 </Button>
               ) : null}
             </HStack>

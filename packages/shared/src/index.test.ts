@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApplicationListItem, CandidateProfile, JobListItem } from "@job-hunter/types";
-import { applicationActions, filterJobs, guessSkillGroup, isAgentRunning, pendingApplications, profileIssues, sortJobs, splitList, statusTone } from "./index";
+import { applicationActions, filterJobs, guessSkillGroup, isAgentRunning, normalizeQuestion, pendingApplications, profileIssues, sortJobs, splitList, statusTone } from "./index";
 
 function job(over: Partial<JobListItem["job"]>, analysis: Partial<NonNullable<JobListItem["analysis"]>> | null = null): JobListItem {
   const base: JobListItem["job"] = {
@@ -163,5 +163,11 @@ describe("isAgentRunning", () => {
   it("treats a job-site profile update as running", () => {
     expect(isAgentRunning("UPDATING_PROFILE")).toBe(true);
     expect(isAgentRunning("COMPLETED")).toBe(false);
+  });
+});
+
+describe("normalizeQuestion", () => {
+  it("ignores case and punctuation", () => {
+    expect(normalizeQuestion("What is your  current annual CTC?")).toBe(normalizeQuestion("what is your current annual ctc"));
   });
 });

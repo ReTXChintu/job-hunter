@@ -105,6 +105,7 @@ Every frame, both directions, is one JSON object:
 ### Relay-originated
 
 - `presence` — `{"device":"desktop","online":true|false,"lastSeenAt":"<iso>"}`, sent to every connected mobile device for the account whenever the desktop connects or disconnects (including on ungraceful drop, detected by a 30s ping/pong heartbeat).
+- `notification` — `{"id","level","kind","title","body","linkPage","linkId","createdAt"}`, sent by the backend to every connected mobile device when the desktop syncs a new, unread document into the `notifications` collection (a job hunt finished, an application or job-site update needs the user, something failed). The phone shows it as a system notification. While the app is closed, it fetches the same collection with its device token from `GET /v1/data/notifications` about every 15 minutes (Android WorkManager) and alerts anything newer than what it last showed.
 
 ### Mobile → desktop (request types; desktop always replies with a `response` echoing the same `id`)
 

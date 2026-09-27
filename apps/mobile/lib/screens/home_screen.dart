@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../state/notifications_controller.dart';
 
 import 'about_screen.dart';
 import 'applications_list_screen.dart';
+import 'notifications_screen.dart';
 import 'settings_screen.dart';
 
 /// The signed-in shell: a bottom nav between the review list and settings.
@@ -19,7 +23,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [ApplicationsListScreen(), SettingsScreen()];
+    final pages = const [ApplicationsListScreen(), NotificationsScreen(), SettingsScreen()];
+    final unread = context.watch<NotificationsController>().unread;
     return Scaffold(
       body: Column(
         children: [
@@ -29,10 +34,19 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.fact_check_outlined), selectedIcon: Icon(Icons.fact_check), label: 'Applications'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+        onDestinationSelected: (i) {
+          // Leaving the Alerts tab counts as having seen them.
+          if (_index == 1 && i != 1) context.read<NotificationsController>().markAllSeen();
+          setState(() => _index = i);
+        },
+        destinations: [
+          const NavigationDestination(icon: Icon(Icons.fact_check_outlined), selectedIcon: Icon(Icons.fact_check), label: 'Applications'),
+          NavigationDestination(
+            icon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications_outlined)),
+            selectedIcon: Badge(isLabelVisible: unread > 0, label: Text('$unread'), child: const Icon(Icons.notifications)),
+            label: 'Alerts',
+          ),
+          const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
     );

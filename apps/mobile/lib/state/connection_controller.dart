@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/app_notification.dart';
 import '../models/envelope.dart';
 import '../services/relay_client.dart';
 import 'auth_controller.dart';
@@ -27,6 +28,10 @@ class ConnectionController extends ChangeNotifier {
 
   final _changedController = StreamController<ChangedUpdate>.broadcast();
   Stream<ChangedUpdate> get changed => _changedController.stream;
+
+  /// Notifications the server pushes as soon as the desktop raises them.
+  final _notificationController = StreamController<AppNotification>.broadcast();
+  Stream<AppNotification> get notifications => _notificationController.stream;
 
   void _onAuthChanged() {
     if (auth.status == AuthStatus.signedIn && auth.relayUrl != null && auth.deviceToken != null) {
@@ -67,6 +72,8 @@ class ConnectionController extends ChangeNotifier {
         notifyListeners();
       case 'changed':
         _changedController.add(ChangedUpdate.fromPayload(env.payload));
+      case 'notification':
+        _notificationController.add(AppNotification.fromJson(env.payload));
       case 'agent_status':
         // Reserved for a future "agent is applying" indicator; the phone
         // does not need per-step detail (see docs/mobile-protocol.md).
@@ -90,6 +97,7 @@ class ConnectionController extends ChangeNotifier {
     auth.removeListener(_onAuthChanged);
     _disconnect();
     _changedController.close();
+    _notificationController.close();
     super.dispose();
   }
 }

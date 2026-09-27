@@ -74,6 +74,11 @@ pub struct PlatformProfile {
     pub pending_questions: Vec<PendingQuestion>,
     #[serde(default)]
     pub run_id: Option<String>,
+    /// Claude session of an update that stopped part-way (needs input,
+    /// needs the user in Chrome, or failed). "Resume" continues it, with the
+    /// browser tab where it left off, instead of starting over.
+    #[serde(default)]
+    pub resume_session_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -101,6 +106,7 @@ impl PlatformProfile {
             message: String::new(),
             pending_questions: vec![],
             run_id: None,
+            resume_session_id: None,
             created_at: ts,
             updated_at: ts,
         }

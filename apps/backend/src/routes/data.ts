@@ -33,6 +33,29 @@ function broadcastChanged(state: AppState, userId: string, collection: string): 
   state.hub.routeToMobiles(userId, frame);
 }
 
+/** Push a new, unread notification to the account's phones right away, so
+ * they can show it even though the desktop only syncs it here. */
+function pushNotification(state: AppState, userId: string, doc: Record<string, unknown>): void {
+  if (doc.read === true) return;
+  const pick = (key: string) => (typeof doc[key] === "string" ? doc[key] : "");
+  const frame = JSON.stringify({
+    v: 1,
+    id: crypto.randomUUID(),
+    type: "notification",
+    payload: {
+      id: pick("id"),
+      level: pick("level"),
+      kind: pick("kind"),
+      title: pick("title"),
+      body: pick("body"),
+      linkPage: pick("linkPage"),
+      linkId: typeof doc.linkId === "string" ? doc.linkId : null,
+      createdAt: pick("createdAt"),
+    },
+  });
+  state.hub.routeToMobiles(userId, frame);
+}
+
 export function registerDataRoutes(app: FastifyInstance, state: AppState): void {
   app.put<{ Params: { collection: string; id: string }; Body: Record<string, unknown> }>(
     "/v1/data/:collection/:id",
@@ -42,6 +65,7 @@ export function registerDataRoutes(app: FastifyInstance, state: AppState): void 
       assertCollection(request.params.collection);
       await state.db.upsertDoc(request.params.collection, userId, request.params.id, request.body ?? {});
       broadcastChanged(state, userId, request.params.collection);
+      if (request.params.collection === "notifications") pushNotification(state, userId, request.body ?? {});
       reply.send({});
     },
   );

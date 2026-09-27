@@ -43,6 +43,7 @@ export const DOMAIN_COLLECTIONS = [
   "agent_runs",
   "agent_events",
   "settings",
+  "notifications",
 ] as const;
 
 export type DomainCollection = (typeof DOMAIN_COLLECTIONS)[number];

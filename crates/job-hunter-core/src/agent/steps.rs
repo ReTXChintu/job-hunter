@@ -23,9 +23,26 @@ pub struct StepCtx {
     pub app: Arc<AppContext>,
     pub run_id: String,
     pub cancel: CancellationToken,
+    /// Session id of the latest Claude run, known as soon as it starts, so a
+    /// run that fails or times out can still be resumed.
+    last_session: Arc<std::sync::Mutex<Option<String>>>,
 }
 
 impl StepCtx {
+    pub fn new(app: Arc<AppContext>, run_id: &str, cancel: CancellationToken) -> Self {
+        Self {
+            app,
+            run_id: run_id.into(),
+            cancel,
+            last_session: Default::default(),
+        }
+    }
+
+    /// The session of the most recent `run_claude`, even when it failed.
+    pub fn last_session(&self) -> Option<String> {
+        self.last_session.lock().unwrap().clone()
+    }
+
     pub fn run_dir(&self) -> PathBuf {
         self.app.paths.run_dir(&self.run_id)
     }
@@ -80,7 +97,12 @@ impl StepCtx {
         let app = self.app.clone();
         let run_id = self.run_id.clone();
         let label = req.label.clone();
+        *self.last_session.lock().unwrap() = None;
+        let last_session = self.last_session.clone();
         let sink: crate::claude::EventSink = Arc::new(move |ev: ClaudeEvent| {
+            if let ClaudeEvent::Init { session_id, .. } = &ev {
+                *last_session.lock().unwrap() = Some(session_id.clone());
+            }
             let (level, message) = match &ev {
                 ClaudeEvent::Init { .. } => (
                     EventLevel::Info,

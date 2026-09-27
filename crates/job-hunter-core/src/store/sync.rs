@@ -232,6 +232,12 @@ impl SyncWorker {
                     self.store.ack(&op)?;
                     flushed += 1;
                 }
+                Err(CoreError::Validation(message)) => {
+                    // This document is refused, not the connection: keep it
+                    // queued (a newer server may accept it) and sync the rest.
+                    tracing::warn!(collection = %op.collection, id = %op.id, %message, "backend refused a document; skipping it for now");
+                    self.store.bump_attempt(&op);
+                }
                 Err(e) => {
                     self.store.bump_attempt(&op);
                     *self.client.lock().await = None;

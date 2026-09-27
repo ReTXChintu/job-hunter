@@ -222,6 +222,21 @@ pub async fn mark_skills_known(
     ctx.mark_skills_known(&skills, &group).map_err(Into::into)
 }
 
+// ---- notifications ---------------------------------------------------------------
+
+#[tauri::command]
+pub async fn list_notifications(ctx: Ctx<'_>, limit: Option<usize>) -> R<Vec<Notification>> {
+    ctx.list_notifications(limit.unwrap_or(50))
+        .map_err(Into::into)
+}
+
+/// Mark these notifications read, or all of them when `ids` is omitted.
+#[tauri::command]
+pub async fn mark_notifications_read(ctx: Ctx<'_>, ids: Option<Vec<String>>) -> R<()> {
+    ctx.mark_notifications_read(ids.as_deref())
+        .map_err(Into::into)
+}
+
 // ---- job-site profiles -------------------------------------------------------------
 
 #[tauri::command]
@@ -254,11 +269,21 @@ pub async fn save_publishing_plan(
     profile_sync::save_publishing_plan(&ctx, featured_project_ids, picks).map_err(Into::into)
 }
 
+/// `resume` continues the Claude session of an update that stopped part-way.
 #[tauri::command]
-pub async fn sync_platform_profile(ctx: Ctx<'_>, platform: String) -> R<AgentRun> {
-    profile_sync::start_profile_sync(ctx.inner().clone(), &platform, vec![])
-        .await
-        .map_err(Into::into)
+pub async fn sync_platform_profile(
+    ctx: Ctx<'_>,
+    platform: String,
+    resume: Option<bool>,
+) -> R<AgentRun> {
+    profile_sync::start_profile_sync(
+        ctx.inner().clone(),
+        &platform,
+        vec![],
+        resume.unwrap_or(false),
+    )
+    .await
+    .map_err(Into::into)
 }
 
 #[tauri::command]

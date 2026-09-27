@@ -1,7 +1,7 @@
 import { Badge, Box, Button, Flex, Heading, HStack, SimpleGrid, Spinner, Switch, Tag, Text, VStack } from "@chakra-ui/react";
 import { formatDateTime, isAgentRunning } from "@job-hunter/shared";
 import type { ApplicationAnswer, PlatformProfileView, PlatformSyncStatus } from "@job-hunter/types";
-import { ExternalLink, RefreshCw, Send } from "lucide-react";
+import { ExternalLink, Play, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { BulletList, ErrorBanner, InfoBanner, PageHeader, Panel } from "../components/common";
@@ -30,7 +30,7 @@ export function JobSitesPage() {
   const busy = agent.data ? isAgentRunning(agent.data.state) : false;
   const confirmed = !!plan.data?.confirmedAt;
   const featured = (plan.data?.featuredProjectIds ?? []).map((id) => projects.data?.find((p) => p.id === id)?.name).filter((n): n is string => !!n);
-  const update = (platform: string) => (confirmed ? sync.mutate(platform) : setPicker({ open: true, platform }));
+  const update = (platform: string) => (confirmed ? sync.mutate({ platform }) : setPicker({ open: true, platform }));
 
   return (
     <Box>
@@ -74,7 +74,14 @@ export function JobSitesPage() {
       ) : (
         <SimpleGrid columns={{ base: 1, xl: 2 }} gap={4} mt={4}>
           {platforms.data?.map((view) => (
-            <PlatformCard key={view.profile.id} view={view} busy={busy} onUpdate={() => update(view.profile.platform)} updating={sync.isPending && sync.variables === view.profile.platform} />
+            <PlatformCard
+              key={view.profile.id}
+              view={view}
+              busy={busy}
+              onUpdate={() => update(view.profile.platform)}
+              onResume={() => sync.mutate({ platform: view.profile.platform, resume: true })}
+              updating={sync.isPending && sync.variables?.platform === view.profile.platform}
+            />
           ))}
         </SimpleGrid>
       )}
@@ -84,14 +91,14 @@ export function JobSitesPage() {
         platform={picker.platform}
         onClose={() => setPicker({ open: false, platform: null })}
         onConfirmed={(platform) => {
-          if (platform) sync.mutate(platform);
+          if (platform) sync.mutate({ platform });
         }}
       />
     </Box>
   );
 }
 
-function PlatformCard({ view, busy, updating, onUpdate }: { view: PlatformProfileView; busy: boolean; updating: boolean; onUpdate: () => void }) {
+function PlatformCard({ view, busy, updating, onUpdate, onResume }: { view: PlatformProfileView; busy: boolean; updating: boolean; onUpdate: () => void; onResume: () => void }) {
   const { profile, outOfDate } = view;
   const agent = useAgentStatus();
   const activity = useActivity();
@@ -104,6 +111,8 @@ function PlatformCard({ view, busy, updating, onUpdate }: { view: PlatformProfil
   const running = profile.status === "SYNCING" && agent.data?.runKind === "PROFILE_SYNC" && agent.data.runId === profile.runId && busy;
   const runEvents = running ? activity.filter((e) => e.runId === profile.runId).slice(-20) : [];
   const neverSynced = !profile.lastSyncedAt;
+  // An update that stopped part-way continues in its session and tab.
+  const canResume = !!profile.resumeSessionId && (profile.status === "FAILED" || profile.status === "MANUAL_ACTION_REQUIRED");
 
   const submitAnswers = () => {
     const list: ApplicationAnswer[] = profile.pendingQuestions.map((q) => ({ question: q.question, answer: (answers[q.id] ?? "").trim(), source: "USER" }));
@@ -133,7 +142,7 @@ function PlatformCard({ view, busy, updating, onUpdate }: { view: PlatformProfil
         ) : null}
         {profile.status === "MANUAL_ACTION_REQUIRED" ? (
           <InfoBanner status="warning" title="Finish this in Chrome">
-            Sign in to {profile.platform} in Chrome (or clear the check it's showing), then update again.
+            Sign in to {profile.platform} in Chrome (or clear the check it's showing), then click Resume: Claude carries on in the same tab.
           </InfoBanner>
         ) : null}
 
@@ -200,9 +209,20 @@ function PlatformCard({ view, busy, updating, onUpdate }: { view: PlatformProfil
                 <ExternalLink size={14} /> Open
               </Button>
             ) : null}
-            <Button size="sm" colorPalette="brand" onClick={onUpdate} loading={updating || running} disabled={busy}>
-              <RefreshCw size={14} /> {neverSynced ? "Update profile" : "Update again"}
-            </Button>
+            {canResume ? (
+              <>
+                <Button size="sm" variant="outline" onClick={onUpdate} disabled={busy} title="Start a fresh update instead of continuing">
+                  Start over
+                </Button>
+                <Button size="sm" colorPalette="brand" onClick={onResume} loading={updating || running} disabled={busy}>
+                  <Play size={14} /> Resume
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" colorPalette="brand" onClick={onUpdate} loading={updating || running} disabled={busy}>
+                <RefreshCw size={14} /> {neverSynced ? "Update profile" : "Update again"}
+              </Button>
+            )}
           </HStack>
         </HStack>
       </VStack>

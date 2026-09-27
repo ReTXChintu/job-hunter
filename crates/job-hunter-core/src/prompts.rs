@@ -377,7 +377,7 @@ pub fn apply_prompt(p: &ApplyParams<'_>) -> String {
         approved, p.application.id
     );
     if p.resuming {
-        s.push_str("\n\nYou are RESUMING an application that stopped for user input. The user has now answered the questions listed under `previouslyAnswered`. Continue from where you stopped (the tab may still be open; if not, open the job URL again and re-fill).");
+        s.push_str("\n\nYou are RESUMING an application that stopped part-way: for the user's answers (listed under `previouslyAnswered`, if any), for a manual step the user may since have done (sign-in, CAPTCHA), or because the previous run hit a time or turn limit. The tab is probably still open: call `tabs_context_mcp`, continue in it from where the form is, and don't redo completed steps. If the tab is gone, open the job URL again and re-fill.");
     }
     s.push_str(&section(
         "Skill: chrome-application",
@@ -521,6 +521,8 @@ pub struct ProfileSyncParams<'a> {
     pub known_answers: &'a [AnswerRecord],
     pub previously_answered: &'a [ApplicationAnswer],
     pub resume_path: Option<&'a str>,
+    /// Continuing a session that stopped part-way.
+    pub resuming: bool,
 }
 
 /// Prompt for filling in the candidate's own profile on one job site.
@@ -533,6 +535,11 @@ CONFIRMED = true (the candidate asked for this update and approved the content)
 Follow the profile-sync skill exactly.",
         p.platform
     );
+    if p.resuming {
+        s.push_str("
+
+You are RESUMING this update: your previous turn in this conversation stopped part-way (a time, turn or budget limit, or the candidate answered the questions you reported). The browser tab you were working in is probably still open: call `tabs_context_mcp` and continue in that tab from where it is. Sections you already saved are done; check them quickly and move on. Don't start over.");
+    }
     s.push_str(&section("Skill: profile-sync", skills::PROFILE_SYNC));
     let input = json!({
         "platform": p.platform,

@@ -667,6 +667,8 @@ export interface PlatformProfile {
   message: string;
   pendingQuestions: PendingQuestion[];
   runId: string | null;
+  /** Session of an update that stopped part-way; "Resume" continues it. */
+  resumeSessionId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -689,6 +691,25 @@ export interface PublishingPlan {
   featuredProjectIds: string[];
   picks: ProjectPick[];
   confirmedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---- notifications -------------------------------------------------------------------
+
+export interface Notification {
+  id: string;
+  userId: string;
+  level: EventLevel;
+  /** JOB_HUNT_FINISHED, JOB_HUNT_FAILED, APPLICATION_NEEDS_INPUT, APPLICATION_MANUAL_ACTION,
+   * APPLICATION_SUBMITTED, PROFILE_UPDATED, PROFILE_NEEDS_INPUT, PROFILE_MANUAL_ACTION, PROFILE_UPDATE_FAILED */
+  kind: string;
+  title: string;
+  body: string;
+  /** "applications" | "application" (with linkId) | "job-sites" | "jobs" | "agent" */
+  linkPage: string;
+  linkId: string | null;
+  read: boolean;
   createdAt: string;
   updatedAt: string;
 }

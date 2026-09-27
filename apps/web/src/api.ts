@@ -7,7 +7,7 @@
  * apps. The short-lived access token is refreshed transparently with the
  * refresh token; if that fails too, the session ends.
  */
-import type { ApplicationListItem, Job, JobAnalysis } from "@job-hunter/types";
+import type { ApplicationListItem, Job, JobAnalysis, Notification } from "@job-hunter/types";
 
 export interface Session {
   email: string;
@@ -164,6 +164,11 @@ export class ApiClient {
 
   async jobs(): Promise<Job[]> {
     return (await this.get<{ documents: Job[] }>("/v1/data/jobs")).documents;
+  }
+
+  /** Notifications the desktop synced (finished hunts, things that need you, failures). */
+  async notifications(): Promise<Notification[]> {
+    return (await this.get<{ documents: Notification[] }>("/v1/data/notifications")).documents;
   }
 
   async analyses(): Promise<JobAnalysis[]> {

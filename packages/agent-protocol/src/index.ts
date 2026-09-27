@@ -24,6 +24,7 @@ import type {
   LogEntry,
   LogLevel,
   MasterResumeRef,
+  Notification,
   PairingCode,
   PlatformProfile,
   PlatformProfileView,
@@ -129,9 +130,12 @@ export interface Commands {
   get_publishing_plan: { args: Record<string, never>; result: PublishingPlan };
   suggest_project_picks: { args: Record<string, never>; result: ProjectPick[] };
   save_publishing_plan: { args: { featuredProjectIds: string[]; picks: ProjectPick[] }; result: PublishingPlan };
-  sync_platform_profile: { args: { platform: string }; result: AgentRun };
+  sync_platform_profile: { args: { platform: string; resume?: boolean }; result: AgentRun };
   answer_platform_questions: { args: { platform: string; answers: ApplicationAnswer[] }; result: AgentRun };
   set_platform_auto_sync: { args: { platform: string; enabled: boolean }; result: PlatformProfile };
+
+  list_notifications: { args: { limit?: number }; result: Notification[] };
+  mark_notifications_read: { args: { ids?: string[] }; result: null };
 
   list_jobs: { args: Record<string, never>; result: JobListItem[] };
   get_job: { args: { id: string }; result: JobDetail };
@@ -205,6 +209,7 @@ export const EVENT_KINDS = [
   "APPLICATION_READY",
   "APPLICATION_UPDATED",
   "PROFILE_UPDATED",
+  "NOTIFICATION",
   "CLAUDE_ACTIVITY",
   "RUN_FINISHED",
 ] as const;

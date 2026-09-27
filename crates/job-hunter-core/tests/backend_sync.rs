@@ -29,6 +29,8 @@ struct FakeBackend {
     valid_tokens: Mutex<Vec<String>>,
     /// Authorised GET /v1/devices calls: what the idle heartbeat sends.
     device_pings: Mutex<usize>,
+    /// Collections this server doesn't know (like an older deployment).
+    unknown_collections: Mutex<Vec<String>>,
 }
 
 type SharedFake = Arc<FakeBackend>;
@@ -86,9 +88,22 @@ async fn upsert_doc(
     headers: HeaderMap,
     Path((collection, id)): Path<(String, String)>,
     Json(value): Json<Value>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     if !authorized(&headers, &fake) {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err((StatusCode::UNAUTHORIZED, Json(json!({}))));
+    }
+    if fake
+        .unknown_collections
+        .lock()
+        .unwrap()
+        .contains(&collection)
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({ "error": { "code": "VALIDATION", "message": format!("unknown collection \"{collection}\"") } }),
+            ),
+        ));
     }
     fake.docs
         .lock()
@@ -251,6 +266,64 @@ async fn signing_in_pushes_local_data_and_pulls_remote_data() {
 
     ctx.sync.sign_out().await.unwrap();
     assert!(!ctx.sync.status().await.configured);
+}
+
+#[tokio::test]
+async fn a_collection_the_server_does_not_know_yet_does_not_block_the_rest() {
+    let (base_url, fake) = spawn_fake_backend().await;
+    fake.unknown_collections
+        .lock()
+        .unwrap()
+        .push("notifications".into());
+    let ctx = desktop().await;
+    ctx.sync.set_enabled(false).await;
+    ctx.sync
+        .configure(
+            &base_url,
+            "alice@example.com",
+            "password1234",
+            true,
+            "Test Desktop",
+            true,
+        )
+        .await
+        .unwrap();
+    ctx.sync.flush().await.unwrap();
+
+    ctx.notify(Notification::new(
+        LOCAL_USER_ID,
+        EventLevel::Info,
+        "TEST",
+        "Hello",
+        "",
+    ));
+    let job = Job::new(
+        LOCAL_USER_ID,
+        "linkedin",
+        "https://example.com/job/9",
+        "Acme",
+        "Engineer",
+    );
+    ctx.store.put(&job).unwrap();
+    ctx.sync
+        .flush()
+        .await
+        .expect("a refused document is skipped, not fatal");
+
+    let docs = fake.docs.lock().unwrap();
+    assert!(
+        docs.get("jobs").is_some_and(|j| j.contains_key(&job.id)),
+        "the job still syncs"
+    );
+    assert!(docs.get("notifications").is_none());
+    drop(docs);
+    assert!(
+        ctx.store
+            .pending_ops()
+            .iter()
+            .any(|op| op.collection == "notifications"),
+        "the notification waits for a server that knows it"
+    );
 }
 
 #[tokio::test]

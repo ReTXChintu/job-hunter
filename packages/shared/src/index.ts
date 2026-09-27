@@ -250,3 +250,34 @@ export function guessSkillGroup(skill: string): SkillGroupKey {
   for (const [group, pattern] of SKILL_GROUP_RULES) if (pattern.test(skill)) return group;
   return "other";
 }
+
+/**
+ * Details job sites and application forms often require that a profile
+ * doesn't hold. Answered once on the Candidate page, they're used for every
+ * profile update and application.
+ */
+export const COMMON_QUESTIONS: string[] = [
+  "What is your current annual CTC?",
+  "What is your expected annual CTC?",
+  "Can you join immediately? If not, your earliest joining date",
+  "Are you currently serving a notice period? If yes, your last working day",
+  "What is your date of birth?",
+  "What is your gender?",
+  "What is your marital status?",
+  "What is your current city?",
+  "What is your hometown?",
+  "What is your permanent address with PIN code?",
+  "Are you authorized to work in India?",
+  "Do you require visa sponsorship?",
+  "Do you have a valid passport?",
+  "Are you open to rotational or night shifts?",
+];
+
+/** The same question in different wording, for matching saved answers. */
+export function normalizeQuestion(q: string): string {
+  return q
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}

@@ -232,6 +232,11 @@ async fn parse_backend_response<T: serde::de::DeserializeOwned>(
         let message = serde_json::from_slice::<ErrBody>(&bytes)
             .map(|b| b.error.message)
             .unwrap_or_else(|_| format!("backend returned {status}"));
+        // The server refused this particular request (e.g. a collection an
+        // older server doesn't know yet); retrying won't change that.
+        if status == reqwest::StatusCode::BAD_REQUEST {
+            return Err(CoreError::Validation(message));
+        }
         return Err(CoreError::BackendUnavailable { message });
     }
     serde_json::from_slice(&bytes)

@@ -36,11 +36,7 @@ fn step_ctx(
     run_id: &str,
     cancel: tokio_util::sync::CancellationToken,
 ) -> StepCtx {
-    StepCtx {
-        app: app.clone(),
-        run_id: run_id.into(),
-        cancel,
-    }
+    StepCtx::new(app.clone(), run_id, cancel)
 }
 
 /// Start a job hunt. Returns the run immediately; the pipeline continues in
@@ -69,6 +65,7 @@ pub async fn start_job_hunt(app: Arc<AppContext>, options: JobHuntOptions) -> Co
         let status = app2.agent.status().await;
         run.stats = status.stats.clone();
         run.finished_at = Some(now());
+        notify_job_hunt(&app2, &outcome, &status.stats);
         match outcome {
             Ok(final_state) => {
                 run.state = final_state;
@@ -101,6 +98,98 @@ pub async fn start_job_hunt(app: Arc<AppContext>, options: JobHuntOptions) -> Co
     });
     app.agent.set_task(task).await;
     Ok(run)
+}
+
+/// Tell the user how a job hunt ended, on every device.
+fn notify_job_hunt(app: &AppContext, outcome: &CoreResult<AgentState>, stats: &RunStats) {
+    let user = app.user_id();
+    let n = match outcome {
+        Ok(AgentState::WaitingForApproval) => Notification::new(
+            &user,
+            EventLevel::Success,
+            "JOB_HUNT_FINISHED",
+            format!(
+                "{} application{} ready for your review",
+                stats.awaiting_approval,
+                if stats.awaiting_approval == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ),
+            format!(
+                "Job hunt found {} new job{}, {} relevant.",
+                stats.jobs_new,
+                if stats.jobs_new == 1 { "" } else { "s" },
+                stats.relevant
+            ),
+        )
+        .link("applications", None),
+        Ok(_) => Notification::new(
+            &user,
+            EventLevel::Info,
+            "JOB_HUNT_FINISHED",
+            "Job hunt finished",
+            format!(
+                "{} new job{}, {} relevant, none ready to apply yet.",
+                stats.jobs_new,
+                if stats.jobs_new == 1 { "" } else { "s" },
+                stats.relevant
+            ),
+        )
+        .link("jobs", None),
+        Err(CoreError::Cancelled) => return,
+        Err(e) => Notification::new(
+            &user,
+            EventLevel::Error,
+            "JOB_HUNT_FAILED",
+            "Job hunt failed",
+            e.user_message(),
+        )
+        .link("agent", None),
+    };
+    app.notify(n);
+}
+
+/// Tell the user how a browser application ended, on every device.
+fn notify_application(app: &AppContext, application_id: &str) {
+    let Ok(application) = app.store.require::<Application>(application_id) else {
+        return;
+    };
+    let Ok(job) = app.store.require::<Job>(&application.job_id) else {
+        return;
+    };
+    let at = format!("{} at {}", job.title, job.company);
+    let n = match application.status {
+        ApplicationStatus::Applied => Notification::new(
+            &application.user_id,
+            EventLevel::Success,
+            "APPLICATION_SUBMITTED",
+            format!("Applied: {at}"),
+            application.evidence.clone().unwrap_or_default(),
+        ),
+        ApplicationStatus::WaitingForUser => Notification::new(
+            &application.user_id,
+            EventLevel::Warn,
+            "APPLICATION_NEEDS_INPUT",
+            format!("{} needs your answers", job.company),
+            application
+                .pending_questions
+                .iter()
+                .map(|q| q.question.clone())
+                .collect::<Vec<_>>()
+                .join(" · "),
+        ),
+        ApplicationStatus::ManualActionRequired => Notification::new(
+            &application.user_id,
+            EventLevel::Warn,
+            "APPLICATION_MANUAL_ACTION",
+            format!("Application stopped: {at}"),
+            application.failure_reason.clone().unwrap_or_default(),
+        ),
+        _ => return,
+    };
+    app.notify(n.link("application", Some(&application.id)));
 }
 
 async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<AgentState> {
@@ -628,6 +717,11 @@ pub async fn apply_application(
             "This application was already submitted.".into(),
         ));
     }
+    // Retrying an application that stopped (timeout, CAPTCHA the user has
+    // since solved, ...) continues its Claude session and tab, not a new one.
+    let resuming = resuming
+        || (application.status == ApplicationStatus::ManualActionRequired
+            && application.claude_session_id.is_some());
     let mut run = AgentRun::new(&app.user_id(), RunKind::Application, app.is_mock().await);
     run.application_id = Some(application.id.clone());
     run.job_ids = vec![application.job_id.clone()];
@@ -665,6 +759,9 @@ pub async fn apply_application(
                 }
                 Err(e) => {
                     application.failure_reason = Some(e.user_message());
+                    if let Some(session) = step.last_session() {
+                        application.claude_session_id = Some(session);
+                    }
                     application.transition(ApplicationStatus::ManualActionRequired, "automatic application failed")?;
                     job.status = JobStatus::ManualActionRequired;
                     job.touch();
@@ -689,6 +786,9 @@ pub async fn apply_application(
             Ok(final_state)
         }
         .await;
+        if !matches!(result, Err(CoreError::Cancelled)) {
+            notify_application(&app2, &app_id);
+        }
         let mut run: AgentRun = app2
             .store
             .get(&run_id)

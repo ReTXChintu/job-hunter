@@ -5,6 +5,7 @@ import type { CandidateProfile, Certification, Education, EmploymentType, Experi
 import { EmptyState } from "@job-hunter/ui";
 import { FileUp, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AdditionalDetails } from "../components/AdditionalDetails";
 import { ErrorBanner, InfoBanner, LinesInput, PageHeader, Panel, TagInput } from "../components/common";
 import { useDeleteExperience, useDeleteProject, useExperiences, useImportMasterResume, useMasterResumeText, useParseMasterResume, useProfile, useProjects, useSaveExperience, useSaveProfile, useSaveProject, useDraftProject } from "../lib/queries";
 
@@ -57,6 +58,7 @@ export function CandidatePage() {
           <Tabs.Trigger value="experience">Experience</Tabs.Trigger>
           <Tabs.Trigger value="projects">Projects</Tabs.Trigger>
           <Tabs.Trigger value="education">Education &amp; more</Tabs.Trigger>
+          <Tabs.Trigger value="details">Additional details</Tabs.Trigger>
           <Tabs.Trigger value="resume">Master resume</Tabs.Trigger>
         </Tabs.List>
 
@@ -225,6 +227,10 @@ export function CandidatePage() {
               </Panel>
             </SimpleGrid>
           </VStack>
+        </Tabs.Content>
+
+        <Tabs.Content value="details">
+          <AdditionalDetails />
         </Tabs.Content>
 
         <Tabs.Content value="resume">

@@ -312,12 +312,19 @@ struct SyncOut {
     unknown_questions: Vec<PendingQuestion>,
 }
 
+/// How many times one update may run Claude: the first run plus automatic
+/// resumes when it stops part-way (no progress, turn or budget limit).
+const MAX_ATTEMPTS: u32 = 3;
+
 /// Update the candidate's profile on one site, in the background. Needs a
 /// confirmed publishing plan: the user decides what gets published first.
+/// `resume` continues the Claude session of the last update that stopped
+/// part-way (if there is one) instead of starting over.
 pub async fn start_profile_sync(
     app: Arc<AppContext>,
     platform: &str,
     previously_answered: Vec<ApplicationAnswer>,
+    resume: bool,
 ) -> CoreResult<AgentRun> {
     let platform = require_platform(platform)?;
     if publishing_plan(&app)?.confirmed_at.is_none() {
@@ -333,22 +340,25 @@ pub async fn start_profile_sync(
     let run_id = run.id.clone();
     let app2 = app.clone();
     let task = tokio::spawn(async move {
-        let step = StepCtx {
-            app: app2.clone(),
-            run_id: run_id.clone(),
-            cancel,
-        };
-        let result = sync_platform(&step, platform, &previously_answered).await;
+        let step = StepCtx::new(app2.clone(), &run_id, cancel);
+        let result = sync_platform(&step, platform, &previously_answered, resume).await;
         if let Err(e) = &result {
-            // Whatever stopped the run, the card must not stay on "Syncing".
+            // Whatever stopped the run, the card must not stay on "Syncing",
+            // and the session stays resumable.
             if let Ok(mut record) = platform_record(&app2, platform) {
                 record.status = PlatformSyncStatus::Failed;
                 record.message = match e {
                     CoreError::Cancelled => "Stopped before it finished.".into(),
                     other => other.user_message(),
                 };
+                if let Some(session) = step.last_session() {
+                    record.resume_session_id = Some(session);
+                }
                 record.updated_at = now();
                 let _ = app2.store.put(&record);
+                if !matches!(e, CoreError::Cancelled) {
+                    notify_outcome(&app2, &record);
+                }
             }
         }
         let mut run: AgentRun = app2
@@ -379,10 +389,68 @@ pub async fn start_profile_sync(
     Ok(run)
 }
 
+/// Tell the user how an update ended, on every device.
+fn notify_outcome(app: &AppContext, record: &PlatformProfile) {
+    let platform = &record.platform;
+    let (level, kind, title, body) = match record.status {
+        PlatformSyncStatus::Synced => (
+            EventLevel::Success,
+            "PROFILE_UPDATED",
+            format!("{platform} profile updated"),
+            match record.changes.len() {
+                0 => "Everything already matched your profile.".to_string(),
+                n => format!(
+                    "{n} change{}: {}",
+                    if n == 1 { "" } else { "s" },
+                    record
+                        .changes
+                        .iter()
+                        .take(3)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                ),
+            },
+        ),
+        PlatformSyncStatus::NeedsInput => (
+            EventLevel::Warn,
+            "PROFILE_NEEDS_INPUT",
+            format!("{platform} needs a few details from you"),
+            record
+                .pending_questions
+                .iter()
+                .map(|q| q.question.clone())
+                .collect::<Vec<_>>()
+                .join(" · "),
+        ),
+        PlatformSyncStatus::ManualActionRequired => (
+            EventLevel::Warn,
+            "PROFILE_MANUAL_ACTION",
+            format!("{platform} needs you in Chrome"),
+            record.message.clone(),
+        ),
+        _ => (
+            EventLevel::Error,
+            "PROFILE_UPDATE_FAILED",
+            format!("{platform} profile update stopped"),
+            if record.resume_session_id.is_some() {
+                format!("{} You can resume it from Job sites.", record.message)
+            } else {
+                record.message.clone()
+            },
+        ),
+    };
+    app.notify(
+        Notification::new(&app.user_id(), level, kind, title, body)
+            .link("job-sites", Some(&record.id)),
+    );
+}
+
 async fn sync_platform(
     step: &StepCtx,
     platform: &'static str,
     previously_answered: &[ApplicationAnswer],
+    resume: bool,
 ) -> CoreResult<PlatformSyncStatus> {
     let app = &step.app;
     let pre = steps::preflight(step, true).await?;
@@ -404,6 +472,11 @@ async fn sync_platform(
         .filter(|n| !project_names.iter().any(|p| p.eq_ignore_ascii_case(n)))
         .cloned()
         .collect();
+    let mut resume_from = if resume {
+        record.resume_session_id.clone()
+    } else {
+        None
+    };
     record.status = PlatformSyncStatus::Syncing;
     record.last_attempt_at = Some(now());
     record.run_id = Some(step.run_id.clone());
@@ -417,7 +490,11 @@ async fn sync_platform(
     step.event_with(
         EventLevel::Info,
         "STEP_STARTED",
-        format!("Updating your {platform} profile"),
+        if resume_from.is_some() {
+            format!("Resuming the update of your {platform} profile")
+        } else {
+            format!("Updating your {platform} profile")
+        },
         json!({ "platform": platform }),
     );
 
@@ -429,35 +506,66 @@ async fn sync_platform(
         .as_ref()
         .map(|m| m.stored_path.clone());
     let settings = app.settings().await;
-    let mut req = step
-        .request(
-            &format!("profile_sync:{}", slugify(platform)),
-            prompts::profile_sync_prompt(&prompts::ProfileSyncParams {
-                platform,
-                profile: &content,
-                remove_projects: &remove_projects,
-                known_answers: &answers,
-                previously_answered,
-                resume_path: resume_path.as_deref(),
-            }),
-        )
-        .await?;
-    req.chrome = true;
-    req.allowed_tools = prompts::chrome_tools(true);
-    req.json_schema = Some(prompts::schemas::profile_sync());
-    // A full profile touches many sections, each with its own editor.
-    req.max_turns = settings.claude.max_turns_browser.saturating_mul(2);
-    if req.max_budget_usd > 0.0 {
-        req.max_budget_usd *= 2.0;
-    }
-    req.mock_context = json!({
-        "platform": platform,
-        "projects": project_names,
-        "knownQuestions": answers.iter().map(|a| a.question.clone())
-            .chain(previously_answered.iter().map(|a| a.question.clone()))
-            .collect::<Vec<_>>(),
-    });
-    let resp = step.run_claude(req).await?;
+    let mut attempt = 0;
+    let resp = loop {
+        attempt += 1;
+        let mut req = step
+            .request(
+                &format!("profile_sync:{}", slugify(platform)),
+                prompts::profile_sync_prompt(&prompts::ProfileSyncParams {
+                    platform,
+                    profile: &content,
+                    remove_projects: &remove_projects,
+                    known_answers: &answers,
+                    previously_answered,
+                    resume_path: resume_path.as_deref(),
+                    resuming: resume_from.is_some(),
+                }),
+            )
+            .await?;
+        req.chrome = true;
+        req.allowed_tools = prompts::chrome_tools(true);
+        req.json_schema = Some(prompts::schemas::profile_sync());
+        // A full profile touches many sections, each with its own editor.
+        req.max_turns = settings.claude.max_turns_browser.saturating_mul(2);
+        if req.max_budget_usd > 0.0 {
+            req.max_budget_usd *= 2.0;
+        }
+        req.resume_session = resume_from.clone();
+        req.mock_context = json!({
+            "platform": platform,
+            "projects": project_names,
+            "resuming": resume_from.is_some(),
+            "knownQuestions": answers.iter().map(|a| a.question.clone())
+                .chain(previously_answered.iter().map(|a| a.question.clone()))
+                .collect::<Vec<_>>(),
+        });
+        match step.run_claude(req).await {
+            Ok(r) => break r,
+            Err(CoreError::ClaudeRunFailed { message, .. }) if attempt < MAX_ATTEMPTS => {
+                // Pick up where it stopped: same conversation, same tab. If
+                // the run never started (e.g. the old session is gone), start
+                // fresh; the update only edits what still differs anyway.
+                resume_from = step.last_session();
+                record.resume_session_id = resume_from.clone();
+                record.updated_at = now();
+                app.store.put(&record)?;
+                step.event(
+                    EventLevel::Warn,
+                    "MESSAGE",
+                    format!(
+                        "Claude stopped ({message}); {}",
+                        if resume_from.is_some() {
+                            "resuming where it left off"
+                        } else {
+                            "starting again"
+                        }
+                    ),
+                );
+            }
+            Err(e) => return Err(e),
+        }
+    };
     let out: SyncOut = steps::structured(&resp, "profile update result")?;
 
     record.changes = out.changes;
@@ -466,6 +574,7 @@ async fn sync_platform(
     if !out.profile_url.trim().is_empty() {
         record.profile_url = out.profile_url.trim().to_string();
     }
+    record.resume_session_id = resp.session_id.clone().or_else(|| step.last_session());
     record.status = match out.outcome.as_str() {
         "UPDATED" => {
             record.synced_hash = Some(hash);
@@ -475,6 +584,7 @@ async fn sync_platform(
             } else {
                 out.projects_on_site
             };
+            record.resume_session_id = None;
             PlatformSyncStatus::Synced
         }
         "HUMAN_INPUT_REQUIRED" => {
@@ -496,38 +606,16 @@ async fn sync_platform(
     record.updated_at = now();
     app.store.put(&record)?;
 
-    let (level, message) = match record.status {
-        PlatformSyncStatus::Synced => (
-            EventLevel::Success,
-            format!(
-                "{platform} profile updated ({} change{})",
-                record.changes.len(),
-                if record.changes.len() == 1 { "" } else { "s" }
-            ),
-        ),
-        PlatformSyncStatus::NeedsInput => (
-            EventLevel::Warn,
-            format!(
-                "{platform} needs {} answer{} from you to finish your profile",
-                record.pending_questions.len(),
-                if record.pending_questions.len() == 1 {
-                    ""
-                } else {
-                    "s"
-                }
-            ),
-        ),
-        _ => (
-            EventLevel::Warn,
-            format!("{platform} profile not updated: {}", record.message),
-        ),
-    };
     step.event_with(
-        level,
+        match record.status {
+            PlatformSyncStatus::Synced => EventLevel::Success,
+            _ => EventLevel::Warn,
+        },
         "PROFILE_UPDATED",
-        message,
+        format!("{platform}: {}", record.message),
         json!({ "platform": platform, "status": record.status }),
     );
+    notify_outcome(app, &record);
     Ok(record.status)
 }
 
@@ -566,7 +654,8 @@ pub async fn answer_platform_questions(
     if given.is_empty() {
         return Err(CoreError::Validation("Answer at least one question".into()));
     }
-    start_profile_sync(app, platform, given).await
+    // Continue the same session: the site's form is usually still open.
+    start_profile_sync(app, platform, given, true).await
 }
 
 // ---------------------------------------------------------------------------
@@ -612,7 +701,7 @@ pub async fn auto_sync_tick(
             && record.synced_hash.as_deref() != Some(hash.as_str())
         {
             tracing::info!(platform, "profile changed; updating the job-site profile");
-            return start_profile_sync(app.clone(), platform, vec![])
+            return start_profile_sync(app.clone(), platform, vec![], false)
                 .await
                 .map(Some);
         }

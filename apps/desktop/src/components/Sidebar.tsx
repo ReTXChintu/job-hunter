@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { Bot, Briefcase, FileText, Globe, LayoutDashboard, Moon, Send, Settings, Sun, UserRound, Crosshair } from "lucide-react";
 import type { ReactNode } from "react";
 import { useAboutInfo, useDashboard, useUpdateCheck } from "../lib/queries";
+import { NotificationBell } from "./NotificationBell";
 
 const NAV: { to: string; label: string; icon: ReactNode; badge?: (n: { awaiting: number; manual: number }) => number }[] = [
   { to: "/", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
@@ -80,9 +81,12 @@ export function Sidebar() {
             {update.data?.available ? <Box w={1.5} h={1.5} borderRadius="full" bg="brand.solid" title="Update available" /> : null}
           </HStack>
         </Link>
-        <IconButton aria-label="Toggle color mode" size="xs" variant="ghost" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
-          {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </IconButton>
+        <HStack gap={1}>
+          <NotificationBell />
+          <IconButton aria-label="Toggle color mode" size="xs" variant="ghost" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
+            {resolvedTheme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </IconButton>
+        </HStack>
       </HStack>
     </Flex>
   );

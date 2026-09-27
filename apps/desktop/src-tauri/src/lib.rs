@@ -27,6 +27,9 @@ fn forward_events(app: AppHandle, ctx: Arc<AppContext>) {
         loop {
             match events.recv().await {
                 Ok(ev) => {
+                    if ev.kind == "NOTIFICATION" {
+                        show_os_notification(&h, &ev.data);
+                    }
                     let _ = h.emit(EVENT_AGENT, &ev);
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -95,6 +98,30 @@ fn forward_events(app: AppHandle, ctx: Arc<AppContext>) {
     });
 }
 
+/// A Windows notification for things the user should hear about even when
+/// the window is in the background (see `AppContext::notify`).
+fn show_os_notification(app: &AppHandle, data: &serde_json::Value) {
+    use tauri_plugin_notification::NotificationExt;
+    let text = |key: &str| {
+        data.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
+    };
+    let title = text("title");
+    if title.is_empty() {
+        return;
+    }
+    let mut builder = app.notification().builder().title(title);
+    let body = text("body");
+    if !body.is_empty() {
+        builder = builder.body(body);
+    }
+    if let Err(e) = builder.show() {
+        tracing::warn!(error = %e, "could not show a desktop notification");
+    }
+}
+
 fn forward_remote_events(app: AppHandle, remote: Arc<RemoteClient>) {
     let mut status = remote.subscribe();
     tauri::async_runtime::spawn(async move {
@@ -129,6 +156,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -175,6 +203,8 @@ pub fn run() {
             commands::sync_platform_profile,
             commands::answer_platform_questions,
             commands::set_platform_auto_sync,
+            commands::list_notifications,
+            commands::mark_notifications_read,
             commands::import_master_resume,
             commands::parse_master_resume,
             commands::get_master_resume_text,

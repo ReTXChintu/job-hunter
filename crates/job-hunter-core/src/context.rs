@@ -316,6 +316,59 @@ impl AppContext {
         self.agent.bus.emit(event);
     }
 
+    // ---- notifications ------------------------------------------------------------
+
+    /// Tell the user something wherever they are: stored (and synced, so the
+    /// web app and phone get it) and pushed to the desktop as a
+    /// `NOTIFICATION` event, which the host turns into an OS notification.
+    pub fn notify(&self, notification: Notification) {
+        if let Err(e) = self.store.put(&notification) {
+            tracing::warn!(error = %e, "could not store notification");
+        }
+        self.agent.bus.emit(
+            AgentEvent::new(
+                "notifications",
+                notification.level,
+                "NOTIFICATION",
+                notification.title.clone(),
+            )
+            .with_data(serde_json::to_value(&notification).unwrap_or_default()),
+        );
+        self.prune_notifications(200);
+    }
+
+    fn prune_notifications(&self, keep: usize) {
+        let Ok(mut all) = self.store.list::<Notification>() else {
+            return;
+        };
+        if all.len() <= keep {
+            return;
+        }
+        all.sort_by_key(|n| std::cmp::Reverse(n.created_at));
+        for old in all.into_iter().skip(keep) {
+            let _ = self.store.delete::<Notification>(&old.id);
+        }
+    }
+
+    pub fn list_notifications(&self, limit: usize) -> CoreResult<Vec<Notification>> {
+        let mut v = self.store.list::<Notification>()?;
+        v.sort_by_key(|n| std::cmp::Reverse(n.created_at));
+        v.truncate(limit);
+        Ok(v)
+    }
+
+    /// Mark these (or, with `None`, every) notifications read.
+    pub fn mark_notifications_read(&self, ids: Option<&[String]>) -> CoreResult<()> {
+        for mut n in self.store.list::<Notification>()? {
+            if !n.read && ids.is_none_or(|ids| ids.contains(&n.id)) {
+                n.read = true;
+                n.updated_at = now();
+                self.store.put(&n)?;
+            }
+        }
+        Ok(())
+    }
+
     // ---- candidate ------------------------------------------------------------------
 
     pub fn profile(&self) -> CoreResult<CandidateProfile> {

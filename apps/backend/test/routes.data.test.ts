@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FastifyInstance } from "fastify";
+import type { AppState } from "../src/state.js";
 import { buildTestApp } from "./testApp.js";
 
 async function registerAndGetAccessToken(app: FastifyInstance, email: string) {
@@ -80,9 +81,10 @@ describe("generic data routes", () => {
 
 describe("application read views", () => {
   let app: FastifyInstance;
+  let state: AppState;
 
   beforeEach(async () => {
-    ({ app } = await buildTestApp());
+    ({ app, state } = await buildTestApp());
   });
   afterEach(async () => {
     await app.close();
@@ -120,5 +122,25 @@ describe("application read views", () => {
     const list = await app.inject({ method: "GET", url: "/v1/applications", headers: auth });
     expect(list.statusCode).toBe(200);
     expect(list.json()).toHaveLength(0);
+  });
+
+  it("pushes a new notification to the account's phones as soon as the desktop syncs it", async () => {
+    const token = await registerAndGetAccessToken(app, "notify@example.com");
+    const auth = { authorization: `Bearer ${token}` };
+    const sent: string[] = [];
+    vi.spyOn(state.hub, "routeToMobiles").mockImplementation((_user: string, text: string) => void sent.push(text));
+
+    const doc = { id: "n-1", level: "ERROR", kind: "PROFILE_UPDATE_FAILED", title: "LinkedIn profile update stopped", body: "Claude made no progress", linkPage: "job-sites", linkId: "linkedin", read: false, createdAt: "2026-09-28T00:00:00Z" };
+    expect((await app.inject({ method: "PUT", url: "/v1/data/notifications/n-1", headers: auth, payload: doc })).statusCode).toBe(200);
+    const pushed = sent.map((t) => JSON.parse(t)).filter((f) => f.type === "notification");
+    expect(pushed).toHaveLength(1);
+    expect(pushed[0].payload).toMatchObject({ id: "n-1", title: "LinkedIn profile update stopped", linkPage: "job-sites" });
+
+    // Marking it read on the desktop syncs again but doesn't re-notify.
+    await app.inject({ method: "PUT", url: "/v1/data/notifications/n-1", headers: auth, payload: { ...doc, read: true } });
+    expect(sent.map((t) => JSON.parse(t)).filter((f) => f.type === "notification")).toHaveLength(1);
+
+    const list = await app.inject({ method: "GET", url: "/v1/data/notifications", headers: auth });
+    expect(list.json().documents[0].title).toBe("LinkedIn profile update stopped");
   });
 });

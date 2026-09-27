@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { href, type Route } from "../route";
 import { useSession } from "../session";
+import { NotificationBell } from "./NotificationBell";
 
 const NAV: { label: string; route: Route; matches: Route["page"][] }[] = [
   { label: "Overview", route: { page: "overview" }, matches: ["overview"] },
@@ -53,6 +54,7 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
               <Text fontSize="xs" color="fg.muted" display={{ base: "none", md: "block" }}>
                 {session?.email}
               </Text>
+              <NotificationBell />
               <IconButton
                 aria-label="Toggle color mode"
                 variant="ghost"

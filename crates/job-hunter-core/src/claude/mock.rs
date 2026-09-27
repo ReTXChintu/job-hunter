@@ -627,6 +627,18 @@ impl ClaudeRunner for MockClaudeRunner {
             "profile_sync" => {
                 self.step(&sink, &cancel, "Opening your profile (mock)")
                     .await?;
+                // Indeed stalls on a fresh run, so tests see an automatic resume.
+                if ctx.get("platform").and_then(|p| p.as_str()) == Some("Indeed")
+                    && !ctx
+                        .get("resuming")
+                        .and_then(|r| r.as_bool())
+                        .unwrap_or(false)
+                {
+                    return Err(CoreError::ClaudeRunFailed {
+                        message: "Claude made no progress for 15 minutes (mock)".into(),
+                        details: String::new(),
+                    });
+                }
                 self.step(&sink, &cancel, "Updating profile sections (mock)")
                     .await?;
                 Self::profile_sync(ctx)

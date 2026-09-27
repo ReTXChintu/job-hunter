@@ -107,7 +107,7 @@ async fn claude_suggests_a_few_projects_and_nothing_is_published_before_proceed(
         "a suggestion saves nothing"
     );
 
-    let err = ps::start_profile_sync(ctx.clone(), "LinkedIn", vec![])
+    let err = ps::start_profile_sync(ctx.clone(), "LinkedIn", vec![], false)
         .await
         .unwrap_err();
     assert!(matches!(err, CoreError::Validation(_)), "{err:?}");
@@ -135,7 +135,7 @@ async fn an_update_publishes_only_the_featured_projects() {
     let (ctx, _dir) = ctx_with_profile().await;
     let plan = confirm_suggested_projects(&ctx).await;
 
-    let run = ps::start_profile_sync(ctx.clone(), "linkedin", vec![])
+    let run = ps::start_profile_sync(ctx.clone(), "linkedin", vec![], false)
         .await
         .unwrap();
     assert_eq!(run.kind, RunKind::ProfileSync);
@@ -170,7 +170,7 @@ async fn a_site_question_is_answered_once_and_remembered() {
     let (ctx, _dir) = ctx_with_profile().await;
     confirm_suggested_projects(&ctx).await;
 
-    ps::start_profile_sync(ctx.clone(), "Naukri", vec![])
+    ps::start_profile_sync(ctx.clone(), "Naukri", vec![], false)
         .await
         .unwrap();
     wait_idle(&ctx).await;
@@ -203,7 +203,7 @@ async fn a_site_question_is_answered_once_and_remembered() {
     );
 
     // A later update needs no answer: it's known now.
-    ps::start_profile_sync(ctx.clone(), "Naukri", vec![])
+    ps::start_profile_sync(ctx.clone(), "Naukri", vec![], false)
         .await
         .unwrap();
     wait_idle(&ctx).await;
@@ -221,7 +221,7 @@ async fn editing_the_profile_re_syncs_only_the_sites_already_updated() {
         .is_none());
 
     confirm_suggested_projects(&ctx).await;
-    ps::start_profile_sync(ctx.clone(), "LinkedIn", vec![])
+    ps::start_profile_sync(ctx.clone(), "LinkedIn", vec![], false)
         .await
         .unwrap();
     wait_idle(&ctx).await;
@@ -343,4 +343,90 @@ async fn a_missing_skill_marked_as_known_joins_the_profile_and_every_analysis() 
 
     assert!(ctx.mark_skills_known(&[], "frontend").is_err());
     assert!(ctx.mark_skills_known(&["Rust".into()], "kitchen").is_err());
+}
+
+fn notification_kinds(ctx: &AppContext) -> Vec<String> {
+    ctx.list_notifications(50)
+        .unwrap()
+        .into_iter()
+        .map(|n| n.kind)
+        .collect()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_update_that_stalls_resumes_by_itself_and_everyone_is_told() {
+    let (ctx, _dir) = ctx_with_profile().await;
+    confirm_suggested_projects(&ctx).await;
+    let mut events = ctx.agent.bus.subscribe_events();
+
+    // The mock stalls Indeed's first run; the update resumes that session.
+    ps::start_profile_sync(ctx.clone(), "Indeed", vec![], false)
+        .await
+        .unwrap();
+    assert_eq!(wait_idle(&ctx).await.state, AgentState::Completed);
+    let indeed = platform(&ctx, "indeed");
+    assert_eq!(indeed.status, PlatformSyncStatus::Synced);
+    assert!(indeed.resume_session_id.is_none(), "nothing left to resume");
+
+    let mut saw_resume = false;
+    let mut saw_notification = false;
+    while let Ok(ev) = events.try_recv() {
+        saw_resume |= ev.message.contains("resuming where it left off");
+        saw_notification |= ev.kind == "NOTIFICATION" && ev.message == "Indeed profile updated";
+    }
+    assert!(saw_resume, "the stall is reported and resumed");
+    assert!(saw_notification, "the desktop is told");
+
+    let stored = ctx.list_notifications(10).unwrap();
+    assert_eq!(stored[0].kind, "PROFILE_UPDATED");
+    assert_eq!(stored[0].link_page, "job-sites");
+    assert!(
+        ctx.store
+            .pending_ops()
+            .iter()
+            .any(|op| op.collection == "notifications"),
+        "notifications sync to the web app and phone"
+    );
+    ctx.mark_notifications_read(None).unwrap();
+    assert!(ctx.list_notifications(10).unwrap().iter().all(|n| n.read));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_site_asking_for_details_notifies_and_answering_resumes_the_session() {
+    let (ctx, _dir) = ctx_with_profile().await;
+    confirm_suggested_projects(&ctx).await;
+    ps::start_profile_sync(ctx.clone(), "Naukri", vec![], false)
+        .await
+        .unwrap();
+    wait_idle(&ctx).await;
+    let naukri = platform(&ctx, "naukri");
+    assert_eq!(naukri.status, PlatformSyncStatus::NeedsInput);
+    assert!(
+        naukri.resume_session_id.is_some(),
+        "the session is kept to resume"
+    );
+    assert!(notification_kinds(&ctx).contains(&"PROFILE_NEEDS_INPUT".to_string()));
+
+    let question = naukri.pending_questions[0].question.clone();
+    let mut events = ctx.agent.bus.subscribe_events();
+    ps::answer_platform_questions(
+        ctx.clone(),
+        "Naukri",
+        vec![ApplicationAnswer {
+            question,
+            answer: "1200000".into(),
+            source: AnswerSource::User,
+        }],
+    )
+    .await
+    .unwrap();
+    wait_idle(&ctx).await;
+    let mut resumed = false;
+    while let Ok(ev) = events.try_recv() {
+        resumed |= ev
+            .message
+            .starts_with("Resuming the update of your Naukri profile");
+    }
+    assert!(resumed, "answers continue the stopped session");
+    assert_eq!(platform(&ctx, "naukri").status, PlatformSyncStatus::Synced);
 }

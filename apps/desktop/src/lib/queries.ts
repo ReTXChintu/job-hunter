@@ -32,6 +32,7 @@ export const keys = {
   remoteStatus: ["remoteStatus"] as const,
   remoteDevices: ["remoteDevices"] as const,
   platformProfiles: ["platformProfiles"] as const,
+  notifications: ["notifications"] as const,
   publishingPlan: ["publishingPlan"] as const,
 };
 
@@ -47,6 +48,7 @@ export const COLLECTION_KEYS: Record<string, readonly (readonly string[])[]> = {
   projects: [keys.projects, keys.platformProfiles],
   platform_profiles: [keys.platformProfiles],
   publishing_plans: [keys.publishingPlan, keys.platformProfiles],
+  notifications: [keys.notifications],
   application_answers: [keys.answers],
   agent_runs: [keys.runs, keys.dashboard],
   agent_events: [["runEvents"]],
@@ -174,9 +176,20 @@ export function useSavePublishingPlan() {
   });
 }
 
+/** Update a site's profile; `resume` continues an update that stopped part-way. */
 export function useSyncPlatformProfile() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (platform: string) => invoke("sync_platform_profile", { platform }), onSuccess: () => inv([keys.platformProfiles, keys.agentStatus, keys.runs]) });
+  return useMutation({
+    mutationFn: (args: { platform: string; resume?: boolean }) => invoke("sync_platform_profile", args),
+    onSuccess: () => inv([keys.platformProfiles, keys.agentStatus, keys.runs]),
+  });
+}
+
+export const useNotifications = () => useQuery({ queryKey: keys.notifications, queryFn: () => invoke("list_notifications", { limit: 50 }) });
+
+export function useMarkNotificationsRead() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (ids?: string[]) => invoke("mark_notifications_read", { ids }), onSuccess: () => inv([keys.notifications]) });
 }
 
 export function useAnswerPlatformQuestions() {

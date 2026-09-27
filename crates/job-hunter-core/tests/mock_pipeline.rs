@@ -114,6 +114,16 @@ async fn full_job_hunt_produces_reviewable_applications_and_never_submits() {
         .unwrap()
         .ends_with("Asha_Cover_Letter.pdf"));
 
+    // The user hears about it wherever they are.
+    let told = ctx.list_notifications(10).unwrap();
+    assert_eq!(told[0].kind, "JOB_HUNT_FINISHED");
+    assert_eq!(told[0].link_page, "applications");
+    assert!(
+        told[0].title.contains("ready for your review"),
+        "{}",
+        told[0].title
+    );
+
     // Applying before approval is refused.
     assert!(
         orchestrator::apply_application(ctx.clone(), &first.application.id, false, None)

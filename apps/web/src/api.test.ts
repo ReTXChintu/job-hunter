@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApiClient, ApiError, type Session } from "./api";
 import { parseRoute, href } from "./route";
 import { countByGroup } from "./statusGroups";
-import type { ApplicationListItem, ApplicationStatus } from "@job-hunter/types";
+import type { ApplicationListItem, ApplicationStatus, Notification } from "@job-hunter/types";
+import { notificationHref, takeFresh, unreadCount } from "./notifications";
 
 type Call = { url: string; init?: RequestInit };
 
@@ -97,5 +98,31 @@ describe("status groups", () => {
     const item = (status: ApplicationStatus) => ({ application: { status } }) as unknown as ApplicationListItem;
     const counts = countByGroup([item("READY_FOR_REVIEW"), item("WAITING_FOR_USER"), item("MANUAL_ACTION_REQUIRED"), item("OFFER")]);
     expect(counts).toMatchObject({ all: 4, review: 1, attention: 2, interviews: 1, applied: 0 });
+  });
+});
+
+describe("notifications", () => {
+  const n = (id: string, createdAt: string, linkPage = "applications", linkId: string | null = null) =>
+    ({ id, createdAt, linkPage, linkId, title: id, body: "", level: "INFO", kind: "X", read: false, userId: "u", updatedAt: createdAt }) as Notification;
+
+  it("counts what arrived after the list was last opened", () => {
+    const list = [n("a", "2026-09-28T10:00:00Z"), n("b", "2026-09-28T11:00:00Z")];
+    expect(unreadCount(list, "")).toBe(2);
+    expect(unreadCount(list, "2026-09-28T10:00:00Z")).toBe(1);
+  });
+
+  it("alerts only for new arrivals, never replaying history on first load", () => {
+    const memory = new Map<string, string>();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => memory.get(k) ?? null, setItem: (k: string, v: string) => void memory.set(k, v) });
+    expect(takeFresh([n("a", "2026-09-28T10:00:00Z")])).toEqual([]);
+    const fresh = takeFresh([n("a", "2026-09-28T10:00:00Z"), n("c", "2026-09-28T12:00:00Z"), n("b", "2026-09-28T11:00:00Z")]);
+    expect(fresh.map((x) => x.id)).toEqual(["b", "c"]);
+    expect(takeFresh([n("c", "2026-09-28T12:00:00Z")])).toEqual([]);
+  });
+
+  it("links to web pages when there is one", () => {
+    expect(notificationHref(n("a", "t", "application", "app 1"))).toBe("#/applications/app%201");
+    expect(notificationHref(n("a", "t", "applications"))).toBe("#/applications");
+    expect(notificationHref(n("a", "t", "job-sites"))).toBeNull();
   });
 });

@@ -156,17 +156,28 @@ impl ClaudeRunner for CliClaudeRunner {
         let mut parser = StreamParser::new();
         let mut log_file = tokio::fs::File::create(&log_path).await.ok();
         let mut lines = BufReader::new(stdout).lines();
-        let started = std::time::Instant::now();
-        let mut timed_out = false;
+        let started = tokio::time::Instant::now();
+        let hard_deadline = started + req.max_duration;
+        let mut last_output = started;
+        let mut timed_out: Option<String> = None;
         let mut cancelled = false;
 
         loop {
+            let idle_deadline = last_output + req.timeout;
             tokio::select! {
                 _ = cancel.cancelled() => { cancelled = true; break; }
-                _ = tokio::time::sleep_until(tokio::time::Instant::from_std(std::time::Instant::now() + req.timeout.saturating_sub(started.elapsed()))) => { timed_out = true; break; }
+                _ = tokio::time::sleep_until(idle_deadline.min(hard_deadline)) => {
+                    timed_out = Some(if idle_deadline <= hard_deadline {
+                        format!("Claude made no progress for {} minutes", req.timeout.as_secs().div_ceil(60))
+                    } else {
+                        format!("Claude was still running after {} minutes", req.max_duration.as_secs() / 60)
+                    });
+                    break;
+                }
                 line = lines.next_line() => {
                     match line {
                         Ok(Some(line)) => {
+                            last_output = tokio::time::Instant::now();
                             if let Some(f) = log_file.as_mut() {
                                 let _ = f.write_all(redact_secrets(&line).as_bytes()).await;
                                 let _ = f.write_all(b"\n").await;
@@ -185,7 +196,7 @@ impl ClaudeRunner for CliClaudeRunner {
             }
         }
 
-        if cancelled || timed_out {
+        if cancelled || timed_out.is_some() {
             let _ = child.kill().await;
             let _ = child.wait().await;
             stderr_task.abort();
@@ -195,10 +206,7 @@ impl ClaudeRunner for CliClaudeRunner {
             }
             tracing::warn!(label = %req.label, "claude run timed out");
             return Err(CoreError::ClaudeRunFailed {
-                message: format!(
-                    "Claude did not finish within {} seconds",
-                    req.timeout.as_secs()
-                ),
+                message: timed_out.unwrap_or_default(),
                 details: format!("log: {}", log_path.display()),
             });
         }

@@ -33,7 +33,11 @@ pub struct ClaudeRequest {
     /// Resume a previous session (`--resume <id>`).
     pub resume_session: Option<String>,
     pub cwd: PathBuf,
+    /// Stop Claude when it has produced no output for this long (it's
+    /// stuck). A run that keeps working is never cut off by this.
     pub timeout: Duration,
+    /// Hard ceiling for one run however busy it is, as a runaway guard.
+    pub max_duration: Duration,
     /// Free-form data for the mock runner; ignored by the real runner.
     pub mock_context: Value,
 }
@@ -54,6 +58,7 @@ impl ClaudeRequest {
             resume_session: None,
             cwd,
             timeout: Duration::from_secs(600),
+            max_duration: Duration::from_secs(3 * 60 * 60),
             mock_context: Value::Null,
         }
     }

@@ -232,6 +232,8 @@ pub struct ClaudeSettings {
     pub max_budget_usd_per_call: f64,
     #[serde(default = "default_max_turns")]
     pub max_turns_browser: u32,
+    /// Stop a Claude run that has produced no output for this long. Runs
+    /// that keep working are not cut off (see `ClaudeRequest::max_duration`).
     #[serde(default = "default_timeout")]
     pub timeout_seconds: u64,
 }

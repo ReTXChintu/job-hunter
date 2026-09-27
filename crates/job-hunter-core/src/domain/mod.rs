@@ -7,6 +7,7 @@ pub mod answers;
 pub mod application;
 pub mod candidate;
 pub mod job;
+pub mod notification;
 pub mod platform;
 pub mod resume;
 
@@ -15,6 +16,7 @@ pub use answers::*;
 pub use application::*;
 pub use candidate::*;
 pub use job::*;
+pub use notification::*;
 pub use platform::*;
 pub use resume::*;
 
@@ -48,6 +50,7 @@ pub const COLLECTIONS: &[&str] = &[
     "agent_runs",
     "agent_events",
     "settings",
+    "notifications",
 ];
 
 /// The single local user. Schemas carry a `userId` so the data model can grow

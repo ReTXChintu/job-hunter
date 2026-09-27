@@ -5,6 +5,7 @@ import 'app.dart';
 import 'state/applications_controller.dart';
 import 'state/auth_controller.dart';
 import 'state/connection_controller.dart';
+import 'state/notifications_controller.dart';
 import 'state/update_controller.dart';
 
 Future<void> main() async {
@@ -20,6 +21,11 @@ Future<void> main() async {
         ChangeNotifierProxyProvider<AuthController, ConnectionController>(
           create: (_) => ConnectionController(auth),
           update: (_, auth, previous) => previous ?? ConnectionController(auth),
+        ),
+        ChangeNotifierProxyProvider<ConnectionController, NotificationsController>(
+          create: (context) => NotificationsController(auth, context.read<ConnectionController>()),
+          update: (_, connection, previous) => previous ?? NotificationsController(auth, connection),
+          lazy: false,
         ),
         ChangeNotifierProxyProvider<ConnectionController, ApplicationsController>(
           create: (context) => ApplicationsController(context.read<ConnectionController>()),
