@@ -60,8 +60,10 @@ class ApplicationsController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     final resp = await connection.request('list_applications');
-    if (resp.ok && resp.data is List) {
-      items = (resp.data as List).map((e) => ApplicationListItem.fromJson((e as Map).cast<String, dynamic>())).toList();
+    // With the desktop offline, read what it last synced to the server.
+    final data = resp.ok ? resp.data : await connection.serverGet('/v1/applications');
+    if (data is List) {
+      items = data.map((e) => ApplicationListItem.fromJson((e as Map).cast<String, dynamic>())).toList();
       isFromCache = false;
       lastLoadedAt = DateTime.now();
       error = null;
@@ -79,8 +81,9 @@ class ApplicationsController extends ChangeNotifier {
 
   Future<ApplicationDetail?> loadDetail(String applicationId) async {
     final resp = await connection.request('get_application', {'id': applicationId});
-    if (resp.ok && resp.data is Map) {
-      return ApplicationDetail.fromJson((resp.data as Map).cast<String, dynamic>());
+    final data = resp.ok ? resp.data : await connection.serverGet('/v1/applications/${Uri.encodeComponent(applicationId)}');
+    if (data is Map) {
+      return ApplicationDetail.fromJson(data.cast<String, dynamic>());
     }
     error = resp.errorMessage;
     notifyListeners();

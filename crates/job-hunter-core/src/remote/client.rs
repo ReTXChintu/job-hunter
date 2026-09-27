@@ -23,7 +23,7 @@ use super::dispatch::dispatch;
 use super::protocol::Envelope;
 use crate::context::AppContext;
 use crate::error::{CoreError, CoreResult};
-use crate::secrets::REMOTE_DEVICE_TOKEN_KEY;
+use crate::secrets::{BACKEND_DEVICE_TOKEN_KEY, REMOTE_DEVICE_TOKEN_KEY};
 use crate::util::now;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -112,11 +112,59 @@ impl RemoteClient {
     pub async fn status(&self) -> RemoteStatus {
         let mut s = self.status.read().await.clone();
         let settings = self.app.settings().await;
-        s.configured = self.has_device_token();
-        s.relay_url = settings.remote.relay_url;
-        s.account_email = settings.remote.account_email;
+        let creds = self.credentials().await;
+        s.configured = creds.is_some();
+        s.relay_url = creds.map(|(url, _)| url).unwrap_or_default();
+        s.account_email = if self.has_device_token() {
+            settings.remote.account_email
+        } else {
+            settings.backend.account_email
+        };
         s.device_name = settings.remote.device_name;
         s
+    }
+
+    /// Where, and with which device token, to hold the connection the phone
+    /// reaches this desktop through: the Mobile app sign-in when there is
+    /// one, otherwise the backend sync sign-in. The backend speaks the relay
+    /// protocol, so signing in once (for sync) is enough -- without this the
+    /// phone saw a signed-in, running desktop as offline.
+    async fn credentials(&self) -> Option<(String, String)> {
+        let token = |key: &str| {
+            self.app
+                .secrets
+                .get(key)
+                .ok()
+                .flatten()
+                .filter(|t| !t.trim().is_empty())
+        };
+        let settings = self.app.settings().await;
+        if let Some(t) = token(REMOTE_DEVICE_TOKEN_KEY) {
+            if !settings.remote.relay_url.trim().is_empty() {
+                return Some((settings.remote.relay_url, t));
+            }
+        }
+        if let Some(t) = token(BACKEND_DEVICE_TOKEN_KEY) {
+            if !settings.backend.backend_url.trim().is_empty() {
+                return Some((settings.backend.backend_url, t));
+            }
+        }
+        None
+    }
+
+    async fn require_credentials(&self) -> CoreResult<(String, String)> {
+        self.credentials()
+            .await
+            .ok_or_else(|| CoreError::Validation("Sign in to your Job Hunter account first".into()))
+    }
+
+    /// The account this desktop is signed in with changed (backend sign-in
+    /// or sign-out): drop the current connection and reconnect with the new
+    /// credentials, if any.
+    pub async fn credentials_changed(&self) {
+        self.disconnect_current().await;
+        self.kick();
+        self.publish_status().await;
     }
 
     async fn publish_status(&self) {
@@ -276,29 +324,10 @@ impl RemoteClient {
         Ok(())
     }
 
-    fn device_token(&self) -> CoreResult<String> {
-        self.app
-            .secrets
-            .get(REMOTE_DEVICE_TOKEN_KEY)?
-            .filter(|t| !t.trim().is_empty())
-            .ok_or_else(|| CoreError::Validation("Not signed in to a relay account".into()))
-    }
-
-    async fn relay_base(&self) -> CoreResult<String> {
-        let url = self.app.settings().await.remote.relay_url;
-        if url.trim().is_empty() {
-            return Err(CoreError::Validation(
-                "Not signed in to a relay account".into(),
-            ));
-        }
-        Ok(url)
-    }
-
     /// Mints a short-lived pairing code the phone can redeem with no
     /// password. Any signed-in device (usually the desktop) may call this.
     pub async fn create_pairing_code(&self) -> CoreResult<(String, chrono::DateTime<chrono::Utc>)> {
-        let relay_url = self.relay_base().await?;
-        let token = self.device_token()?;
+        let (relay_url, token) = self.require_credentials().await?;
         let resp = self
             .http
             .post(format!("{relay_url}/v1/pairing/create"))
@@ -312,8 +341,7 @@ impl RemoteClient {
     }
 
     pub async fn list_devices(&self) -> CoreResult<Vec<RemoteDevice>> {
-        let relay_url = self.relay_base().await?;
-        let token = self.device_token()?;
+        let (relay_url, token) = self.require_credentials().await?;
         let resp = self
             .http
             .get(format!("{relay_url}/v1/devices"))
@@ -327,8 +355,7 @@ impl RemoteClient {
     }
 
     pub async fn revoke_device(&self, device_id: &str) -> CoreResult<()> {
-        let relay_url = self.relay_base().await?;
-        let token = self.device_token()?;
+        let (relay_url, token) = self.require_credentials().await?;
         let resp = self
             .http
             .delete(format!("{relay_url}/v1/devices/{device_id}"))
@@ -372,36 +399,26 @@ impl RemoteClient {
     pub async fn run(self: Arc<Self>) {
         let mut backoff = Duration::from_secs(2);
         loop {
-            let token = self
-                .app
-                .secrets
-                .get(REMOTE_DEVICE_TOKEN_KEY)
-                .ok()
-                .flatten()
-                .filter(|t| !t.trim().is_empty());
-            let relay_url = self.app.settings().await.remote.relay_url;
-            match token {
-                Some(token) if !relay_url.trim().is_empty() => {
-                    match Self::ws_url(&relay_url, &token) {
-                        Ok(url) => {
-                            let cancel = CancellationToken::new();
-                            *self.cancel_current.lock().await = Some(cancel.clone());
-                            let result = tokio::select! {
-                                r = self.handle_connection(&url) => r,
-                                _ = cancel.cancelled() => Ok(()),
-                            };
-                            *self.cancel_current.lock().await = None;
-                            match result {
-                                Ok(()) => backoff = Duration::from_secs(2),
-                                Err(e) => {
-                                    self.record_error(&e).await;
-                                    backoff = (backoff * 2).min(Duration::from_secs(60));
-                                }
+            match self.credentials().await {
+                Some((relay_url, token)) => match Self::ws_url(&relay_url, &token) {
+                    Ok(url) => {
+                        let cancel = CancellationToken::new();
+                        *self.cancel_current.lock().await = Some(cancel.clone());
+                        let result = tokio::select! {
+                            r = self.handle_connection(&url) => r,
+                            _ = cancel.cancelled() => Ok(()),
+                        };
+                        *self.cancel_current.lock().await = None;
+                        match result {
+                            Ok(()) => backoff = Duration::from_secs(2),
+                            Err(e) => {
+                                self.record_error(&e).await;
+                                backoff = (backoff * 2).min(Duration::from_secs(60));
                             }
                         }
-                        Err(e) => self.record_error(&e).await,
                     }
-                }
+                    Err(e) => self.record_error(&e).await,
+                },
                 _ => self.set_connected(false).await,
             }
             tokio::select! {

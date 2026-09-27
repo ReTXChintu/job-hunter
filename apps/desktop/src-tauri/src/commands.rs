@@ -121,31 +121,39 @@ async fn backend_sign_in(
 #[tauri::command]
 pub async fn backend_register(
     ctx: Ctx<'_>,
+    remote: RemoteCtx<'_>,
     email: String,
     password: String,
     device_name: Option<String>,
 ) -> R<SyncStatus> {
-    backend_sign_in(&ctx, email, password, device_name, true).await
+    let status = backend_sign_in(&ctx, email, password, device_name, true).await?;
+    // The same sign-in also connects this desktop for the phone.
+    remote.credentials_changed().await;
+    Ok(status)
 }
 
 #[tauri::command]
 pub async fn backend_login(
     ctx: Ctx<'_>,
+    remote: RemoteCtx<'_>,
     email: String,
     password: String,
     device_name: Option<String>,
 ) -> R<SyncStatus> {
-    backend_sign_in(&ctx, email, password, device_name, false).await
+    let status = backend_sign_in(&ctx, email, password, device_name, false).await?;
+    remote.credentials_changed().await;
+    Ok(status)
 }
 
 #[tauri::command]
-pub async fn backend_logout(ctx: Ctx<'_>) -> R<SyncStatus> {
+pub async fn backend_logout(ctx: Ctx<'_>, remote: RemoteCtx<'_>) -> R<SyncStatus> {
     ctx.sync.sign_out().await.map_err(UserFacingError::from)?;
     let mut settings = ctx.settings().await;
     settings.backend = Default::default();
     ctx.save_settings(settings)
         .await
         .map_err(UserFacingError::from)?;
+    remote.credentials_changed().await;
     Ok(ctx.sync.status().await)
 }
 

@@ -279,3 +279,56 @@ async fn logout_forgets_local_credentials_and_stops_reconnecting() {
         .unwrap();
     assert!(remote.status().await.configured);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn signing_in_for_sync_alone_connects_the_desktop_for_the_phone() {
+    // The backend speaks the relay protocol; here the relay stands in for it.
+    let relay_http = spawn_relay().await;
+    let relay_ws = relay_http.replacen("http://", "ws://", 1);
+    let ctx = desktop_with_one_ready_application().await;
+    ctx.sync.set_enabled(false).await;
+
+    // Only the backend (sync) sign-in, never Settings → Mobile app.
+    ctx.sync
+        .configure(
+            &relay_http,
+            "desktop@example.com",
+            "hunter2222",
+            true,
+            "Desktop",
+            true,
+        )
+        .await
+        .expect("sync sign-in should succeed");
+    let mut settings = ctx.settings().await;
+    settings.backend.backend_url = relay_http.clone();
+    settings.backend.account_email = "desktop@example.com".into();
+    ctx.save_settings(settings).await.unwrap();
+
+    let remote = RemoteClient::new(ctx.clone());
+    remote.credentials_changed().await;
+    let run_handle = tokio::spawn(remote.clone().run());
+    for _ in 0..50 {
+        if remote.status().await.connected {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let status = remote.status().await;
+    assert!(status.configured && status.connected, "{status:?}");
+    assert_eq!(status.account_email, "desktop@example.com");
+
+    let (code, _) = remote.create_pairing_code().await.unwrap();
+    let mobile_token = redeem_pairing_code(&relay_http, &code).await;
+    let (mut mobile_ws, _) =
+        tokio_tungstenite::connect_async(format!("{relay_ws}/v1/ws?token={mobile_token}"))
+            .await
+            .unwrap();
+    let presence = next_json(&mut mobile_ws).await;
+    assert_eq!(
+        presence["payload"]["online"], true,
+        "the phone sees the desktop online"
+    );
+
+    run_handle.abort();
+}

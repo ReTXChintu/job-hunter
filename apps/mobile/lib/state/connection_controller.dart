@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/app_notification.dart';
@@ -78,6 +79,24 @@ class ConnectionController extends ChangeNotifier {
         // Reserved for a future "agent is applying" indicator; the phone
         // does not need per-step detail (see docs/mobile-protocol.md).
         break;
+    }
+  }
+
+  /// Reads a server view directly (e.g. `/v1/applications`) with this
+  /// phone's device token. The server keeps the desktop's synced data, so
+  /// the phone can show it while the desktop is offline. Returns null on
+  /// any failure.
+  Future<dynamic> serverGet(String path) async {
+    final url = auth.relayUrl;
+    final token = auth.deviceToken;
+    if (url == null || token == null) return null;
+    try {
+      final dio = Dio(BaseOptions(baseUrl: url, connectTimeout: const Duration(seconds: 15), receiveTimeout: const Duration(seconds: 15)));
+      final resp = await dio.get<dynamic>(path, options: Options(headers: {'Authorization': 'Bearer $token'}));
+      return resp.data;
+    } catch (e) {
+      debugPrint('server read $path failed: $e');
+      return null;
     }
   }
 
