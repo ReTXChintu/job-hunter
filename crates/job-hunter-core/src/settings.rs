@@ -126,13 +126,27 @@ fn default_max_applications_per_run() -> u32 {
 fn default_recency_days() -> u32 {
     7
 }
+/// Every job source the discovery skill knows, and whether it starts
+/// enabled: on a new install, and when an update adds it to existing
+/// settings.
+pub const KNOWN_SOURCES: &[(&str, bool)] = &[
+    ("LinkedIn", true),
+    ("Naukri", true),
+    ("LinkedIn Posts", true),
+    ("Cutshort", true),
+    ("Indeed", false),
+    ("Wellfound", false),
+    ("Instahyre", false),
+    ("Hirist", false),
+    ("Foundit", false),
+];
+
 fn default_sources() -> Vec<JobSourceConfig> {
-    ["LinkedIn", "Naukri", "Indeed", "Wellfound"]
+    KNOWN_SOURCES
         .iter()
-        .enumerate()
-        .map(|(i, p)| JobSourceConfig {
+        .map(|(p, enabled)| JobSourceConfig {
             platform: p.to_string(),
-            enabled: i < 2,
+            enabled: *enabled,
         })
         .collect()
 }
@@ -269,6 +283,7 @@ impl AppSettings {
         }
         let raw = std::fs::read_to_string(path)?;
         let mut s: AppSettings = serde_json::from_str(&raw).unwrap_or_default();
+        s.add_new_sources();
         s.apply_env();
         Ok(s)
     }
@@ -293,6 +308,23 @@ impl AppSettings {
         if let Ok(v) = std::env::var("CHROME_PATH") {
             if !v.trim().is_empty() {
                 self.browser.chrome_path = Some(v);
+            }
+        }
+    }
+
+    /// Sources added in a later version show up in existing settings too,
+    /// without touching the user's choices for the ones already there.
+    fn add_new_sources(&mut self) {
+        for (platform, enabled) in KNOWN_SOURCES {
+            if !self
+                .job_sources
+                .iter()
+                .any(|s| s.platform.eq_ignore_ascii_case(platform))
+            {
+                self.job_sources.push(JobSourceConfig {
+                    platform: platform.to_string(),
+                    enabled: *enabled,
+                });
             }
         }
     }
@@ -330,6 +362,29 @@ mod tests {
         s.save(&path).unwrap();
         let loaded = AppSettings::load(&path).unwrap();
         assert_eq!(loaded.max_jobs_per_source, 3);
+    }
+
+    #[test]
+    fn new_sources_join_existing_settings_without_changing_old_choices() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{"jobSources":[{"platform":"LinkedIn","enabled":false},{"platform":"Naukri","enabled":true}]}"#,
+        )
+        .unwrap();
+        let s = AppSettings::load(&path).unwrap();
+        let enabled = |p: &str| {
+            s.job_sources
+                .iter()
+                .find(|x| x.platform == p)
+                .map(|x| x.enabled)
+        };
+        assert_eq!(enabled("LinkedIn"), Some(false), "the user's choice stays");
+        assert_eq!(enabled("LinkedIn Posts"), Some(true));
+        assert_eq!(enabled("Cutshort"), Some(true));
+        assert_eq!(enabled("Foundit"), Some(false));
+        assert_eq!(s.job_sources.len(), KNOWN_SOURCES.len());
     }
 
     #[test]

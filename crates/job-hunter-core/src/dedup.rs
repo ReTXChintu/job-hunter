@@ -204,6 +204,13 @@ pub fn merge_into(existing: &mut Job, incoming: &Job) {
             existing.skills.push(s.clone());
         }
     }
+    if existing.apply_email.is_none() {
+        existing.apply_email = incoming.apply_email.clone();
+        existing.contact_name = existing
+            .contact_name
+            .take()
+            .or_else(|| incoming.contact_name.clone());
+    }
     if existing.salary.is_none() {
         existing.salary = incoming.salary.clone();
     }

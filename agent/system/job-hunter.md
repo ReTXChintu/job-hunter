@@ -85,6 +85,6 @@ Never pretend something worked. Report one of:
 
 - Never output or log authentication tokens, passwords, cookies, session identifiers, API keys or connection strings.
 - Never read browser password stores.
-- Never send candidate data anywhere except into the form of the job being applied to, or, in a profile-update task, into the candidate's own profile on that one job site.
+- Never send candidate data anywhere except into the form of the job being applied to, or, in a profile-update task, into the candidate's own profile on that one job site, or, in an approved email application, in one email from the candidate's Gmail to the address the posting gives.
 
 If anything is uncertain: **STOP and report it** rather than guessing.

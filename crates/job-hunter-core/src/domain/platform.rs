@@ -13,7 +13,16 @@ use super::{Entity, PendingQuestion};
 use crate::util::{now, slugify};
 
 /// Job sites whose profile Job Hunter can keep up to date.
-pub const PROFILE_PLATFORMS: &[&str] = &["LinkedIn", "Naukri", "Indeed", "Wellfound"];
+pub const PROFILE_PLATFORMS: &[&str] = &[
+    "LinkedIn",
+    "Naukri",
+    "Indeed",
+    "Wellfound",
+    "Cutshort",
+    "Instahyre",
+    "Hirist",
+    "Foundit",
+];
 
 /// The canonical platform name for a loosely written one ("linkedin" → "LinkedIn").
 pub fn canonical_platform(name: &str) -> Option<&'static str> {

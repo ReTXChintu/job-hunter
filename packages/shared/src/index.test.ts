@@ -30,6 +30,8 @@ function job(over: Partial<JobListItem["job"]>, analysis: Partial<NonNullable<Jo
     applicationId: null,
     saved: false,
     detailsComplete: true,
+    applyEmail: null,
+    contactName: null,
     dedupKey: "",
     createdAt: "",
     updatedAt: "",

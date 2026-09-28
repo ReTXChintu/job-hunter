@@ -80,6 +80,10 @@ impl CliClaudeRunner {
             args.push("--append-system-prompt-file".into());
             args.push(file.to_string_lossy().to_string());
         }
+        for dir in &req.add_dirs {
+            args.push("--add-dir".into());
+            args.push(dir.to_string_lossy().to_string());
+        }
         if let Some(sid) = &req.resume_session {
             args.push("--resume".into());
             args.push(sid.clone());
@@ -316,5 +320,17 @@ mod tests {
         assert!(args.contains(&"mcp__claude-in-chrome__navigate".to_string()));
         assert!(!args.iter().any(|a| a.contains("dangerously")));
         assert!(!args.iter().any(|a| a == "bypassPermissions"));
+    }
+
+    #[test]
+    fn upload_folders_are_granted_with_add_dir() {
+        let mut req = ClaudeRequest::new("apply", "hi".into(), PathBuf::from("."));
+        req.add_dirs = vec![PathBuf::from("resumes/generated/acme/v1")];
+        let args = CliClaudeRunner::build_args(&req);
+        let i = args
+            .iter()
+            .position(|a| a == "--add-dir")
+            .expect("--add-dir passed");
+        assert!(args[i + 1].ends_with("v1"));
     }
 }

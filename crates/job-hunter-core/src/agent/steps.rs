@@ -17,7 +17,7 @@ use crate::documents::render::{
 use crate::domain::*;
 use crate::error::{CoreError, CoreResult};
 use crate::prompts;
-use crate::util::{now, slugify, truncate};
+use crate::util::{looks_like_email, now, slugify, truncate};
 
 pub struct StepCtx {
     pub app: Arc<AppContext>,
@@ -386,6 +386,11 @@ pub async fn discover_source(
         job.responsibilities = d.responsibilities;
         job.skills = d.skills;
         job.details_complete = d.details_complete && !job.description.trim().is_empty();
+        job.apply_email = d
+            .apply_email
+            .map(|e| e.trim().to_string())
+            .filter(|e| looks_like_email(e));
+        job.contact_name = d.contact_name.filter(|n| !n.trim().is_empty());
         job.run_id = Some(step.run_id.clone());
         dedup::prepare(&mut job);
         jobs.push(job);
@@ -1009,6 +1014,23 @@ pub async fn apply(
         .filter(|a| a.source == AnswerSource::User)
         .cloned()
         .collect();
+    // The browser can only upload files from folders this Claude session may
+    // read; without this every resume upload was refused.
+    let mut upload_dirs: Vec<PathBuf> = Vec::new();
+    for file in [
+        resume.as_ref().and_then(|r| r.pdf_path.as_deref()),
+        resume.as_ref().and_then(|r| r.docx_path.as_deref()),
+        cover.as_ref().and_then(|c| c.pdf_path.as_deref()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Some(dir) = std::path::Path::new(file).parent() {
+            if !upload_dirs.iter().any(|d| d == dir) {
+                upload_dirs.push(dir.to_path_buf());
+            }
+        }
+    }
     let params = prompts::ApplyParams {
         application,
         job,
@@ -1031,6 +1053,7 @@ pub async fn apply(
     req.allowed_tools = prompts::chrome_tools(true);
     req.json_schema = Some(prompts::schemas::apply());
     req.max_turns = settings.claude.max_turns_browser.max(40);
+    req.add_dirs = upload_dirs.clone();
     req.resume_session = if resuming {
         application.claude_session_id.clone()
     } else {
@@ -1056,6 +1079,7 @@ pub async fn apply(
             req.allowed_tools = prompts::chrome_tools(true);
             req.json_schema = Some(prompts::schemas::apply());
             req.max_turns = settings.claude.max_turns_browser.max(40);
+            req.add_dirs = upload_dirs.clone();
             req.mock_context = json!({ "application": { "url": job.url }, "simulate": simulate });
             let _ = details;
             step.run_claude(req).await?

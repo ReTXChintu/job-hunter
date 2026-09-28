@@ -26,7 +26,18 @@
         "Improve performance and reliability of the platform",
         "Collaborate with product and design"
       ],
-      "skills": ["React", "TypeScript", "Node.js", "Express", "PostgreSQL", "AWS", "Docker", "Jest", "Playwright", "CI/CD"],
+      "skills": [
+        "React",
+        "TypeScript",
+        "Node.js",
+        "Express",
+        "PostgreSQL",
+        "AWS",
+        "Docker",
+        "Jest",
+        "Playwright",
+        "CI/CD"
+      ],
       "detailsComplete": true
     },
     {
@@ -48,8 +59,18 @@
         "Testing with React Testing Library",
         "Good communication in a remote team"
       ],
-      "responsibilities": ["Build dashboard features", "Maintain the component library", "Write tests"],
-      "skills": ["React", "TypeScript", "GraphQL", "React Testing Library", "CSS"],
+      "responsibilities": [
+        "Build dashboard features",
+        "Maintain the component library",
+        "Write tests"
+      ],
+      "skills": [
+        "React",
+        "TypeScript",
+        "GraphQL",
+        "React Testing Library",
+        "CSS"
+      ],
       "detailsComplete": true
     },
     {
@@ -64,9 +85,23 @@
       "salary": null,
       "seniority": "Staff",
       "description": "Lead the design of large-scale training pipelines and model serving infrastructure. Requires 10+ years of experience including deep expertise in PyTorch, distributed training, CUDA optimisation and a PhD in machine learning or related field.",
-      "requirements": ["10+ years of experience", "PhD in ML or related field", "PyTorch", "Distributed training", "CUDA"],
-      "responsibilities": ["Lead ML infrastructure", "Mentor researchers"],
-      "skills": ["PyTorch", "CUDA", "Kubernetes", "Python"],
+      "requirements": [
+        "10+ years of experience",
+        "PhD in ML or related field",
+        "PyTorch",
+        "Distributed training",
+        "CUDA"
+      ],
+      "responsibilities": [
+        "Lead ML infrastructure",
+        "Mentor researchers"
+      ],
+      "skills": [
+        "PyTorch",
+        "CUDA",
+        "Kubernetes",
+        "Python"
+      ],
       "detailsComplete": true
     }
   ],
@@ -83,9 +118,25 @@
       "salary": "25-35 Lacs PA",
       "seniority": "Senior",
       "description": "ABC Technologies is hiring a Senior Full Stack Developer to build customer-facing web applications for our fintech platform. You will own features end to end across a React front end and Node.js services backed by PostgreSQL, deploy to AWS with Docker and CI/CD, and mentor junior developers. Hybrid from our Mumbai office.",
-      "requirements": ["5-8 years experience", "React, TypeScript", "Node.js", "PostgreSQL", "AWS, Docker"],
-      "responsibilities": ["Build features across the stack", "Mentor junior developers"],
-      "skills": ["React", "TypeScript", "Node.js", "PostgreSQL", "AWS", "Docker"],
+      "requirements": [
+        "5-8 years experience",
+        "React, TypeScript",
+        "Node.js",
+        "PostgreSQL",
+        "AWS, Docker"
+      ],
+      "responsibilities": [
+        "Build features across the stack",
+        "Mentor junior developers"
+      ],
+      "skills": [
+        "React",
+        "TypeScript",
+        "Node.js",
+        "PostgreSQL",
+        "AWS",
+        "Docker"
+      ],
       "detailsComplete": true
     },
     {
@@ -100,10 +151,57 @@
       "salary": "Not disclosed",
       "seniority": "Mid-level",
       "description": "Coastal Commerce runs an e-commerce marketplace. We need a Backend Developer with Node.js, MongoDB and Redis experience to build order and inventory services, integrate payment gateways, and improve API performance. Experience with message queues (RabbitMQ or Kafka) is a plus.",
-      "requirements": ["3-6 years with Node.js", "MongoDB", "Redis", "REST API design", "Payment gateway integration"],
-      "responsibilities": ["Build order and inventory services", "Integrate payment gateways", "Optimise APIs"],
-      "skills": ["Node.js", "MongoDB", "Redis", "REST", "RabbitMQ", "Kafka"],
+      "requirements": [
+        "3-6 years with Node.js",
+        "MongoDB",
+        "Redis",
+        "REST API design",
+        "Payment gateway integration"
+      ],
+      "responsibilities": [
+        "Build order and inventory services",
+        "Integrate payment gateways",
+        "Optimise APIs"
+      ],
+      "skills": [
+        "Node.js",
+        "MongoDB",
+        "Redis",
+        "REST",
+        "RabbitMQ",
+        "Kafka"
+      ],
       "detailsComplete": true
+    }
+  ],
+  "LinkedIn Posts": [
+    {
+      "title": "Node.js Developer",
+      "company": "Brightpath Software",
+      "url": "https://www.linkedin.com/feed/update/urn:li:activity:7300000000000000001/",
+      "location": "Pune (Hybrid)",
+      "postedAt": "1 day ago",
+      "sourceJobId": "7300000000000000001",
+      "description": "We're hiring! Brightpath Software is looking for a Node.js Developer (3-5 years) to build REST APIs with Express.js and MongoDB for our logistics platform. React.js is a plus. Pune, hybrid. Interested candidates can send their resume to careers@brightpath.example with the subject 'Node.js Developer'.",
+      "requirements": [
+        "3-5 years experience",
+        "Node.js, Express.js",
+        "MongoDB",
+        "REST APIs"
+      ],
+      "responsibilities": [
+        "Build REST APIs for the logistics platform"
+      ],
+      "skills": [
+        "Node.js",
+        "Express.js",
+        "MongoDB",
+        "REST APIs",
+        "React.js"
+      ],
+      "detailsComplete": true,
+      "applyEmail": "careers@brightpath.example",
+      "contactName": "Priya Sharma"
     }
   ]
 }

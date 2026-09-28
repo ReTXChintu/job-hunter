@@ -526,6 +526,12 @@ async fn sync_platform(
         req.chrome = true;
         req.allowed_tools = prompts::chrome_tools(true);
         req.json_schema = Some(prompts::schemas::profile_sync());
+        // Let the browser upload the master resume (see `ClaudeRequest::add_dirs`).
+        req.add_dirs = resume_path
+            .as_deref()
+            .and_then(|p| std::path::Path::new(p).parent())
+            .map(|d| vec![d.to_path_buf()])
+            .unwrap_or_default();
         // A full profile touches many sections, each with its own editor.
         req.max_turns = settings.claude.max_turns_browser.saturating_mul(2);
         if req.max_budget_usd > 0.0 {

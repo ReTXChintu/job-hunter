@@ -17,7 +17,7 @@ Do not attempt to defeat anti-bot protections.
 
 ## Inputs
 
-- `platform`: LinkedIn, Naukri, Indeed or Wellfound.
+- `platform`: LinkedIn, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist or Foundit.
 - `profile`: the facts: personal details, `headline` (current title),
   `summary`, `skills`, `experiences`, `projects` (only the ones the candidate
   chose to feature), `education`, `certifications`, `languages`,
@@ -83,6 +83,10 @@ your job; adding facts is not.
    - Naukri: `https://www.naukri.com/mnjuser/profile`
    - Indeed: `https://profile.indeed.com/`
    - Wellfound: `https://wellfound.com/profile/edit/overview`
+   - Cutshort: `https://cutshort.io/profile` (or the avatar menu → your profile)
+   - Instahyre: `https://www.instahyre.com/candidate/profile/` (or the account menu → Profile)
+   - Hirist: `https://www.hirist.tech/` → the account menu → My Profile
+   - Foundit: `https://www.foundit.in/` → the account menu → My Profile
 2. If the site shows a login page, CAPTCHA, OTP/verification, or "unusual
    activity": stop and return `MANUAL_ACTION_REQUIRED` with the reason. Don't
    try to sign in.

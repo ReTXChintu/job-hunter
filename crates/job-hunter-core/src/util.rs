@@ -93,6 +93,20 @@ pub fn extract_json(text: &str) -> Option<String> {
     None
 }
 
+/// A plausible email address (one `@`, a dot in the domain, no spaces).
+pub fn looks_like_email(s: &str) -> bool {
+    let s = s.trim();
+    let Some((local, domain)) = s.split_once('@') else {
+        return false;
+    };
+    !local.is_empty()
+        && !domain.contains('@')
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && !s.chars().any(char::is_whitespace)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +194,13 @@ mod path_tests {
                 .replace(std::path::MAIN_SEPARATOR, "/"),
         );
         assert!(path_is_inside(&root, &spelled));
+    }
+
+    #[test]
+    fn email_addresses_are_recognised() {
+        assert!(looks_like_email("hr@acme.co.in"));
+        assert!(!looks_like_email("hr at acme.com"));
+        assert!(!looks_like_email("hr@acme"));
+        assert!(!looks_like_email("a b@acme.com"));
     }
 }

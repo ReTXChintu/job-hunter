@@ -182,6 +182,9 @@ export interface Job {
   applicationId: string | null;
   saved: boolean;
   detailsComplete: boolean;
+  /** Set for postings that ask for the resume by email; the application is sent from Gmail. */
+  applyEmail: string | null;
+  contactName: string | null;
   dedupKey: string;
   createdAt: string;
   updatedAt: string;

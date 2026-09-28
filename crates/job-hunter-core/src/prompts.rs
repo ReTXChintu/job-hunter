@@ -41,6 +41,8 @@ pub mod skills {
     pub const PROJECT_SELECTION: &str =
         include_str!("../../../agent/skills/project-selection/SKILL.md");
     pub const PROFILE_SYNC: &str = include_str!("../../../agent/skills/profile-sync/SKILL.md");
+    pub const EMAIL_APPLICATION: &str =
+        include_str!("../../../agent/skills/email-application/SKILL.md");
 }
 
 pub mod schemas {
@@ -370,8 +372,70 @@ pub struct ApplyParams<'a> {
     pub resuming: bool,
 }
 
+/// The email an email application sends: to the posting's address, a plain
+/// subject, and the approved cover letter as the body (the user reviews and
+/// can edit it before approving).
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct EmailMessage {
+    pub to: String,
+    pub subject: String,
+    pub body: String,
+}
+
+pub fn email_message(
+    job: &Job,
+    truth: &CandidateTruth,
+    cover_letter: Option<&str>,
+) -> Option<EmailMessage> {
+    let to = job.apply_email.as_deref()?.trim();
+    if to.is_empty() {
+        return None;
+    }
+    let personal = &truth.profile.personal;
+    let body = match cover_letter.map(str::trim).filter(|c| !c.is_empty()) {
+        Some(letter) => letter.to_string(),
+        None => {
+            let greeting = job
+                .contact_name
+                .as_deref()
+                .and_then(|n| n.split_whitespace().next())
+                .map(|first| format!("Hi {first},"))
+                .unwrap_or_else(|| "Hello,".to_string());
+            let contact: Vec<&str> = [
+                personal.phone.as_str(),
+                personal.email.as_str(),
+                personal.linkedin.as_str(),
+            ]
+            .into_iter()
+            .filter(|c| !c.trim().is_empty())
+            .collect();
+            format!(
+                "{greeting}
+
+I'd like to apply for the {} role at {}. My resume is attached.
+
+Regards,
+{}
+{}",
+                job.title,
+                job.company,
+                personal.name,
+                contact.join(" | ")
+            )
+        }
+    };
+    Some(EmailMessage {
+        to: to.to_string(),
+        subject: format!("Application for {} - {}", job.title, personal.name),
+        body,
+    })
+}
+
 pub fn apply_prompt(p: &ApplyParams<'_>) -> String {
     let approved = p.application.is_approved();
+    if let Some(email) = email_message(p.job, p.truth, p.cover_letter_text) {
+        return email_apply_prompt(p, approved, &email);
+    }
     let mut s = format!(
         "# Task: complete an approved job application\n\nAPPROVED = {}\nAPPLICATION_ID = {}\n\nFollow the chrome-application, application-questions, application-tracking and manual-fallback skills exactly.",
         approved, p.application.id
@@ -422,6 +486,47 @@ pub fn apply_prompt(p: &ApplyParams<'_>) -> String {
     });
     s.push_str(&section("Inputs", &json_block(&input)));
     s.push_str("\n\nReturn only the structured output. Remember: SUBMITTED requires visible evidence; otherwise report HUMAN_INPUT_REQUIRED, MANUAL_ACTION_REQUIRED or FAILED.");
+    s
+}
+
+fn email_apply_prompt(p: &ApplyParams<'_>, approved: bool, email: &EmailMessage) -> String {
+    let mut s = format!(
+        "# Task: send an approved job application by email
+
+APPROVED = {}
+APPLICATION_ID = {}
+
+The posting asks candidates to email their resume. Follow the email-application and manual-fallback skills exactly.",
+        approved, p.application.id
+    );
+    if p.resuming {
+        s.push_str("
+
+You are RESUMING: the previous run stopped part-way. Check Gmail's Drafts and Sent first: if this message was already sent, report SUBMITTED with that evidence; if a draft exists, finish and send it instead of composing a new one.");
+    }
+    s.push_str(&section(
+        "Skill: email-application",
+        skills::EMAIL_APPLICATION,
+    ));
+    s.push_str(&section("Skill: manual-fallback", skills::MANUAL_FALLBACK));
+    let input = json!({
+        "application": {
+            "id": p.application.id,
+            "approved": approved,
+            "url": p.job.url,
+            "company": p.job.company,
+            "title": p.job.title,
+            "source": p.job.source,
+        },
+        "email": email,
+        "documents": { "resumePdf": p.resume_pdf },
+    });
+    s.push_str(&section("Inputs", &json_block(&input)));
+    s.push_str(
+        "
+
+Return only the structured output. SUBMITTED requires Gmail's \"Message sent\" confirmation.",
+    );
     s
 }
 

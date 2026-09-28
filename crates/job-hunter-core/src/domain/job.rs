@@ -105,6 +105,14 @@ pub struct Job {
     /// True when the description was fully extracted from the job page.
     #[serde(default)]
     pub details_complete: bool,
+    /// Set for postings (e.g. LinkedIn posts) that ask for the resume by
+    /// email instead of an application form: the approved application is
+    /// sent from the user's Gmail to this address.
+    #[serde(default)]
+    pub apply_email: Option<String>,
+    /// Who posted it, for the email greeting.
+    #[serde(default)]
+    pub contact_name: Option<String>,
     #[serde(default)]
     pub dedup_key: String,
     pub created_at: DateTime<Utc>,
@@ -146,6 +154,8 @@ impl Job {
             application_id: None,
             saved: false,
             details_complete: false,
+            apply_email: None,
+            contact_name: None,
             dedup_key: String::new(),
             created_at: ts,
             updated_at: ts,
@@ -198,6 +208,10 @@ pub struct DiscoveredJob {
     pub skills: Vec<String>,
     #[serde(default)]
     pub details_complete: bool,
+    #[serde(default)]
+    pub apply_email: Option<String>,
+    #[serde(default)]
+    pub contact_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

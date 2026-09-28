@@ -42,6 +42,10 @@ async fn fixture_context() -> (Arc<AppContext>, tempfile::TempDir) {
     }
     let mut settings = ctx.settings().await;
     settings.mock_mode = true;
+    // This scenario is about LinkedIn + Naukri (and their duplicate).
+    for source in settings.job_sources.iter_mut() {
+        source.enabled = source.platform == "LinkedIn" || source.platform == "Naukri";
+    }
     settings.resume.generate_pdf = true;
     settings.resume.generate_docx = true;
     ctx.save_settings(settings).await.unwrap();

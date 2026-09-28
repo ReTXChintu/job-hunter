@@ -30,6 +30,10 @@ pub struct ClaudeRequest {
     pub max_turns: u32,
     pub model: Option<String>,
     pub max_budget_usd: f64,
+    /// Extra folders this session may read (`--add-dir`). Claude in Chrome
+    /// can only upload files from folders the session may read, so an
+    /// application must grant the folder holding its resume.
+    pub add_dirs: Vec<PathBuf>,
     /// Resume a previous session (`--resume <id>`).
     pub resume_session: Option<String>,
     pub cwd: PathBuf,
@@ -55,6 +59,7 @@ impl ClaudeRequest {
             max_turns: 12,
             model: None,
             max_budget_usd: 0.0,
+            add_dirs: vec![],
             resume_session: None,
             cwd,
             timeout: Duration::from_secs(600),

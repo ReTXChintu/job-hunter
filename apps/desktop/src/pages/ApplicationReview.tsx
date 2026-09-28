@@ -52,6 +52,8 @@ export function ApplicationReviewPage() {
   const thisRunActive = busy && agent.data?.runKind === "APPLICATION" && activity.some((e) => e.runId === agent.data?.runId);
   const actions = applicationActions(application.status, busy);
   const applyUrl = application.applicationUrl || job.url;
+  const byEmail = !!job.applyEmail;
+  const approveLabel = byEmail ? "Approve & Send email" : "Approve & Apply";
   const runEvents = activity.filter((e) => e.runId === application.runId || (agent.data?.runId && e.runId === agent.data.runId && agent.data.runKind === "APPLICATION"));
 
   const submitAnswers = () => {
@@ -87,7 +89,7 @@ export function ApplicationReviewPage() {
           ) : null}
           {actions.canApprove ? (
             <Button size="sm" colorPalette="brand" onClick={() => setConfirm("approve")} disabled={busy}>
-              <Check size={14} /> Approve &amp; Apply
+              <Check size={14} /> {approveLabel}
             </Button>
           ) : null}
         </HStack>
@@ -213,6 +215,19 @@ export function ApplicationReviewPage() {
               Claude is working in Chrome
             </Heading>
             <ActivityFeed events={runEvents.slice(-30)} maxHeight="200px" compact />
+          </Box>
+        ) : null}
+
+        {byEmail ? (
+          <Box px={6} py={4} borderBottomWidth="1px" borderColor="border.muted" bg="blue.subtle">
+            <Text fontSize="sm">
+              <Text as="span" fontWeight="semibold">
+                Applies by email
+              </Text>{" "}
+              to {job.applyEmail}
+              {job.contactName ? ` (posted by ${job.contactName})` : ""}. On approval Job Hunter sends it from your Gmail with the resume attached and the
+              cover letter as the message: edit the cover letter below to change what's sent.
+            </Text>
           </Box>
         ) : null}
 
@@ -419,7 +434,7 @@ export function ApplicationReviewPage() {
                 </Text>
               ) : null}
               <Button colorPalette="brand" size="lg" onClick={() => setConfirm("approve")} disabled={busy}>
-                <Check size={16} /> Approve &amp; Apply
+                <Check size={16} /> {approveLabel}
               </Button>
             </HStack>
           </HStack>
@@ -429,9 +444,13 @@ export function ApplicationReviewPage() {
       <ConfirmDialog
         open={confirm === "approve"}
         onOpenChange={(o) => !o && setConfirm(null)}
-        title="Approve and apply?"
-        description={`Job Hunter will open ${job.company}'s application in Chrome and fill it with this resume${coverLetter ? " and cover letter" : ""}. It only submits after every required field is filled, and stops to ask you about anything it cannot answer.`}
-        confirmLabel="Approve & Apply"
+        title={byEmail ? "Approve and send the email?" : "Approve and apply?"}
+        description={
+          byEmail
+            ? `Job Hunter will open Gmail in Chrome and send one email to ${job.applyEmail} with the subject "Application for ${job.title}", your cover letter below as the message, and this resume attached. It sends only after the attachment is in, and never emails anyone else.`
+            : `Job Hunter will open ${job.company}'s application in Chrome and fill it with this resume${coverLetter ? " and cover letter" : ""}. It only submits after every required field is filled, and stops to ask you about anything it cannot answer.`
+        }
+        confirmLabel={approveLabel}
         loading={approve.isPending}
         onConfirm={() => approve.mutate({ id: application.id, applyNow: true }, { onSuccess: () => setConfirm(null) })}
       />
