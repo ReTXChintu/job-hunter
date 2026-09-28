@@ -529,6 +529,30 @@ impl MockClaudeRunner {
         })
     }
 
+    /// The first watched application got an interview invite, filed in Spam.
+    fn check_inbox(ctx: &Value) -> Value {
+        let first = ctx.pointer("/applications/0").cloned().unwrap_or(json!({}));
+        let Some(id) = first.get("applicationId").and_then(|v| v.as_str()) else {
+            return json!({ "replies": [] });
+        };
+        let company = first
+            .get("company")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Company");
+        json!({
+            "replies": [{
+                "applicationId": id,
+                "from": format!("Talent Team <talent@{}.example>", company.to_lowercase().replace(' ', "")),
+                "subject": "Interview invitation",
+                "receivedAt": "Sep 28, 2026, 10:14 AM",
+                "folder": "SPAM",
+                "kind": "INTERVIEW",
+                "summary": "They'd like a 45-minute technical call this week; reply with two time slots.",
+            }],
+            "blocked": false,
+        })
+    }
+
     fn parse_profile() -> Value {
         let c = FIXTURE_CANDIDATE.clone();
         let profile = c.get("profile").cloned().unwrap_or(json!({}));
@@ -618,6 +642,10 @@ impl ClaudeRunner for MockClaudeRunner {
                 self.step(&sink, &cancel, "Drafting the project (mock)")
                     .await?;
                 Self::draft_project()
+            }
+            "check_inbox" => {
+                self.step(&sink, &cancel, "Searching Gmail (mock)").await?;
+                Self::check_inbox(ctx)
             }
             "select_projects" => {
                 self.step(&sink, &cancel, "Choosing projects to feature (mock)")

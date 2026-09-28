@@ -772,6 +772,7 @@ pub async fn apply_application(
                 }
             };
             steps::record_apply_result(&step, &mut application, &mut job, &result)?;
+            steps::cleanup_after_applied(&app2, &application).await;
             let final_state = match application.status {
                 ApplicationStatus::Applied => {
                     app2.agent.update(|s| s.stats.applied += 1).await;
@@ -890,6 +891,7 @@ pub async fn mark_manual_complete(
         application.notes.push_str(note.trim());
     }
     app.store.put(&application)?;
+    steps::cleanup_after_applied(&app, &application).await;
     if let Ok(mut job) = app.store.require::<Job>(&application.job_id) {
         job.status = JobStatus::Applied;
         job.touch();

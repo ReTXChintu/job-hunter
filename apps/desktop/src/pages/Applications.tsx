@@ -1,11 +1,12 @@
-import { Box, HStack, Table, Tabs, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Table, Tabs, Text } from "@chakra-ui/react";
 import { useNavigate } from "@tanstack/react-router";
-import { timeAgo } from "@job-hunter/shared";
+import { isAgentRunning, timeAgo } from "@job-hunter/shared";
 import type { ApplicationStatus } from "@job-hunter/types";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
+import { Mail } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ErrorBanner, PageHeader } from "../components/common";
-import { useApplications } from "../lib/queries";
+import { useAgentStatus, useApplications, useCheckInbox, useSettings } from "../lib/queries";
 
 type Bucket = "PENDING" | "ALL" | "APPLIED" | "REJECTED";
 const BUCKETS: { key: Bucket; label: string; statuses?: ApplicationStatus[] }[] = [
@@ -24,11 +25,32 @@ export function ApplicationsPage() {
     return (apps.data ?? []).filter((i) => !b.statuses || b.statuses.includes(i.application.status));
   }, [apps.data, bucket]);
   const awaiting = (apps.data ?? []).filter((i) => i.application.status === "READY_FOR_REVIEW").length;
+  const sent = (apps.data ?? []).filter((i) => ["APPLIED", "INTERVIEW", "OFFER"].includes(i.application.status)).length;
+  const checkInbox = useCheckInbox();
+  const agent = useAgentStatus();
+  const settings = useSettings();
+  const busy = agent.data ? isAgentRunning(agent.data.state) : false;
+  const hours = settings.data?.inboxCheckHours ?? 0;
 
   return (
     <Box>
-      <PageHeader title="Applications" subtitle={awaiting > 0 ? `${awaiting} application${awaiting === 1 ? "" : "s"} waiting for your approval` : "Every submission needs your explicit approval."} />
-      <ErrorBanner error={apps.error} onRetry={() => apps.refetch()} />
+      <PageHeader
+        title="Applications"
+        subtitle={awaiting > 0 ? `${awaiting} application${awaiting === 1 ? "" : "s"} waiting for your approval` : "Every submission needs your explicit approval."}
+        actions={
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => checkInbox.mutate()}
+            loading={checkInbox.isPending || agent.data?.state === "CHECKING_INBOX"}
+            disabled={busy || sent === 0}
+            title={hours ? `Also checked automatically every ${hours} hours` : "Automatic checks are off (Settings)"}
+          >
+            <Mail size={14} /> Check Gmail for replies
+          </Button>
+        }
+      />
+      <ErrorBanner error={apps.error ?? checkInbox.error} onRetry={() => apps.refetch()} />
       <Tabs.Root value={bucket} onValueChange={(e) => setBucket(e.value as Bucket)} variant="subtle" size="sm" mb={4}>
         <Tabs.List>
           {BUCKETS.map((b) => (

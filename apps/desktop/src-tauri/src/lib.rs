@@ -166,6 +166,9 @@ pub fn run() {
             tauri::async_runtime::spawn(job_hunter_core::agent::profile_sync::run_auto_sync(
                 ctx.clone(),
             ));
+            tauri::async_runtime::spawn(job_hunter_core::agent::inbox::run_inbox_checks(
+                ctx.clone(),
+            ));
             let remote = RemoteClient::new(ctx.clone());
             tauri::async_runtime::spawn(remote.clone().run());
             forward_remote_events(handle.clone(), remote.clone());
@@ -204,6 +207,8 @@ pub fn run() {
             commands::answer_platform_questions,
             commands::set_platform_auto_sync,
             commands::list_notifications,
+            commands::check_inbox_now,
+            commands::restore_application_files,
             commands::mark_notifications_read,
             commands::import_master_resume,
             commands::parse_master_resume,

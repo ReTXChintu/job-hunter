@@ -19,6 +19,8 @@ pub enum AgentState {
     Applying,
     /// Filling in the candidate's own profile on a job site.
     UpdatingProfile,
+    /// Reading Gmail for employers' replies.
+    CheckingInbox,
     Completed,
     Failed,
     ManualActionRequired,
@@ -40,6 +42,7 @@ impl AgentState {
             AgentState::WaitingForApproval => "WAITING_FOR_APPROVAL",
             AgentState::Applying => "APPLYING",
             AgentState::UpdatingProfile => "UPDATING_PROFILE",
+            AgentState::CheckingInbox => "CHECKING_INBOX",
             AgentState::Completed => "COMPLETED",
             AgentState::Failed => "FAILED",
             AgentState::ManualActionRequired => "MANUAL_ACTION_REQUIRED",
@@ -73,6 +76,7 @@ impl AgentState {
                 | AgentState::PreparingApplications
                 | AgentState::Applying
                 | AgentState::UpdatingProfile
+                | AgentState::CheckingInbox
                 | AgentState::Stopping
         )
     }
@@ -155,6 +159,7 @@ pub enum RunKind {
     ResumeGeneration,
     Analysis,
     ProfileSync,
+    InboxCheck,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

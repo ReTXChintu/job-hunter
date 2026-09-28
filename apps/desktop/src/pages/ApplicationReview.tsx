@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox, Grid, GridItem, Heading, HStack, Input, SimpleGrid, Spinner, Tabs, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, Checkbox, Grid, GridItem, Heading, HStack, Input, SimpleGrid, Spinner, Tabs, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { applicationActions, formatDateTime, isAgentRunning } from "@job-hunter/shared";
 import type { ApplicationAnswer, ApplicationStatus, ResumeDocument } from "@job-hunter/types";
@@ -12,7 +12,16 @@ import { QuestionField } from "../components/QuestionField";
 import { ResumeEditor } from "../components/ResumeEditor";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { useActivity } from "../lib/activity";
-import { useAgentStatus, useAnswerQuestions, useApplication, useApplyApplication, useApproveApplication, useGenerateResume, useMarkManualComplete, useOpenUrl, useRejectApplication, useSetApplicationStatus, useUpdateCoverLetter, useUpdateResumeContent, useSettings } from "../lib/queries";
+import { useAgentStatus, useAnswerQuestions, useApplication, useApplyApplication, useApproveApplication, useGenerateResume, useMarkManualComplete, useOpenUrl, useRejectApplication, useSetApplicationStatus, useRestoreApplicationFiles, useUpdateCoverLetter, useUpdateResumeContent, useSettings } from "../lib/queries";
+
+const REPLY_PALETTE: Record<string, string> = {
+  INTERVIEW: "green",
+  OFFER: "green",
+  ASSESSMENT: "orange",
+  QUESTION: "orange",
+  REJECTION: "red",
+  ACKNOWLEDGEMENT: "blue",
+};
 
 export function ApplicationReviewPage() {
   const { applicationId } = useParams({ from: "/applications/$applicationId" });
@@ -29,6 +38,7 @@ export function ApplicationReviewPage() {
   const updateResume = useUpdateResumeContent();
   const updateCover = useUpdateCoverLetter();
   const openUrl = useOpenUrl();
+  const restoreFiles = useRestoreApplicationFiles();
   const navigate = useNavigate();
   const activity = useActivity();
 
@@ -94,7 +104,7 @@ export function ApplicationReviewPage() {
           ) : null}
         </HStack>
       </HStack>
-      <ErrorBanner error={approve.error ?? reject.error ?? apply.error ?? answer.error ?? markApplied.error ?? setStatus.error ?? regenerate.error ?? updateResume.error ?? updateCover.error} />
+      <ErrorBanner error={restoreFiles.error ?? approve.error ?? reject.error ?? apply.error ?? answer.error ?? markApplied.error ?? setStatus.error ?? regenerate.error ?? updateResume.error ?? updateCover.error} />
 
       <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" bg="bg.panel" overflow="hidden">
         <Box px={6} py={5} borderBottomWidth="1px" borderColor="border.muted">
@@ -209,6 +219,43 @@ export function ApplicationReviewPage() {
           </Box>
         ) : null}
 
+        {application.replies.length ? (
+          <Box px={6} py={5} borderBottomWidth="1px" borderColor="border.muted">
+            <Heading size="xs" mb={3} color="fg.muted" textTransform="uppercase" letterSpacing="wide">
+              Replies from {job.company}
+            </Heading>
+            <VStack align="stretch" gap={3}>
+              {[...application.replies].reverse().map((r) => (
+                <Box key={r.id} p={3} borderWidth="1px" borderColor="border.muted" borderRadius="md">
+                  <HStack gap={2} mb={1} wrap="wrap">
+                    <Badge colorPalette={REPLY_PALETTE[r.kind] ?? "gray"} variant="subtle">
+                      {r.kind.charAt(0) + r.kind.slice(1).toLowerCase()}
+                    </Badge>
+                    {r.folder === "SPAM" ? (
+                      <Badge colorPalette="red" variant="solid">
+                        In Spam
+                      </Badge>
+                    ) : null}
+                    <Text fontSize="sm" fontWeight="semibold">
+                      {r.subject}
+                    </Text>
+                  </HStack>
+                  <Text fontSize="sm" className="selectable">
+                    {r.summary}
+                  </Text>
+                  <Text fontSize="xs" color="fg.muted" mt={1}>
+                    {r.from}
+                    {r.receivedAt ? ` · ${r.receivedAt}` : ""}
+                  </Text>
+                </Box>
+              ))}
+            </VStack>
+            <Text fontSize="xs" color="fg.subtle" mt={2}>
+              Reply from your Gmail. Job Hunter only reads it{application.replies.some((r) => r.folder === "SPAM") ? "; move anything found in Spam to your inbox so you don't miss follow-ups" : ""}.
+            </Text>
+          </Box>
+        ) : null}
+
         {thisRunActive ? (
           <Box px={6} py={4} borderBottomWidth="1px" borderColor="border.muted">
             <Heading size="xs" mb={2} color="fg.muted" textTransform="uppercase" letterSpacing="wide">
@@ -305,6 +352,16 @@ export function ApplicationReviewPage() {
                     />
                   ) : (
                     <VStack align="stretch" gap={3}>
+                      {resume.filesDeletedAt ? (
+                        <InfoBanner status="info" title="Files deleted after applying">
+                          <HStack justify="space-between" gap={3} wrap="wrap">
+                            <Text fontSize="sm">The resume and cover letter were sent, so their files were removed. Everything is still here and can be re-created.</Text>
+                            <Button size="xs" variant="outline" onClick={() => restoreFiles.mutate(application.id)} loading={restoreFiles.isPending}>
+                              <RefreshCw size={12} /> Re-create files
+                            </Button>
+                          </HStack>
+                        </InfoBanner>
+                      ) : null}
                       {markedSkills.length ? (
                         <InfoBanner status="success" title={`Added ${markedSkills.join(", ")} to your skills`}>
                           <HStack justify="space-between" gap={3} wrap="wrap">

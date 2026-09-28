@@ -126,6 +126,18 @@ export function SettingsPage() {
                 <Switch.Control />
                 <Switch.Label>Produce DOCX</Switch.Label>
               </Switch.Root>
+              <Switch.Root checked={draft.resume.deleteFilesAfterApplied} onCheckedChange={(e) => update((s) => { s.resume.deleteFilesAfterApplied = !!e.checked; })}>
+                <Switch.HiddenInput />
+                <Switch.Control />
+                <Switch.Label>Delete an application's files once it's sent (they can be re-created from the application)</Switch.Label>
+              </Switch.Root>
+              <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                <Field.Root>
+                  <Field.Label>Check Gmail for replies every (hours, 0 = off)</Field.Label>
+                  <Input type="number" value={draft.inboxCheckHours} onChange={(e) => update((s) => { s.inboxCheckHours = Math.min(48, Math.max(0, num(e.target.value, 3))); })} />
+                  <Field.HelperText>Reads your inbox and spam for employers' replies to sent applications. It never replies or moves mail.</Field.HelperText>
+                </Field.Root>
+              </SimpleGrid>
               <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
                 <Field.Root>
                   <Field.Label>ATS validation iterations (max 3)</Field.Label>

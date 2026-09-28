@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "replies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "applicationId": { "type": "string" },
+          "from": { "type": "string" },
+          "subject": { "type": "string" },
+          "receivedAt": { "type": "string" },
+          "folder": { "type": "string", "enum": ["INBOX", "SPAM"] },
+          "kind": { "type": "string", "enum": ["INTERVIEW", "ASSESSMENT", "QUESTION", "OFFER", "REJECTION", "ACKNOWLEDGEMENT", "OTHER"] },
+          "summary": { "type": "string" }
+        },
+        "required": ["applicationId", "from", "subject", "folder", "kind", "summary"]
+      }
+    },
+    "notes": { "type": "string" },
+    "blocked": { "type": "boolean" },
+    "blockedReason": { "type": "string" }
+  },
+  "required": ["replies"]
+}

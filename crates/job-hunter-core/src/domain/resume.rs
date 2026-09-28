@@ -169,6 +169,10 @@ pub struct Resume {
     /// Set when the user edited the generated content by hand.
     #[serde(default)]
     pub user_edited: bool,
+    /// When the files were deleted after the application was sent. The
+    /// content stays, so they can be re-created.
+    #[serde(default)]
+    pub files_deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -199,6 +203,7 @@ impl Resume {
             validation: None,
             run_id: None,
             user_edited: false,
+            files_deleted_at: None,
             created_at: ts,
             updated_at: ts,
         }
@@ -233,6 +238,9 @@ pub struct CoverLetter {
     pub txt_path: Option<String>,
     #[serde(default)]
     pub user_edited: bool,
+    /// See `Resume::files_deleted_at`.
+    #[serde(default)]
+    pub files_deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

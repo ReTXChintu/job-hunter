@@ -230,6 +230,23 @@ pub async fn mark_skills_known(
     ctx.mark_skills_known(&skills, &group).map_err(Into::into)
 }
 
+/// Look for employers' replies in Gmail (inbox and spam) now.
+#[tauri::command]
+pub async fn check_inbox_now(ctx: Ctx<'_>) -> R<AgentRun> {
+    job_hunter_core::agent::inbox::start_inbox_check(ctx.inner().clone())
+        .await
+        .map_err(Into::into)
+}
+
+/// Re-create an application's resume and cover-letter files (deleted after
+/// it was sent) from their saved content.
+#[tauri::command]
+pub async fn restore_application_files(ctx: Ctx<'_>, id: String) -> R<()> {
+    job_hunter_core::agent::steps::restore_application_files(&ctx, &id)
+        .await
+        .map_err(Into::into)
+}
+
 // ---- notifications ---------------------------------------------------------------
 
 #[tauri::command]

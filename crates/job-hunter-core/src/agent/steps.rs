@@ -708,14 +708,7 @@ pub async fn generate_resume(
         .store
         .find::<Resume>(|r| r.job_id.as_deref() == Some(&job.id))?;
     let version = existing.iter().map(|r| r.version).max().unwrap_or(0) + 1;
-    let company_slug = slugify(&job.company);
-    // One folder per version, so every file can carry the plain name a
-    // recruiter sees ("Biswajit_Resume.pdf") without overwriting another.
-    let dir = step
-        .app
-        .paths
-        .company_resume_dir(&company_slug)
-        .join(format!("v{version}"));
+    let dir = document_dir(&step.app, &job.company, &job.title, &job.id, version);
     let candidate_name = &truth.profile.personal.name;
     let resume_stem = document_file_stem(candidate_name, "Resume");
     let cover_letter_stem = document_file_stem(candidate_name, "Cover_Letter");
@@ -769,6 +762,7 @@ pub async fn generate_resume(
             pdf_path: cl_files.pdf,
             txt_path: cl_files.txt,
             user_edited: false,
+            files_deleted_at: None,
             created_at: ts,
             updated_at: ts,
         };
@@ -793,16 +787,174 @@ pub async fn generate_resume(
     })
 }
 
+/// Folder for one version of one job's documents:
+/// `generated/<company>/<title>-<job id>/v<N>`. Per job, since two openings
+/// at one company would otherwise share (and overwrite) "v1"; per version,
+/// so every file keeps the plain name a recruiter sees ("Biswajit_Resume.pdf").
+pub fn document_dir(
+    app: &AppContext,
+    company: &str,
+    title: &str,
+    job_id: &str,
+    version: u32,
+) -> PathBuf {
+    let short: String = job_id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(6)
+        .collect();
+    app.paths
+        .company_resume_dir(&slugify(company))
+        .join(format!("{}-{short}", slugify(title)))
+        .join(format!("v{version}"))
+}
+
+/// Delete the generated files of an application that has been sent: every
+/// resume and cover-letter version for its job. The content stays on the
+/// records, so [`restore_application_files`] can re-create them. Returns
+/// how many files were removed.
+pub fn delete_application_files(app: &AppContext, application: &Application) -> CoreResult<usize> {
+    let root = app.paths.generated_dir();
+    let mut removed = 0;
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let mut remove = |path: &mut Option<String>| {
+        if let Some(p) = path.take() {
+            let p = PathBuf::from(p);
+            // Only ever inside the generated-documents folder.
+            if crate::util::path_is_inside(&root, &p)
+                && p.is_file()
+                && std::fs::remove_file(&p).is_ok()
+            {
+                removed += 1;
+            }
+            if let Some(parent) = p.parent() {
+                if !dirs.iter().any(|d| d == parent) {
+                    dirs.push(parent.to_path_buf());
+                }
+            }
+        }
+    };
+    let ts = now();
+    for mut r in app
+        .store
+        .find::<Resume>(|r| r.job_id.as_deref() == Some(application.job_id.as_str()))?
+    {
+        if r.pdf_path.is_none()
+            && r.docx_path.is_none()
+            && r.html_path.is_none()
+            && r.json_path.is_none()
+        {
+            continue;
+        }
+        remove(&mut r.pdf_path);
+        remove(&mut r.docx_path);
+        remove(&mut r.html_path);
+        remove(&mut r.json_path);
+        r.files_deleted_at = Some(ts);
+        r.updated_at = ts;
+        app.store.put(&r)?;
+    }
+    for mut c in app
+        .store
+        .find::<CoverLetter>(|c| c.job_id == application.job_id)?
+    {
+        if c.pdf_path.is_none() && c.docx_path.is_none() && c.txt_path.is_none() {
+            continue;
+        }
+        remove(&mut c.pdf_path);
+        remove(&mut c.docx_path);
+        remove(&mut c.txt_path);
+        c.files_deleted_at = Some(ts);
+        c.updated_at = ts;
+        app.store.put(&c)?;
+    }
+    // The job's own folder (every version, plus the text/HTML copies the
+    // records don't track). Only in the per-job layout; files from before it
+    // sat in folders shared across jobs and were removed one by one above.
+    if let Ok(job) = app.store.require::<Job>(&application.job_id) {
+        if let Some(job_dir) = document_dir(app, &job.company, &job.title, &job.id, 1).parent() {
+            if job_dir.is_dir() && crate::util::path_is_inside(&root, job_dir) {
+                match std::fs::remove_dir_all(job_dir) {
+                    Ok(()) => removed += 1,
+                    Err(e) => {
+                        tracing::warn!(error = %e, dir = %job_dir.display(), "could not remove a job's documents folder")
+                    }
+                }
+                if let Some(company_dir) = job_dir.parent() {
+                    dirs.push(company_dir.to_path_buf());
+                }
+            }
+        }
+    }
+    // Tidy folders left empty (version, job, company), never the root itself.
+    let root_canonical = std::fs::canonicalize(&root).ok();
+    for dir in dirs {
+        let mut current = Some(dir.as_path());
+        while let Some(d) = current {
+            let is_root = std::fs::canonicalize(d).ok() == root_canonical;
+            // remove_dir only removes empty folders.
+            if is_root || !crate::util::path_is_inside(&root, d) || std::fs::remove_dir(d).is_err()
+            {
+                break;
+            }
+            current = d.parent();
+        }
+    }
+    if removed > 0 {
+        tracing::info!(application = %application.id, removed, "deleted generated files after applying");
+    }
+    Ok(removed)
+}
+
+/// Delete an applied application's files if the user wants that (on by default).
+pub async fn cleanup_after_applied(app: &AppContext, application: &Application) {
+    if application.status != ApplicationStatus::Applied
+        || !app.settings().await.resume.delete_files_after_applied
+    {
+        return;
+    }
+    if let Err(e) = delete_application_files(app, application) {
+        tracing::warn!(error = %e, "could not delete generated files after applying");
+    }
+}
+
+/// Re-create the files of an application's resume and cover letter from
+/// their saved content (after they were deleted on applying).
+pub async fn restore_application_files(app: &AppContext, application_id: &str) -> CoreResult<()> {
+    let application: Application = app.store.require(application_id)?;
+    if let Some(id) = &application.resume_id {
+        let mut resume: Resume = app.store.require(id)?;
+        let edited = resume.user_edited;
+        rerender_resume(app, &mut resume).await?;
+        resume.user_edited = edited;
+        resume.files_deleted_at = None;
+        app.store.put(&resume)?;
+    }
+    if let Some(id) = &application.cover_letter_id {
+        let mut cl: CoverLetter = app.store.require(id)?;
+        let job: Job = app.store.require(&cl.job_id)?;
+        let edited = cl.user_edited;
+        rerender_cover_letter(app, &mut cl, &job.company).await?;
+        cl.user_edited = edited;
+        cl.files_deleted_at = None;
+        app.store.put(&cl)?;
+    }
+    Ok(())
+}
+
 /// Re-render an edited resume document (user edits) into new files.
 pub async fn rerender_resume(app: &AppContext, resume: &mut Resume) -> CoreResult<()> {
     let Some(doc) = resume.content.clone() else {
         return Err(CoreError::Validation("resume has no content".into()));
     };
     let settings = app.settings().await;
-    let dir = app
-        .paths
-        .company_resume_dir(&slugify(&resume.company))
-        .join(format!("v{}", resume.version));
+    let dir = document_dir(
+        app,
+        &resume.company,
+        &resume.job_title,
+        resume.job_id.as_deref().unwrap_or(&resume.id),
+        resume.version,
+    );
     let stem = document_file_stem(&app.profile()?.personal.name, "Resume");
     let chrome = app.chrome_path().await;
     let temp = app.paths.temp_dir();
@@ -831,10 +983,12 @@ pub async fn rerender_cover_letter(
     company: &str,
 ) -> CoreResult<()> {
     let settings = app.settings().await;
-    let dir = app
-        .paths
-        .company_resume_dir(&slugify(company))
-        .join(format!("v{}", cl.version));
+    let title = app
+        .store
+        .get::<Job>(&cl.job_id)?
+        .map(|j| j.title)
+        .unwrap_or_default();
+    let dir = document_dir(app, company, &title, &cl.job_id, cl.version);
     let stem = document_file_stem(&app.profile()?.personal.name, "Cover_Letter");
     let chrome = app.chrome_path().await;
     let temp = app.paths.temp_dir();

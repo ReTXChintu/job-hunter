@@ -173,8 +173,46 @@ pub struct Application {
     pub run_id: Option<String>,
     #[serde(default)]
     pub manual_completed: bool,
+    /// Replies from the employer found in the user's Gmail (inbox or spam).
+    #[serde(default)]
+    pub replies: Vec<EmailReply>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// One email from an employer about an application, found by the inbox
+/// check. Read-only: Job Hunter never answers it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EmailReply {
+    #[serde(default = "new_id")]
+    pub id: String,
+    pub from: String,
+    pub subject: String,
+    /// As Gmail shows it (e.g. "Sep 28, 2026, 10:14 AM").
+    #[serde(default)]
+    pub received_at: String,
+    /// "INBOX" or "SPAM".
+    #[serde(default)]
+    pub folder: String,
+    /// INTERVIEW, ASSESSMENT, QUESTION, OFFER, REJECTION, ACKNOWLEDGEMENT or OTHER.
+    #[serde(default)]
+    pub kind: String,
+    /// One or two sentences: what they want and by when.
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default = "now")]
+    pub found_at: DateTime<Utc>,
+}
+
+impl EmailReply {
+    /// The same email reported again by a later check.
+    pub fn same_email(&self, other: &EmailReply) -> bool {
+        let norm = |s: &str| s.trim().to_lowercase();
+        norm(&self.from) == norm(&other.from)
+            && norm(&self.subject) == norm(&other.subject)
+            && norm(&self.received_at) == norm(&other.received_at)
+    }
 }
 
 impl Application {
@@ -205,6 +243,7 @@ impl Application {
             claude_session_id: None,
             run_id: None,
             manual_completed: false,
+            replies: vec![],
             created_at: ts,
             updated_at: ts,
         }

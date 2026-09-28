@@ -123,6 +123,7 @@ export const AGENT_STATE_LABELS: Record<AgentState, string> = {
   WAITING_FOR_APPROVAL: "Waiting for your approval",
   APPLYING: "Applying",
   UPDATING_PROFILE: "Updating a job-site profile",
+  CHECKING_INBOX: "Checking Gmail for replies",
   COMPLETED: "Completed",
   FAILED: "Failed",
   MANUAL_ACTION_REQUIRED: "Manual action required",
@@ -132,7 +133,7 @@ export const AGENT_STATE_LABELS: Record<AgentState, string> = {
 };
 
 export function isAgentRunning(state: AgentState): boolean {
-  return ["INITIALIZING", "DISCOVERING", "EXTRACTING", "DEDUPLICATING", "ANALYZING", "PREPARING_APPLICATIONS", "APPLYING", "UPDATING_PROFILE", "STOPPING", "PAUSED"].includes(state);
+  return ["INITIALIZING", "DISCOVERING", "EXTRACTING", "DEDUPLICATING", "ANALYZING", "PREPARING_APPLICATIONS", "APPLYING", "UPDATING_PROFILE", "CHECKING_INBOX", "STOPPING", "PAUSED"].includes(state);
 }
 
 /** Which user actions make sense for an application in a given status. */

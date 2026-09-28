@@ -135,6 +135,8 @@ export interface Commands {
   set_platform_auto_sync: { args: { platform: string; enabled: boolean }; result: PlatformProfile };
 
   list_notifications: { args: { limit?: number }; result: Notification[] };
+  check_inbox_now: { args: Record<string, never>; result: AgentRun };
+  restore_application_files: { args: { id: string }; result: null };
   mark_notifications_read: { args: { ids?: string[] }; result: null };
 
   list_jobs: { args: Record<string, never>; result: JobListItem[] };
@@ -210,6 +212,7 @@ export const EVENT_KINDS = [
   "APPLICATION_UPDATED",
   "PROFILE_UPDATED",
   "NOTIFICATION",
+  "REPLY_FOUND",
   "CLAUDE_ACTIVITY",
   "RUN_FINISHED",
 ] as const;

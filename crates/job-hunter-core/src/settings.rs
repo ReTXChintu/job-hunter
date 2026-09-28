@@ -38,6 +38,14 @@ pub struct AppSettings {
     pub remote: RemoteSettings,
     #[serde(default)]
     pub backend: BackendSettings,
+    /// Check Gmail (inbox and spam) for employers' replies this often, in
+    /// hours, while the agent is idle. 0 turns it off.
+    #[serde(default = "default_inbox_check_hours")]
+    pub inbox_check_hours: u32,
+}
+
+fn default_inbox_check_hours() -> u32 {
+    3
 }
 
 /// Non-secret configuration for the mobile companion app connection. The
@@ -167,6 +175,7 @@ impl Default for AppSettings {
             minimum_match_score: 60,
             remote: RemoteSettings::default(),
             backend: BackendSettings::default(),
+            inbox_check_hours: default_inbox_check_hours(),
         }
     }
 }
@@ -198,6 +207,10 @@ pub struct ResumeSettings {
     pub generate_pdf: bool,
     #[serde(default = "default_true")]
     pub generate_docx: bool,
+    /// Delete an application's generated files (PDF, DOCX, HTML, ...) once
+    /// it's applied. The content stays, so they can be re-created any time.
+    #[serde(default = "default_true")]
+    pub delete_files_after_applied: bool,
 }
 
 fn default_true() -> bool {
@@ -218,6 +231,7 @@ impl Default for ResumeSettings {
             minimum_keyword_coverage: 70,
             generate_pdf: true,
             generate_docx: true,
+            delete_files_after_applied: true,
         }
     }
 }

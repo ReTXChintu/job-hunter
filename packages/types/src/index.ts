@@ -301,6 +301,8 @@ export interface Resume {
   validation: AtsValidation | null;
   runId: string | null;
   userEdited: boolean;
+  /** Set when the files were deleted after applying; they can be re-created. */
+  filesDeletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -316,6 +318,7 @@ export interface CoverLetter {
   pdfPath: string | null;
   txtPath: string | null;
   userEdited: boolean;
+  filesDeletedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -381,8 +384,24 @@ export interface Application {
   claudeSessionId: string | null;
   runId: string | null;
   manualCompleted: boolean;
+  /** Employers' replies found in Gmail (inbox or spam). */
+  replies: EmailReply[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type ReplyKind = "INTERVIEW" | "ASSESSMENT" | "QUESTION" | "OFFER" | "REJECTION" | "ACKNOWLEDGEMENT" | "OTHER";
+
+/** An employer's email about an application, found in Gmail by the inbox check. */
+export interface EmailReply {
+  id: string;
+  from: string;
+  subject: string;
+  receivedAt: string;
+  folder: "INBOX" | "SPAM" | string;
+  kind: ReplyKind | string;
+  summary: string;
+  foundAt: string;
 }
 
 export interface AnswerRecord {
@@ -410,6 +429,7 @@ export type AgentState =
   | "WAITING_FOR_APPROVAL"
   | "APPLYING"
   | "UPDATING_PROFILE"
+  | "CHECKING_INBOX"
   | "COMPLETED"
   | "FAILED"
   | "MANUAL_ACTION_REQUIRED"
@@ -443,7 +463,7 @@ export interface RunStats {
   claudeCostUsd: number;
 }
 
-export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC";
+export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC" | "INBOX_CHECK";
 
 export interface AgentRun {
   id: string;
@@ -489,6 +509,8 @@ export interface ResumeSettings {
   minimumKeywordCoverage: number;
   generatePdf: boolean;
   generateDocx: boolean;
+  /** Delete an application's generated files once it's sent (content is kept). */
+  deleteFilesAfterApplied: boolean;
 }
 
 export interface BrowserSettings {
@@ -535,6 +557,8 @@ export interface AppSettings {
   minimumMatchScore: number;
   remote: RemoteSettings;
   backend: BackendSettings;
+  /** Hours between Gmail checks for employers' replies (inbox and spam); 0 = off. */
+  inboxCheckHours: number;
 }
 
 export interface ClaudeStatus {

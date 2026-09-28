@@ -43,6 +43,7 @@ pub mod skills {
     pub const PROFILE_SYNC: &str = include_str!("../../../agent/skills/profile-sync/SKILL.md");
     pub const EMAIL_APPLICATION: &str =
         include_str!("../../../agent/skills/email-application/SKILL.md");
+    pub const INBOX_TRACKING: &str = include_str!("../../../agent/skills/inbox-tracking/SKILL.md");
 }
 
 pub mod schemas {
@@ -119,6 +120,13 @@ pub mod schemas {
     });
     pub fn profile_sync() -> Value {
         PROFILE_SYNC.clone()
+    }
+    static INBOX_CHECK: Lazy<Value> = Lazy::new(|| {
+        serde_json::from_str(include_str!("../../../agent/schemas/inbox-check.json"))
+            .expect("inbox-check schema")
+    });
+    pub fn inbox_check() -> Value {
+        INBOX_CHECK.clone()
     }
 }
 
@@ -526,6 +534,24 @@ You are RESUMING: the previous run stopped part-way. Check Gmail's Drafts and Se
         "
 
 Return only the structured output. SUBMITTED requires Gmail's \"Message sent\" confirmation.",
+    );
+    s
+}
+
+/// Prompt for finding employers' replies in Gmail (inbox and spam).
+pub fn inbox_check_prompt(applications: &Value, since_days: u32) -> String {
+    let mut s = String::from("# Task: find employers' replies to the candidate's applications in Gmail
+
+Follow the inbox-tracking skill exactly. Read-only: never reply, send, delete, archive, label or move anything.");
+    s.push_str(&section("Skill: inbox-tracking", skills::INBOX_TRACKING));
+    s.push_str(&section(
+        "Inputs",
+        &json_block(&json!({ "sinceDays": since_days, "applications": applications })),
+    ));
+    s.push_str(
+        "
+
+Return only the structured output.",
     );
     s
 }

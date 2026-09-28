@@ -185,6 +185,18 @@ export function useSyncPlatformProfile() {
   });
 }
 
+/** Look for employers' replies in Gmail (inbox and spam) now. */
+export function useCheckInbox() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: () => invoke("check_inbox_now"), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+}
+
+/** Re-create an application's files that were deleted after it was sent. */
+export function useRestoreApplicationFiles() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (id: string) => invoke("restore_application_files", { id }), onSuccess: () => inv([keys.resumes, ["application"], ["job"], ["file"]]) });
+}
+
 export const useNotifications = () => useQuery({ queryKey: keys.notifications, queryFn: () => invoke("list_notifications", { limit: 50 }) });
 
 export function useMarkNotificationsRead() {
