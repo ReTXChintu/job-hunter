@@ -4,6 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase Cloud Messaging (instant notifications with the app closed) needs
+// google-services.json from the Firebase console, which isn't committed (CI
+// writes it from the GOOGLE_SERVICES_JSON secret). Without it the app still
+// builds and falls back to its periodic background check.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("android/app/google-services.json not found: building without Firebase push notifications.")
+}
+
 android {
     namespace = "io.jobhunter.job_hunter_mobile"
     compileSdk = flutter.compileSdkVersion

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../config.dart';
 import '../state/auth_controller.dart';
+import '../widgets/common.dart';
 import 'pairing_scan_screen.dart';
 
 /// Sign-in/sign-up with an email+password account on a relay the user
@@ -53,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final auth = context.watch<AuthController>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Job Hunter'),
+        title: const Row(children: [BrandLogo(size: 30), SizedBox(width: 10), Text('Job Hunter')]),
         bottom: TabBar(controller: _tab, tabs: const [Tab(text: 'Pair with code'), Tab(text: 'Email + password')]),
       ),
       body: TabBarView(

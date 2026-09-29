@@ -6,36 +6,71 @@ thin.
 
 ## What it can do
 
-- See every application the agent has produced or is working on, with its
-  status, match score, and the desktop's own analysis of why it matched.
-- Open one application to read the job posting, the analysis, resume/cover
-  letter info, and any potential issues the agent flagged.
-- Approve or reject an application awaiting review.
-- Answer a pending question the agent needs before it can continue.
-- Confirm a manual step is done, or trigger "apply now" on an approved
-  application.
-- Show whether the desktop is currently online, reported by the relay, not
-  guessed from the phone's own connectivity.
-- Work offline in a read-only sense: the last-loaded list is cached on the
-  phone and shown (labeled "Showing cached data") until a live connection
-  refreshes it.
+Five tabs:
+
+- **Home** — whether the desktop is online, what the agent is doing
+  (`agent_status` pushes / `get_agent_status`), counts of applications
+  pending approval, needing input or a manual step, applied, interviews and
+  offers (tap one to open that filter), what's waiting on you, and quick
+  actions that run on the desktop: **Start job hunt**, **Stop**, **Find
+  hiring posts** (a job hunt limited to LinkedIn Posts) and **Check Gmail for
+  replies**. They're disabled, with the reason shown, while the desktop is
+  offline or the agent is busy.
+- **Applications** — every application, with filter chips and counts (All,
+  Needs you, Pending approval, In progress, Applied, Interviews & offers,
+  Rejected/withdrawn), search, and pull to refresh. The detail screen shows
+  the status and its history, the posting, the match analysis, employers'
+  replies found in Gmail (with an "In Spam" badge), the answers used, the
+  failure reason and the tailored resume/cover letter, and offers what the
+  status allows: **Approve & apply** / **Reject**, the **pending-questions
+  form** (answers are saved for reuse), **Retry / resume** and **Mark as
+  applied** for a manual step, and interview/offer/rejected/withdrawn
+  tracking once applied.
+- **Jobs** — everything the desktop found (All, Shortlisted, Not relevant,
+  Has application, Email posts, plus search), each with its description,
+  analysis and source link, and **Prepare application** / **Reject job**.
+- **Alerts** — the desktop's notifications; tapping one opens the linked
+  application, list, jobs or job sites.
+- **More** — **Job sites** (each profile's state, Update / Resume / Start
+  over, and the questions an update stopped on), **Additional details**
+  (saved answers, add and edit), Settings and About.
+
+Reads come live from the desktop when it's online. When it isn't, the app
+reads what the desktop last synced to the server (`/v1/applications`,
+`/v1/data/jobs`, ...) and says so ("Showing data from the server — desktop
+offline"). Job-site profiles are desktop-only.
 
 ## What it deliberately cannot do
 
-- **No AI runs on the phone.** Every action it sends is a request that the
-  relay forwards to the desktop, which calls the exact same
-  `orchestrator` functions the desktop UI itself calls
-  (`crates/job-hunter-core/src/remote/dispatch.rs`). The phone has no
-  Claude access, no browser automation, and cannot bypass the desktop's
-  own approval gating (`domain/application.rs::can_transition_to`).
-- **No job discovery, scraping, or job data storage.** It only ever reads
-  what the desktop already produced, through the relay.
+- **No AI runs on the phone.** Every action is a request the server
+  forwards to the desktop, which calls the exact same `orchestrator`
+  functions the desktop UI calls
+  (`crates/job-hunter-core/src/remote/dispatch.rs`). The phone cannot bypass
+  the desktop's approval gating (`domain/application.rs::can_transition_to`).
+- **Actions need the desktop online.** The server never queues them: with
+  the desktop offline the reply is `DESKTOP_OFFLINE` and the app says "Your
+  desktop is offline — open Job Hunter on your computer".
 - It cannot manage other paired devices or the account itself — that
-  stays on the desktop's Settings → Mobile app tab, which is the source of
-  truth for who's paired.
-- **If the desktop is offline, nothing works.** The relay only routes
-  live requests to a connected desktop; it never queues actions or runs
-  anything on its own.
+  stays on the desktop's Settings → Mobile app tab.
+
+## Notifications
+
+- **App open:** the server pushes each notification over the WebSocket
+  the moment the desktop syncs it; the app also catches up whenever it comes
+  to the foreground or reconnects.
+- **App closed, with Firebase:** the server sends a Firebase Cloud Messaging
+  push, shown instantly on the `job_hunter_alerts` channel. The app registers
+  its token with `PUT /v1/devices/me/push-token` on sign-in (and on token
+  refresh) and clears it on sign-out.
+- **App closed, without Firebase:** WorkManager checks
+  `GET /v1/data/notifications` about every 15 minutes (Android may delay it).
+
+All three paths share one `createdAt` watermark, so a notification is shown
+once. Firebase is optional: the build applies the Google Services Gradle
+plugin only when `android/app/google-services.json` exists (it's
+git-ignored; CI writes it from the `GOOGLE_SERVICES_JSON` secret), and the
+app starts normally without it. Setup is in
+[deploy.md](deploy.md#phone-notifications-firebase).
 
 ## Architecture in one paragraph
 
@@ -103,14 +138,19 @@ it's meant to be used day to day.
 ```
 lib/
   models/     Hand-written JSON models mirroring the Rust domain types
-              and the relay's wire format (Envelope, RelayResponse, ...)
+              and the relay's wire format (Envelope, RelayResponse, ...);
+              parsing never throws on a missing field (models/json.dart)
+  logic/      Pure, tested rules: filter chips and counts, notification
+              links, labels and error messages
   services/   ApiClient (REST), RelayClient (the WebSocket transport),
-              SecureStore (device token + settings persistence)
-  state/      ChangeNotifier controllers: AuthController,
-              ConnectionController, ApplicationsController
+              SecureStore, NotificationService (local alerts + WorkManager),
+              PushService (Firebase), LinkBus (notification taps)
+  state/      ChangeNotifier controllers: Auth, Connection, Applications,
+              Jobs, Agent, Profiles/Answers, Notifications, Nav
   theme/      Shared colors/status labels, kept in sync with the
               desktop's own theme and status vocabulary by hand
-  widgets/    Small reusable presentation widgets
+  widgets/    Small reusable presentation widgets, incl. the
+              pending-questions form (question_form.dart)
   screens/    One file per screen
   app.dart    Routing (go_router) with an auth-gated redirect
   main.dart   Provider wiring and entry point

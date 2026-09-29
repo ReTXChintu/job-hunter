@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../config.dart';
 import '../services/api_client.dart';
+import '../services/push_service.dart';
 import '../services/secure_store.dart';
 
 enum AuthStatus { unknown, signedOut, signedIn }
@@ -102,6 +103,8 @@ class AuthController extends ChangeNotifier {
   Future<void> signOut() async {
     isBusy = true;
     notifyListeners();
+    // Stop pushes to this phone while its device token still works.
+    await PushService.instance.unregister(relayUrl, deviceToken);
     await _store.clearAll();
     relayUrl = null;
     accountEmail = null;

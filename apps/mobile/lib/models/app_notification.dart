@@ -1,3 +1,6 @@
+import '../logic/links.dart';
+import 'json.dart';
+
 /// A notification the desktop raised (a job hunt finished, an application
 /// or a job-site update needs you, something failed). Mirrors the Rust
 /// `domain::Notification` / `packages/types` `Notification`, trimmed to what
@@ -34,8 +37,24 @@ class AppNotification {
         createdAt: j['createdAt'] as String? ?? '',
       );
 
-  /// Opens an application on the phone; everything else lives on the desktop.
-  String? get applicationId => linkPage == 'application' ? linkId : null;
+  /// A Firebase message: `data` carries the fields (string values, empty
+  /// meaning absent), `notification` the title and body.
+  factory AppNotification.fromPushData(Map<String, dynamic> data, {String? title, String? body}) => AppNotification(
+        id: str(data['id']),
+        level: str(data['level'], 'INFO'),
+        kind: str(data['kind']),
+        title: title ?? str(data['title']),
+        body: body ?? str(data['body']),
+        linkPage: str(data['linkPage']),
+        linkId: optStr(data['linkId']),
+        createdAt: str(data['createdAt']),
+      );
+
+  /// The application this opens, if it links to one.
+  String? get applicationId => linkPage == 'application' && linkId != null && linkId!.isNotEmpty ? linkId : null;
+
+  /// Where tapping it goes.
+  AppLink get link => resolveLink(linkPage, linkId);
 }
 
 /// Newest first.

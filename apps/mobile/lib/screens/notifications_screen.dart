@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/app_notification.dart';
 import '../state/notifications_controller.dart';
 import '../widgets/empty_state.dart';
-import 'application_detail_screen.dart';
+import '../util/format.dart';
+import 'shell_screen.dart';
 
 /// Everything the desktop wanted you to know: finished job hunts,
 /// applications and job-site updates that need you, failures.
@@ -64,7 +65,7 @@ class _NotificationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final when = DateTime.tryParse(n.createdAt)?.toLocal();
+    final when = DateTime.tryParse(n.createdAt);
     return ListTile(
       leading: Icon(
         switch (n.level) { 'ERROR' => Icons.error_outline, 'WARN' => Icons.warning_amber, 'SUCCESS' => Icons.check_circle_outline, _ => Icons.info_outline },
@@ -72,19 +73,13 @@ class _NotificationTile extends StatelessWidget {
       ),
       title: Text(n.title, style: TextStyle(fontWeight: unread ? FontWeight.w600 : FontWeight.normal)),
       subtitle: Text(
-        [if (n.body.isNotEmpty) n.body, if (when != null) '${MaterialLocalizations.of(context).formatShortDate(when)} ${TimeOfDay.fromDateTime(when).format(context)}'].join('\n'),
+        [if (n.body.isNotEmpty) n.body, if (when != null) '${formatDateTime(context, when)} · ${timeAgo(when)}'].join('\n'),
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
       isThreeLine: n.body.isNotEmpty,
-      onTap: () {
-        final id = n.applicationId;
-        if (id != null) {
-          Navigator.of(context).push(MaterialPageRoute(builder: (_) => ApplicationDetailScreen(applicationId: id)));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Open the desktop app to act on this.')));
-        }
-      },
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => openAppLink(context, n.link),
     );
   }
 }

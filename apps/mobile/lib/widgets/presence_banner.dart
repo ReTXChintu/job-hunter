@@ -3,15 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../services/relay_client.dart';
 import '../state/connection_controller.dart';
-
-String _timeAgo(DateTime? at) {
-  if (at == null) return '';
-  final diff = DateTime.now().difference(at);
-  if (diff.inMinutes < 1) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
-  if (diff.inHours < 24) return '${diff.inHours} h ago';
-  return '${diff.inDays} d ago';
-}
+import '../util/format.dart';
 
 /// A thin banner showing whether the desktop is reachable right now. This
 /// reflects the relay's own `presence` push, never a guess made on the
@@ -25,11 +17,11 @@ class PresenceBanner extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     if (connection.socketState != SocketState.connected) {
-      return _Bar(color: Colors.orange, icon: Icons.cloud_off, text: connection.socketState == SocketState.connecting ? 'Connecting to your relay…' : 'Not connected to your relay');
+      return _Bar(color: Colors.orange, icon: Icons.cloud_off, text: connection.socketState == SocketState.connecting ? 'Connecting to your Job Hunter server…' : 'Not connected to your Job Hunter server');
     }
     if (!connection.desktopOnline) {
       final seen = connection.desktopLastSeenAt;
-      return _Bar(color: Colors.orange, icon: Icons.desktop_access_disabled, text: seen == null ? 'Desktop offline' : 'Desktop offline · last seen ${_timeAgo(seen)}');
+      return _Bar(color: Colors.orange, icon: Icons.desktop_access_disabled, text: seen == null ? 'Desktop offline — actions need it running' : 'Desktop offline · last seen ${timeAgo(seen)}');
     }
     return _Bar(color: Colors.green, icon: Icons.desktop_windows, text: 'Desktop online', background: scheme.surface);
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'screens/home_screen.dart';
+import 'screens/shell_screen.dart';
 import 'screens/login_screen.dart';
 import 'state/auth_controller.dart';
 import 'theme/theme.dart';
@@ -36,7 +36,7 @@ class _JobHunterAppState extends State<JobHunterApp> {
         return null;
       },
       routes: [
-        GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+        GoRoute(path: '/', builder: (context, state) => const AppShell()),
         GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       ],
     );

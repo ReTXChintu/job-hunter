@@ -92,7 +92,7 @@ class RelayClient {
       return;
     }
     _setState(SocketState.disconnected);
-    _failAllPending('DESKTOP_OFFLINE', 'Lost the connection to the relay.');
+    _failAllPending('NOT_CONNECTED', 'Lost the connection to the server.');
     _scheduleReconnect();
   }
 
@@ -113,7 +113,7 @@ class RelayClient {
   Future<RelayResponse> request(String type, [Map<String, dynamic> payload = const {}, Duration timeout = const Duration(seconds: 20)]) {
     final channel = _channel;
     if (channel == null || _current != SocketState.connected) {
-      return Future.value(const RelayResponse(ok: false, errorCode: 'DESKTOP_OFFLINE', errorMessage: 'Not connected to the relay right now.'));
+      return Future.value(const RelayResponse(ok: false, errorCode: 'NOT_CONNECTED', errorMessage: 'Not connected to the server right now.'));
     }
     final id = _randomId();
     final completer = Completer<RelayResponse>();

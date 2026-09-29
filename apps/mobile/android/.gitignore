@@ -12,3 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase config for push notifications: supplied locally or by CI
+# (GOOGLE_SERVICES_JSON secret), never committed.
+app/google-services.json

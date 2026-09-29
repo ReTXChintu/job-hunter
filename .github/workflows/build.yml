@@ -138,6 +138,19 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
+      - name: Add Firebase config (push notifications)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          # Optional: base64 of google-services.json from the Firebase console.
+          # Without it the APK still builds, and phones fall back to checking
+          # for notifications every ~15 minutes instead of instant pushes.
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON is not set: building without Firebase push notifications. See docs/mobile.md."
+          fi
+
       - name: Warn about debug signing
         if: env.HAS_SIGNING_KEY != 'true'
         run: echo "::warning::ANDROID_KEYSTORE_BASE64 is not set. This APK is signed with a throwaway debug key, so phones can't install it over a previous build; they must uninstall first. See docs/deploy.md."

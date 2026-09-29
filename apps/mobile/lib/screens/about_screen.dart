@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../config.dart';
 import '../state/update_controller.dart';
+import '../widgets/common.dart';
 
 String formatMb(int bytes) => '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 
@@ -57,11 +58,7 @@ class AboutScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: theme.colorScheme.primary, borderRadius: BorderRadius.circular(12)),
-                child: Icon(Icons.work_outline, color: theme.colorScheme.onPrimary, size: 28),
-              ),
+              const BrandLogo(size: 56),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

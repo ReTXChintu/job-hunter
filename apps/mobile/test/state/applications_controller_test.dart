@@ -4,25 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:job_hunter_mobile/models/envelope.dart';
 import 'package:job_hunter_mobile/state/applications_controller.dart';
 import 'package:job_hunter_mobile/state/auth_controller.dart';
-import 'package:job_hunter_mobile/state/connection_controller.dart';
+import 'package:job_hunter_mobile/logic/labels.dart';
 
-/// A `ConnectionController` stand-in that records every `request()` call
-/// and returns whatever the test stubs, so `ApplicationsController` can be
-/// exercised without a real relay or WebSocket. It never touches the
-/// network -- `ConnectionController` itself is a no-op here because the
-/// underlying `AuthController` is never marked signed in.
-class FakeConnectionController extends ConnectionController {
-  FakeConnectionController(super.auth);
-
-  final List<({String type, Map<String, dynamic> payload})> calls = [];
-  final Map<String, RelayResponse> stubbed = {};
-
-  @override
-  Future<RelayResponse> request(String type, [Map<String, dynamic> payload = const {}]) async {
-    calls.add((type: type, payload: payload));
-    return stubbed[type] ?? const RelayResponse(ok: false, errorCode: 'NOT_STUBBED', errorMessage: 'This test did not stub a response for this request type.');
-  }
-}
+import '../support/fakes.dart';
 
 Map<String, dynamic> _applicationJson({String id = 'app-1', String status = 'READY_FOR_REVIEW'}) => {
       'id': id,
@@ -99,7 +83,7 @@ void main() {
     await controller.refresh();
 
     expect(controller.items, isEmpty);
-    expect(controller.error, 'Desktop is not connected.');
+    expect(controller.error, desktopOfflineMessage);
     expect(controller.loading, isFalse);
   });
 

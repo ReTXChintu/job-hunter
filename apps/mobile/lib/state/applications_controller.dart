@@ -4,88 +4,137 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../logic/labels.dart';
 import '../models/application.dart';
 import '../models/dashboard.dart';
 import '../models/envelope.dart';
 import 'connection_controller.dart';
+import 'data_source.dart';
 
-/// The review list/detail data and the actions a phone may take on it.
-/// Every action is one `connection.request(...)` call that reaches the
+/// The applications list/detail data and the actions a phone may take on
+/// them. Every action is one `connection.request(...)` call that reaches the
 /// exact same desktop-side `orchestrator` function the Tauri UI calls (see
 /// `crates/job-hunter-core/src/remote/dispatch.rs`) -- this class never
 /// decides an application's fate on its own, it only asks the desktop to.
+/// Reads come from the desktop when it's online, else from what it last
+/// synced to the server.
 class ApplicationsController extends ChangeNotifier {
-  static const _cacheKey = 'job_hunter.applications_cache';
+  static const _cacheKey = 'job_hunter.applications_cache.v2';
 
   final ConnectionController connection;
   StreamSubscription? _changedSub;
+  StreamSubscription? _resyncSub;
 
   ApplicationsController(this.connection) {
     _changedSub = connection.changed.listen((update) {
-      if (update.collections.any((c) => c == 'applications' || c == 'jobs' || c == 'job_analyses' || c == 'agent_runs')) {
+      if (update.collections.any((c) => const {'applications', 'jobs', 'job_analyses', 'agent_runs', 'resumes', 'cover_letters'}.contains(c))) {
         refresh();
       }
     });
+    _resyncSub = connection.resync.listen((_) => refresh());
     _loadCache();
   }
 
   List<ApplicationListItem> items = [];
   Dashboard? dashboard;
   bool loading = false;
-  bool isFromCache = false;
+  DataSource source = DataSource.none;
   String? error;
   DateTime? lastLoadedAt;
+  bool _refreshQueued = false;
+  Future<void>? _inFlight;
+
+  bool get isFromCache => source == DataSource.cache;
+  bool get isFromServer => source == DataSource.server;
 
   Future<void> _loadCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_cacheKey);
-    if (raw == null) return;
     try {
-      final list = (jsonDecode(raw) as List).map((e) => ApplicationListItem.fromJson((e as Map).cast<String, dynamic>())).toList();
-      items = list;
-      isFromCache = true;
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_cacheKey);
+      if (raw == null || source != DataSource.none) return;
+      items = parseApplicationList(jsonDecode(raw));
+      source = DataSource.cache;
       notifyListeners();
     } catch (_) {
       // Corrupt cache: ignore, a live refresh will replace it.
     }
   }
 
-  Future<void> _saveCache(List<ApplicationListItem> list) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = jsonEncode(list.map((i) => {'application': _applicationJson(i.application), 'job': _jobJson(i.job)}).toList());
-    await prefs.setString(_cacheKey, raw);
+  Future<void> _saveCache(dynamic raw) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(raw));
+    } catch (_) {}
   }
 
-  Future<void> refresh() async {
+  /// Reloads the list (and the desktop's dashboard counts). Calls made while
+  /// one is running coalesce into one more run afterwards.
+  Future<void> refresh() {
+    if (_inFlight != null) {
+      _refreshQueued = true;
+      return _inFlight!;
+    }
+    final run = _refresh().whenComplete(() {
+      _inFlight = null;
+      if (_refreshQueued) {
+        _refreshQueued = false;
+        refresh();
+      }
+    });
+    _inFlight = run;
+    return run;
+  }
+
+  Future<void> _refresh() async {
     loading = true;
     notifyListeners();
     final resp = await connection.request('list_applications');
-    // With the desktop offline, read what it last synced to the server.
-    final data = resp.ok ? resp.data : await connection.serverGet('/v1/applications');
+    dynamic data = resp.ok ? resp.data : null;
+    var from = DataSource.desktop;
+    if (data is! List) {
+      // With the desktop offline, read what it last synced to the server.
+      data = await connection.serverGet('/v1/applications');
+      from = DataSource.server;
+    }
     if (data is List) {
-      items = data.map((e) => ApplicationListItem.fromJson((e as Map).cast<String, dynamic>())).toList();
-      isFromCache = false;
+      items = parseApplicationList(data);
+      source = from;
       lastLoadedAt = DateTime.now();
       error = null;
-      unawaited(_saveCache(items));
-    } else if (!resp.ok) {
-      error = resp.errorMessage;
+      unawaited(_saveCache(data));
+    } else {
+      error = resp.ok ? 'Unexpected reply from the desktop.' : friendlyError(resp);
     }
-    final dashResp = await connection.request('list_dashboard');
-    if (dashResp.ok && dashResp.data is Map) {
-      dashboard = Dashboard.fromJson((dashResp.data as Map).cast<String, dynamic>());
+    if (from == DataSource.desktop) {
+      final dashResp = await connection.request('list_dashboard');
+      if (dashResp.ok && dashResp.data is Map) {
+        dashboard = Dashboard.fromJson((dashResp.data as Map).cast<String, dynamic>());
+      }
     }
     loading = false;
     notifyListeners();
   }
 
+  /// The full application, from the desktop or else the server (which has
+  /// no resume/cover letter). Returns null with [lastDetailError] set.
+  String? lastDetailError;
+  bool lastDetailFromServer = false;
+
   Future<ApplicationDetail?> loadDetail(String applicationId) async {
     final resp = await connection.request('get_application', {'id': applicationId});
-    final data = resp.ok ? resp.data : await connection.serverGet('/v1/applications/${Uri.encodeComponent(applicationId)}');
-    if (data is Map) {
+    if (resp.ok && resp.data is Map) {
+      lastDetailFromServer = false;
+      lastDetailError = null;
+      return ApplicationDetail.fromJson((resp.data as Map).cast<String, dynamic>());
+    }
+    final data = await connection.serverGet('/v1/applications/${Uri.encodeComponent(applicationId)}');
+    if (data is Map && data['application'] is Map) {
+      lastDetailFromServer = true;
+      lastDetailError = null;
       return ApplicationDetail.fromJson(data.cast<String, dynamic>());
     }
-    error = resp.errorMessage;
+    lastDetailError = resp.ok ? 'Could not load this application.' : friendlyError(resp);
+    error = lastDetailError;
     notifyListeners();
     return null;
   }
@@ -110,46 +159,10 @@ class ApplicationsController extends ChangeNotifier {
     return resp;
   }
 
-  Map<String, dynamic> _applicationJson(Application a) => {
-        'id': a.id,
-        'jobId': a.jobId,
-        'status': a.status,
-        'applicationUrl': a.applicationUrl,
-        'notes': a.notes,
-        'answers': a.answers.map((x) => {'question': x.question, 'answer': x.answer, 'source': x.source}).toList(),
-        'pendingQuestions': const [],
-        'statusHistory': const [],
-        'potentialIssues': a.potentialIssues,
-        'approvedAt': a.approvedAt?.toIso8601String(),
-        'appliedAt': a.appliedAt?.toIso8601String(),
-        'failureReason': a.failureReason,
-        'evidence': a.evidence,
-        'manualCompleted': a.manualCompleted,
-        'updatedAt': a.updatedAt.toIso8601String(),
-      };
-
-  Map<String, dynamic> _jobJson(dynamic job) => {
-        'id': job.id,
-        'title': job.title,
-        'company': job.company,
-        'location': job.location,
-        'employmentType': job.employmentType,
-        'remote': job.remote,
-        'salary': job.salary,
-        'seniority': job.seniority,
-        'postedAt': job.postedAt,
-        'source': job.source,
-        'url': job.url,
-        'description': job.description,
-        'requirements': job.requirements,
-        'responsibilities': job.responsibilities,
-        'skills': job.skills,
-        'status': job.status,
-      };
-
   @override
   void dispose() {
     _changedSub?.cancel();
+    _resyncSub?.cancel();
     super.dispose();
   }
 }
