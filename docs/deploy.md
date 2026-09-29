@@ -1,7 +1,7 @@
 # Deploying the server and building the apps
 
 One server runs everything that isn't the desktop app: the backend API
-(accounts, data sync, mobile connectivity), the read-only web app, and the
+(accounts, data sync, mobile connectivity), the web app, and the
 Android APK download. It is reached as plain `http://<server-ip>:<port>`;
 no domain or TLS certificate is needed. It can use one port for everything,
 or, as in this setup, two:

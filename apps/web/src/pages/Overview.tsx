@@ -5,6 +5,7 @@ import { Monitor } from "lucide-react";
 
 import { AppDownloads, useDownloads } from "../components/AppDownloads";
 import { ApplicationRow } from "../components/ApplicationRow";
+import { DesktopActions } from "../components/DesktopActions";
 import { ErrorBox, Loading, Panel } from "../components/State";
 import { href } from "../route";
 import { useSession } from "../session";
@@ -16,7 +17,6 @@ const TILES: { key: StatusGroupKey; label: string; tone: string }[] = [
   { key: "applied", label: "Applied", tone: "green" },
   { key: "interviews", label: "Interviews & offers", tone: "green" },
 ];
-
 
 function Tile({ label, value, tone, link }: { label: string; value: number | string; tone?: string; link: string }) {
   const highlight = tone && typeof value === "number" && value > 0;
@@ -67,7 +67,7 @@ export function OverviewPage() {
           <Text fontSize="2xl" fontWeight="semibold">
             Overview
           </Text>
-          <Text color="fg.muted">A read-only view of your job hunt. Approve, reject and apply from the desktop or mobile app.</Text>
+          <Text color="fg.muted">Your job hunt at a glance. Actions you take here run on your desktop.</Text>
         </Box>
         <HStack gap={2} px={3} py={1.5} borderRadius="full" borderWidth="1px" borderColor="border.muted" flexShrink={0}>
           <Monitor size={14} />
@@ -77,6 +77,8 @@ export function OverviewPage() {
           </Text>
         </HStack>
       </Flex>
+
+      <DesktopActions desktopOnline={devices.isSuccess ? online : null} />
 
       <SimpleGrid columns={{ base: 2, md: 5 }} gap={3}>
         {TILES.map((t) => (
@@ -109,7 +111,7 @@ export function OverviewPage() {
         >
           {recent.length === 0 ? (
             <Text fontSize="sm" color="fg.muted">
-              No applications yet. Start a job hunt from the desktop app.
+              No applications yet. Start a job hunt above.
             </Text>
           ) : (
             <VStack align="stretch" gap={0} mx={-3}>

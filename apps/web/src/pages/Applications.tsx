@@ -61,7 +61,7 @@ export function ApplicationsPage({ group }: { group?: string }) {
         <ErrorBox error={applications.error} onRetry={() => void applications.refetch()} />
       ) : visible.length === 0 ? (
         <Box borderWidth="1px" borderColor="border.muted" borderRadius="lg" p={8} textAlign="center">
-          <Text color="fg.muted">{applications.data.length === 0 ? "No applications yet. Start a job hunt from the desktop app." : "Nothing matches this filter."}</Text>
+          <Text color="fg.muted">{applications.data.length === 0 ? "No applications yet. Start a job hunt from the Overview." : "Nothing matches this filter."}</Text>
         </Box>
       ) : (
         <Box borderWidth="1px" borderColor="border.muted" borderRadius="lg" bg="bg.panel" p={2}>

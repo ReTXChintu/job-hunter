@@ -2,7 +2,7 @@
  * Static serving for a self-hosted, domain-less deployment (reached as
  * `http://<ip>:<port>`):
  *
- * - `GET /` and friends: the read-only web app (`apps/web/dist`), served
+ * - `GET /` and friends: the web app (`apps/web/dist`), served
  *   from the same origin as the API so it needs no CORS or configured URL.
  *   Skipped when the directory doesn't exist (e.g. in development, where
  *   the web app runs on Vite's own dev server instead).

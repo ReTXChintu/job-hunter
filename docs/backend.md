@@ -6,7 +6,7 @@ desktop being online, and so the desktop's own persistence eventually goes
 through one place instead of talking to MongoDB directly from Rust.
 
 **Status: this is the one server in a deployment.** It serves the API, the
-read-only web app (`apps/web`) at `/`, and the Android APK at
+web app (`apps/web`) at `/`, and the Android APK at
 `/downloads/android`, reached as plain `http://<ip>:<port>` and run under
 PM2 (see [`deploy.md`](deploy.md)). The desktop app syncs its local data
 through it (Settings → Backend account) and routes the mobile app's live
@@ -147,14 +147,18 @@ The mobile app does the same with `--dart-define=BACKEND_URL=...`
 
 ## The web app
 
-`apps/web` is a small, read-only React app for checking on things from any
+`apps/web` is a small React app for checking on things, and acting on them
+through the desktop (`POST /v1/desktop/request`, the same approval-gated
+requests the phone sends), from any
 browser: an overview (counts, what needs you, whether the desktop is
 online, the APK download), the application list and detail, and the job
 list. Its login page also offers account creation and the app downloads. It signs in with the same email and password (access token plus
-refresh token, refreshed transparently) and reads only
-`/v1/applications`, `/v1/data/jobs`, `/v1/data/job_analyses`, `/v1/devices`
-and `/v1/downloads`. It never approves, rejects or applies; those stay in
-the desktop and mobile apps. It uses hash routes (`#/applications/<id>`),
+refresh token, refreshed transparently). It reads `/v1/applications`,
+`/v1/data/*`, `/v1/devices` and `/v1/downloads`, and never writes data
+itself: approving, answering questions, starting a hunt and so on are sent
+to the desktop with `POST /v1/desktop/request`, which runs them through its
+own approval-gated code and fails with `DESKTOP_OFFLINE` when it isn't
+running. It uses hash routes (`#/applications/<id>`),
 so the backend serves it as plain static files.
 
 ## Device presence

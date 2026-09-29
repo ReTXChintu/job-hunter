@@ -1,4 +1,4 @@
-import { Box, Button, Center, Field, Heading, Input, SegmentGroup, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Center, Field, Heading, HStack, Image, Input, SegmentGroup, Text, VStack } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
 
 import { AppDownloads, useDownloads } from "../components/AppDownloads";
@@ -48,13 +48,14 @@ export function LoginPage() {
     <Center minH="100vh" px={4} py={8}>
       <VStack w="full" maxW="400px" gap={4} align="stretch">
         <Box borderWidth="1px" borderColor="border.muted" borderRadius="lg" bg="bg.panel" p={{ base: 6, md: 8 }}>
-          <Heading size="lg" mb={1}>
-            Job Hunter
-          </Heading>
+          <HStack gap={3} mb={2}>
+            <Image src="/logo-96.png" alt="" boxSize="40px" flexShrink={0} />
+            <Heading size="lg">Job Hunter</Heading>
+          </HStack>
           <Text fontSize="sm" color="fg.muted" mb={5}>
             {registering
               ? "Create your account. Then sign in to the same account in the desktop app (Settings → Backend account) so your jobs sync here."
-              : "Sign in with the same account you use in the desktop app to see your jobs and applications."}
+              : "Sign in with the same account you use in the desktop app to follow your job hunt and act on it."}
           </Text>
           <SegmentGroup.Root value={mode} onValueChange={(e) => switchMode((e.value as Mode) ?? "login")} size="sm" mb={5} w="full">
             <SegmentGroup.Indicator />

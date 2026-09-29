@@ -4,8 +4,8 @@ import { href } from "./route";
 
 /**
  * Notifications come from the desktop (see the Rust `AppContext::notify`),
- * synced through the backend. The web app is read-only, so "read" here is
- * per browser: everything created after the last time the list was opened.
+ * synced through the backend. The web app never writes them, so "read" here
+ * is per browser: everything created after the last time the list was opened.
  */
 
 const SEEN_KEY = "jobhunter.notifications.seenAt";

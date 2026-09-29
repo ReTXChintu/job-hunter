@@ -19,7 +19,7 @@ Claude ──► Claude in Chrome ──► Google Chrome ──► job websites
 
 Data is stored locally under your app data directory. Mirroring it to MongoDB Atlas is optional and goes through a self-hosted **Node backend** (`apps/backend`, see [docs/backend.md](docs/backend.md)) — sign in from Settings → Backend account or the setup wizard, or skip it and stay local-only.
 
-An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone, and a read-only **web app** (`apps/web`) shows your jobs and applications in any browser. Neither runs AI or holds job data of its own; both reach your data through the same self-hosted server, reached as `http://<ip>:<port>`. See [docs/mobile.md](docs/mobile.md), [docs/backend.md](docs/backend.md) and [docs/deploy.md](docs/deploy.md).
+An optional **mobile companion app** (Flutter) lets you review and approve/reject applications from your phone, and a **web app** (`apps/web`) shows your jobs and applications in any browser and lets you answer questions, approve and trigger work on your desktop. Neither runs AI or holds job data of its own; both reach your data through the same self-hosted server, reached as `http://<ip>:<port>`. See [docs/mobile.md](docs/mobile.md), [docs/backend.md](docs/backend.md) and [docs/deploy.md](docs/deploy.md).
 
 ## What it does
 
@@ -74,7 +74,7 @@ job-hunter/
 │   ├── src/                 React UI (Vite, Chakra UI, TanStack Query/Router)
 │   └── src-tauri/           Tauri shell: commands + event forwarding
 ├── apps/mobile/             Flutter companion app (review-only, no AI) -- see docs/mobile.md
-├── apps/web/                Read-only web app, served by the backend -- see docs/backend.md
+├── apps/web/                Web app, served by the backend -- see docs/backend.md
 ├── apps/backend/            Self-hosted Node/Fastify backend the desktop app can sign
 │                            into (Settings → Backend account) -- owns MongoDB Atlas
 │                            data directly -- see docs/backend.md

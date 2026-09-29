@@ -29,3 +29,20 @@ export function countByGroup(items: ApplicationListItem[]): Record<StatusGroupKe
 export function byUpdatedDesc(a: ApplicationListItem, b: ApplicationListItem): number {
   return b.application.updatedAt.localeCompare(a.application.updatedAt);
 }
+
+/**
+ * Where the user can move a sent application as it progresses (mirrors
+ * `can_transition_to` in crates/job-hunter-core/src/domain/application.rs).
+ */
+export function trackingStatuses(status: ApplicationStatus): ApplicationStatus[] {
+  switch (status) {
+    case "APPLIED":
+      return ["INTERVIEW", "OFFER", "REJECTED", "WITHDRAWN"];
+    case "INTERVIEW":
+      return ["OFFER", "REJECTED", "WITHDRAWN"];
+    case "OFFER":
+      return ["REJECTED", "WITHDRAWN"];
+    default:
+      return [];
+  }
+}

@@ -1,5 +1,5 @@
-import { Box, Button, Container, Flex, HStack, IconButton, Link, Text } from "@chakra-ui/react";
-import { Briefcase, LogOut, Moon, Sun } from "lucide-react";
+import { Box, Button, Container, Flex, HStack, IconButton, Image, Link, Text } from "@chakra-ui/react";
+import { LogOut, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 
@@ -22,9 +22,7 @@ export function Layout({ route, children }: { route: Route; children: ReactNode 
         <Container maxW="6xl" px={{ base: 4, md: 6 }}>
           <Flex minH="56px" align="center" gap={{ base: 3, md: 6 }} wrap="wrap" py={2}>
             <HStack gap={2}>
-              <Box bg="brand.solid" color="brand.contrast" borderRadius="md" p={1.5} display="flex">
-                <Briefcase size={16} />
-              </Box>
+              <Image src="/logo-96.png" alt="" boxSize="28px" flexShrink={0} />
               <Text fontWeight="semibold" fontSize="md">
                 Job Hunter
               </Text>

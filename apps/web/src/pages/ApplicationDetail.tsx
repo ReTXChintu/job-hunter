@@ -4,6 +4,8 @@ import { KeyValue, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
+import { ApplicationActions } from "../components/ApplicationActions";
+import { Replies } from "../components/Replies";
 import { ErrorBox, Loading, Panel } from "../components/State";
 import { href } from "../route";
 import { useSession } from "../session";
@@ -80,24 +82,13 @@ export function ApplicationDetailPage({ id }: { id: string }) {
         </Alert.Root>
       ) : null}
 
-      {app.pendingQuestions.length > 0 ? (
-        <Panel title="Questions waiting for your answer">
-          <VStack align="stretch" gap={2}>
-            {app.pendingQuestions.map((q) => (
-              <Text key={q.id} fontSize="sm">
-                • {q.question}
-              </Text>
-            ))}
-            <Text fontSize="xs" color="fg.muted">
-              Answer these from the desktop or mobile app.
-            </Text>
-          </VStack>
-        </Panel>
-      ) : null}
+      <ApplicationActions item={detail.data} />
 
       <SimpleGrid columns={{ base: 1, lg: 3 }} gap={4} alignItems="start">
         <Box gridColumn={{ lg: "span 2" }}>
           <VStack align="stretch" gap={4}>
+            {app.replies.length > 0 ? <Replies replies={app.replies} company={job.company} /> : null}
+
             <Panel title="Match analysis">
               {analysis ? (
                 <VStack align="stretch" gap={4}>
