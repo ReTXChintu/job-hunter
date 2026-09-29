@@ -132,9 +132,22 @@ async fn fetch_all(
     State(fake): State<SharedFake>,
     headers: HeaderMap,
     Path(collection): Path<String>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     if !authorized(&headers, &fake) {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err((StatusCode::UNAUTHORIZED, Json(json!({}))));
+    }
+    if fake
+        .unknown_collections
+        .lock()
+        .unwrap()
+        .contains(&collection)
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                json!({ "error": { "code": "VALIDATION", "message": format!("unknown collection \"{collection}\"") } }),
+            ),
+        ));
     }
     let docs = fake
         .docs
@@ -309,6 +322,11 @@ async fn a_collection_the_server_does_not_know_yet_does_not_block_the_rest() {
         .flush()
         .await
         .expect("a refused document is skipped, not fatal");
+    // Pulling skips the unknown collection too, instead of failing all sync.
+    ctx.sync
+        .pull_all()
+        .await
+        .expect("an unknown collection doesn't stop the pull");
 
     let docs = fake.docs.lock().unwrap();
     assert!(

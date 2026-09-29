@@ -1,17 +1,18 @@
-import { Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui/react";
 import { useNavigate } from "@tanstack/react-router";
 import { filterJobs, JOB_FILTERS, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
-import { Bookmark, Search } from "lucide-react";
+import { Bookmark, Mail, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
-import { useDiscoverJobs, useJobs, useAgentStatus } from "../lib/queries";
+import { useDiscoverJobs, useJobs, useAgentStatus, useStartJobHunt } from "../lib/queries";
 import { isAgentRunning } from "@job-hunter/shared";
 
 export function JobsPage() {
   const jobs = useJobs();
   const agent = useAgentStatus();
   const discover = useDiscoverJobs();
+  const huntPosts = useStartJobHunt();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<JobFilter>("ALL");
   const [query, setQuery] = useState("");
@@ -25,12 +26,23 @@ export function JobsPage() {
         title="Jobs"
         subtitle={`${jobs.data?.length ?? 0} jobs discovered`}
         actions={
-          <Button variant="subtle" onClick={() => discover.mutate(undefined)} loading={discover.isPending} disabled={running}>
-            <Search size={16} /> Discover jobs
-          </Button>
+          <HStack gap={2}>
+            <Button
+              variant="outline"
+              onClick={() => huntPosts.mutate({ sources: ["LinkedIn Posts"] })}
+              loading={huntPosts.isPending}
+              disabled={running}
+              title="Search LinkedIn posts that ask for resumes by email, then analyze them and prepare applications for your review"
+            >
+              <Mail size={16} /> Find hiring posts
+            </Button>
+            <Button variant="subtle" onClick={() => discover.mutate(undefined)} loading={discover.isPending} disabled={running}>
+              <Search size={16} /> Discover jobs
+            </Button>
+          </HStack>
         }
       />
-      <ErrorBanner error={jobs.error ?? discover.error} onRetry={() => jobs.refetch()} />
+      <ErrorBanner error={jobs.error ?? discover.error ?? huntPosts.error} onRetry={() => jobs.refetch()} />
       <HStack mb={4} gap={4} align="center">
         <Tabs.Root value={filter} onValueChange={(e) => setFilter(e.value as JobFilter)} variant="subtle" size="sm" flex="1">
           <Tabs.List>
@@ -68,9 +80,16 @@ export function JobsPage() {
                   <HStack gap={2} align="flex-start">
                     {item.job.saved ? <Bookmark size={14} style={{ marginTop: 3 }} /> : null}
                     <Box minW={0}>
-                      <Text fontWeight="semibold" truncate>
-                        {item.job.title}
-                      </Text>
+                      <HStack gap={1.5}>
+                        <Text fontWeight="semibold" truncate>
+                          {item.job.title}
+                        </Text>
+                        {item.job.applyEmail ? (
+                          <Badge size="xs" colorPalette="blue" variant="subtle" title={`Apply by email to ${item.job.applyEmail}`}>
+                            Email
+                          </Badge>
+                        ) : null}
+                      </HStack>
                       <Text fontSize="xs" color="fg.muted" truncate>
                         {item.job.company}
                         {item.job.remote ? ` · ${item.job.remote}` : ""}

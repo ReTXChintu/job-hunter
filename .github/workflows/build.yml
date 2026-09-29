@@ -208,6 +208,28 @@ jobs:
           scp "${ssh_opts[@]}" -P "$port" "${files[@]}" "$DEPLOY_USER@$DEPLOY_HOST:$dest/"
           rm -f "$key"
 
+      # The apps of a release expect that release's server (e.g. new data
+      # collections): update the server's code and restart it, via the same
+      # `pnpm server:update` used by hand (pull, install, build, restart).
+      - name: Update and restart the server
+        if: env.HAS_DEPLOY_TARGET == 'true' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          key="$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          chmod 600 "$key"
+          port="${DEPLOY_PORT:-22}"
+          repo="${DEPLOY_PATH:-job-hunter}"
+          # A login shell, so node/pnpm/pm2 installed via nvm or similar are on PATH.
+          ssh -i "$key" -o StrictHostKeyChecking=accept-new -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -lc 'cd \"$repo\" && pnpm server:update && pnpm server:status'"
+          rm -f "$key"
+
   release:
     name: GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')

@@ -204,7 +204,16 @@ impl SyncWorker {
         let client = self.client().await?;
         let mut merged = 0;
         for name in COLLECTIONS {
-            let docs = client.fetch_all(name).await?;
+            let docs = match client.fetch_all(name).await {
+                Ok(docs) => docs,
+                // A server older than this app doesn't know every collection
+                // yet; that must not stop the others from syncing.
+                Err(CoreError::Validation(message)) => {
+                    tracing::warn!(collection = name, %message, "backend refused a collection; skipping it");
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
             for d in docs {
                 if self.store.merge_remote(name, d)? {
                     merged += 1;

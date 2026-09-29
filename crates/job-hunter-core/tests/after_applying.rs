@@ -209,3 +209,39 @@ async fn with_nothing_sent_there_is_nothing_to_watch() {
     assert!(inbox::inbox_tick(&ctx).await.unwrap().is_none());
     assert!(inbox::start_inbox_check(ctx.clone()).await.is_err());
 }
+
+#[test]
+fn a_failed_gmail_check_is_retried_soon_once_then_waits_for_the_regular_time() {
+    let every = chrono::Duration::hours(3);
+    let t0 = job_hunter_core::util::now();
+    let check = |minutes_ago: i64, state: AgentState| {
+        let mut r = AgentRun::new(LOCAL_USER_ID, RunKind::InboxCheck, true);
+        r.started_at = t0 - chrono::Duration::minutes(minutes_ago);
+        r.state = state;
+        r
+    };
+    assert_eq!(
+        inbox::next_check_due(&[], every),
+        None,
+        "never checked: due now"
+    );
+    let ok = [check(10, AgentState::Completed)];
+    assert_eq!(
+        inbox::next_check_due(&ok, every),
+        Some(ok[0].started_at + every)
+    );
+    let failed_once = [
+        check(10, AgentState::Failed),
+        check(200, AgentState::Completed),
+    ];
+    assert_eq!(
+        inbox::next_check_due(&failed_once, every),
+        Some(failed_once[0].started_at + inbox::RETRY_AFTER_FAILURE)
+    );
+    let failed_twice = [check(10, AgentState::Failed), check(30, AgentState::Failed)];
+    assert_eq!(
+        inbox::next_check_due(&failed_twice, every),
+        Some(failed_twice[0].started_at + every),
+        "Chrome may be closed for hours: back to the regular interval"
+    );
+}

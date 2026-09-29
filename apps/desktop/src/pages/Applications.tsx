@@ -5,8 +5,8 @@ import type { ApplicationStatus } from "@job-hunter/types";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { Mail } from "lucide-react";
 import { useMemo, useState } from "react";
-import { ErrorBanner, PageHeader } from "../components/common";
-import { useAgentStatus, useApplications, useCheckInbox, useSettings } from "../lib/queries";
+import { ErrorBanner, InfoBanner, PageHeader } from "../components/common";
+import { useAgentStatus, useApplications, useCheckInbox, useRuns, useSettings } from "../lib/queries";
 
 type Bucket = "PENDING" | "ALL" | "APPLIED" | "REJECTED";
 const BUCKETS: { key: Bucket; label: string; statuses?: ApplicationStatus[] }[] = [
@@ -31,6 +31,8 @@ export function ApplicationsPage() {
   const settings = useSettings();
   const busy = agent.data ? isAgentRunning(agent.data.state) : false;
   const hours = settings.data?.inboxCheckHours ?? 0;
+  const runs = useRuns(40);
+  const lastCheck = runs.data?.find((r) => r.kind === "INBOX_CHECK");
 
   return (
     <Box>
@@ -51,6 +53,24 @@ export function ApplicationsPage() {
         }
       />
       <ErrorBanner error={apps.error ?? checkInbox.error} onRetry={() => apps.refetch()} />
+      {lastCheck?.state === "FAILED" && agent.data?.state !== "CHECKING_INBOX" ? (
+        <InfoBanner status="warning" title={`Gmail check failed ${timeAgo(lastCheck.startedAt)}`}>
+          <HStack justify="space-between" gap={3} wrap="wrap">
+            <Text fontSize="sm">
+              {lastCheck.error ?? "Claude couldn't read Gmail."} Make sure Chrome is open with the Claude extension connected and Gmail signed in.
+              {hours ? " It retries by itself in 15 minutes." : ""}
+            </Text>
+            <Button size="xs" colorPalette="brand" onClick={() => checkInbox.mutate()} loading={checkInbox.isPending} disabled={busy}>
+              <Mail size={12} /> Retry now
+            </Button>
+          </HStack>
+        </InfoBanner>
+      ) : lastCheck?.finishedAt ? (
+        <Text fontSize="xs" color="fg.muted" mb={3}>
+          Gmail last checked for replies {timeAgo(lastCheck.finishedAt)}
+          {hours ? `; next check within ${hours} hours` : " (automatic checks are off in Settings)"}.
+        </Text>
+      ) : null}
       <Tabs.Root value={bucket} onValueChange={(e) => setBucket(e.value as Bucket)} variant="subtle" size="sm" mb={4}>
         <Tabs.List>
           {BUCKETS.map((b) => (

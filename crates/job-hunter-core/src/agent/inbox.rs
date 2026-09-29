@@ -92,6 +92,9 @@ pub async fn start_inbox_check(app: Arc<AppContext>) -> CoreResult<AgentRun> {
             "No sent applications to look for replies to yet.".into(),
         ));
     }
+    let previous_failed = recent_checks(&app)?
+        .first()
+        .is_some_and(|r| r.state == AgentState::Failed);
     let mut run = AgentRun::new(&app.user_id(), RunKind::InboxCheck, app.is_mock().await);
     run.job_ids = tracked.iter().map(|(_, j)| j.id.clone()).collect();
     let cancel = app.agent.begin(&run).await?;
@@ -115,7 +118,8 @@ pub async fn start_inbox_check(app: Arc<AppContext>) -> CoreResult<AgentRun> {
             Err(e) => (AgentState::Failed, Some(e.user_message())),
         };
         if let Err(e) = &result {
-            if !matches!(e, CoreError::Cancelled) {
+            // One notice per streak of failures, not one every retry.
+            if !matches!(e, CoreError::Cancelled) && !previous_failed {
                 app2.notify(
                     Notification::new(
                         &app2.user_id(),
@@ -247,8 +251,31 @@ async fn check_inbox(step: &StepCtx, tracked: &[(Application, Job)]) -> CoreResu
     Ok(found)
 }
 
+/// A failed check (Chrome not connected yet, Gmail signed out) is retried
+/// this soon, once, instead of waiting for the next regular check.
+pub const RETRY_AFTER_FAILURE: Duration = Duration::minutes(15);
+
+/// Inbox checks, newest first.
+fn recent_checks(app: &AppContext) -> CoreResult<Vec<AgentRun>> {
+    let mut runs = app
+        .store
+        .find::<AgentRun>(|r| r.kind == RunKind::InboxCheck)?;
+    runs.sort_by_key(|r| std::cmp::Reverse(r.started_at));
+    Ok(runs)
+}
+
+/// When the next check is due: the regular interval after a success; soon
+/// after a first failure; back to the regular interval if the retry failed
+/// too (e.g. Chrome closed for the evening), so it doesn't keep trying.
+pub fn next_check_due(runs: &[AgentRun], every: Duration) -> Option<chrono::DateTime<chrono::Utc>> {
+    let last = runs.first()?;
+    let failed = |r: &AgentRun| r.state == AgentState::Failed;
+    let retry = failed(last) && !runs.get(1).is_some_and(failed);
+    Some(last.started_at + if retry { RETRY_AFTER_FAILURE } else { every })
+}
+
 /// Check the inbox when it's due: enabled, something to watch, the agent
-/// idle, and the last check at least `every` ago.
+/// idle, and [`next_check_due`] reached.
 pub async fn inbox_tick(app: &Arc<AppContext>) -> CoreResult<Option<AgentRun>> {
     let hours = app.settings().await.inbox_check_hours;
     if hours == 0 || app.agent.is_busy().await {
@@ -257,13 +284,8 @@ pub async fn inbox_tick(app: &Arc<AppContext>) -> CoreResult<Option<AgentRun>> {
     if tracked_applications(app)?.is_empty() {
         return Ok(None);
     }
-    let last = app
-        .store
-        .find::<AgentRun>(|r| r.kind == RunKind::InboxCheck)?
-        .into_iter()
-        .map(|r| r.started_at)
-        .max();
-    if last.is_some_and(|t| now() - t < Duration::hours(i64::from(hours))) {
+    let runs = recent_checks(app)?;
+    if next_check_due(&runs, Duration::hours(i64::from(hours))).is_some_and(|due| now() < due) {
         return Ok(None);
     }
     start_inbox_check(app.clone()).await.map(Some)
@@ -272,7 +294,10 @@ pub async fn inbox_tick(app: &Arc<AppContext>) -> CoreResult<Option<AgentRun>> {
 /// Checks when an inbox check is due, every few minutes, for the life of
 /// the app. The host spawns this on its runtime.
 pub async fn run_inbox_checks(app: Arc<AppContext>) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5 * 60));
+    // Not the moment the app starts: Chrome and its Claude extension need a
+    // few minutes to connect, and a check before that fails every time.
+    let every = std::time::Duration::from_secs(5 * 60);
+    let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + every, every);
     loop {
         interval.tick().await;
         if let Err(e) = inbox_tick(&app).await {
