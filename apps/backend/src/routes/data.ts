@@ -54,6 +54,25 @@ function pushNotification(state: AppState, userId: string, doc: Record<string, u
     },
   });
   state.hub.routeToMobiles(userId, frame);
+  void sendPush(state, userId, doc);
+}
+
+/** The same notification as a Firebase push, which reaches phones whose
+ * app is closed. Best-effort: a failure never fails the sync request. */
+async function sendPush(state: AppState, userId: string, doc: Record<string, unknown>): Promise<void> {
+  if (!state.push) return;
+  const text = (key: string) => (typeof doc[key] === "string" ? (doc[key] as string) : "");
+  try {
+    const targets = await state.db.listPushTokens(userId);
+    const invalid = await state.push.send(targets, {
+      title: text("title") || "Job Hunter",
+      body: text("body"),
+      data: { id: text("id"), kind: text("kind"), level: text("level"), linkPage: text("linkPage"), linkId: text("linkId"), createdAt: text("createdAt") },
+    });
+    await Promise.all(invalid.map((deviceId) => state.db.setDevicePushToken(userId, deviceId, null)));
+  } catch (e) {
+    console.warn(`push notification failed: ${(e as Error).message}`);
+  }
 }
 
 export function registerDataRoutes(app: FastifyInstance, state: AppState): void {

@@ -121,6 +121,30 @@ Every frame, both directions, is one JSON object:
 | `mark_manual_application_complete` | `{id, note?}` | `{ok:true, data: Application}` |
 | `set_application_status` | `{id, status: "INTERVIEW"\|"OFFER"\|"WITHDRAWN"\|"REJECTED", note?}` | `{ok:true, data: Application}` |
 | `request_file` | `{path, kind:"pdf"}` | `{ok:true, data: {name, base64}}` (desktop refuses anything over 4 MB or outside its data directory with `ok:false`) |
+| `get_agent_status` | `{}` | `{state, paused, runKind, progress}` (no free text) |
+| `start_job_hunt` | `{sources?: string[], discoverOnly?: bool}` | `{runId}`; `sources: ["LinkedIn Posts"]` = find hiring posts |
+| `stop_job_hunt` | `{}` | `{stopped}` |
+| `check_inbox` | `{}` | `{runId}` (Gmail replies check) |
+| `list_jobs` | `{}` | `JobListItem[]` (strings capped at 1,500 characters) |
+| `get_job` | `{id}` | `JobDetail` |
+| `generate_resume` | `{jobId}` | `{runId}` (prepare an application for review) |
+| `reject_job` | `{id}` | `Job` |
+| `list_platform_profiles` | `{}` | `PlatformProfileView[]` |
+| `sync_platform_profile` | `{platform, resume?}` | `{runId}` |
+| `answer_platform_questions` | `{platform, answers: [{question, answer}]}` | `{runId}` |
+| `list_answers` | `{}` | `AnswerRecord[]` |
+| `save_answer` | `{id?, question, answer}` | `AnswerRecord` |
+
+The web app sends the same requests over HTTP: `POST /v1/desktop/request`
+with `{type, payload}` and its access token. The server relays it to the
+desktop over the desktop's socket and returns `200 {data}`, or
+`{error: {code, message}}` with 503 (`DESKTOP_OFFLINE`), 504
+(`DESKTOP_TIMEOUT`), 409 (`AGENT_BUSY`, `INVALID_TRANSITION`), 404 or 400.
+Either way every action runs in the desktop's own approval-gated code.
+
+Phones register for Firebase push with `PUT /v1/devices/me/push-token`
+`{token}` (or `{token: null}` on sign-out), authorized with their own device
+token.
 
 Every error reply is `{"ok":false,"error":{"code":"...","message":"..."}}`
 using the same `UserFacingError` shape and codes the Tauri commands already

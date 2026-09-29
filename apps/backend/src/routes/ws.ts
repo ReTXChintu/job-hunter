@@ -68,7 +68,7 @@ function handleSocket(state: AppState, socket: WebSocket, userId: string, device
       if (!state.hub.routeToDesktop(userId, text)) {
         socket.send(offlineResponseFrame(text));
       }
-    } else {
+    } else if (!state.hub.takeDesktopReply(text)) {
       state.hub.routeToMobiles(userId, text);
     }
   });

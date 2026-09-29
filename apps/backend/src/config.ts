@@ -29,6 +29,9 @@ export interface BackendConfig {
   webDir: string;
   /** Directory holding downloadable app builds (the Android APK). */
   downloadsDir: string;
+  /** Firebase service account (JSON, base64 JSON or a file path) for push
+   * notifications to phones. Unset: no push, phones poll instead. */
+  fcmServiceAccount?: string;
 }
 
 function envInt(key: string, fallback: number): number {
@@ -68,5 +71,6 @@ export function loadConfig(): BackendConfig {
     // Relative paths are relative to the repository root, like the .env itself.
     webDir: path.resolve(REPO_ROOT, process.env.JOB_HUNTER_BACKEND_WEB_DIR || "apps/web/dist"),
     downloadsDir: path.resolve(REPO_ROOT, process.env.JOB_HUNTER_BACKEND_DOWNLOADS_DIR || "apps/backend/downloads"),
+    fcmServiceAccount: process.env.JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT || undefined,
   };
 }

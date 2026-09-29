@@ -96,6 +96,7 @@ secret.
 | `TAURI_SIGNING_PRIVATE_KEY` | Recommended | Signs Windows builds so the desktop app can install updates itself (see below). |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | With that key | Its password (leave empty if it has none). |
 | `TAURI_UPDATER_PUBKEY` | With that key | The matching public key, built into the app to verify updates. |
+| `GOOGLE_SERVICES_JSON` | For phone push | The Firebase `google-services.json`, base64-encoded (see "Phone notifications" below). |
 
 ### The Android signing key
 
@@ -132,6 +133,30 @@ safe: installed apps only accept updates signed with it.
 Without it, the desktop app still notices new versions, but offers
 **Download** (run the installer yourself) instead of **Install & restart**.
 
+### Phone notifications (Firebase)
+
+Without Firebase the phone checks the server for new notifications about
+every 15 minutes, which Android delays or skips when the app is closed. With
+it, the server pushes each notification the moment the desktop raises it. It
+is free. One-time setup:
+
+1. Go to <https://console.firebase.google.com>, **Add project** (any name,
+   e.g. "Job Hunter"; Google Analytics not needed).
+2. In the project, **Add app → Android**, package name
+   `io.jobhunter.job_hunter_mobile`, then **Download google-services.json**.
+   Add it as the `GOOGLE_SERVICES_JSON` GitHub secret, base64-encoded:
+   `base64 -w0 google-services.json` (PowerShell:
+   `[Convert]::ToBase64String([IO.File]::ReadAllBytes("google-services.json"))`).
+   The next Android build includes Firebase.
+3. **Project settings → Service accounts → Generate new private key**. Put
+   that JSON file on the server (e.g. `~/job-hunter/firebase-service-account.json`,
+   outside git) and point the server's `.env` at it:
+   `JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT=firebase-service-account.json`,
+   then `pnpm server:restart`. Keep this key private: it can send pushes to
+   your app.
+4. Install the new APK and allow notifications. The app registers itself for
+   push when it signs in.
+
 ## 3. Releasing a version
 
 Releases are cut from the repo root with [release-it](https://github.com/release-it/release-it):
@@ -153,6 +178,10 @@ A release, which must run on a clean `main`:
 3. The tag starts the build below. CI refuses a tag that doesn't match the
    versions in the code, so always release with `pnpm release` rather
    than tagging by hand.
+4. With the `DEPLOY_*` secrets set, CI then updates the server itself: it
+   runs `pnpm server:update` there over SSH (pull, install, build, restart),
+   so the server always matches the apps it just released. The server's
+   clone must be able to `git pull` without prompting.
 
 ## 4. Building the apps
 

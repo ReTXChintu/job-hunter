@@ -28,8 +28,63 @@ export interface RegisterOutcome {
   desktopOnline: boolean;
 }
 
+/** The desktop's answer to a request, as in a `response` frame's payload. */
+export interface DesktopReply {
+  ok: boolean;
+  data?: unknown;
+  error?: { code: string; message: string };
+}
+
+interface PendingRequest {
+  resolve: (reply: DesktopReply) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export class Hub {
   private readonly users = new Map<string, UserChannels>();
+  /** Requests the server itself sent to a desktop (for the web app), by id. */
+  private readonly pending = new Map<string, PendingRequest>();
+
+  /**
+   * Sends a request to the account's desktop on behalf of an HTTP caller
+   * (the web app) and resolves with its reply, exactly like a phone's
+   * request over the WebSocket. The desktop runs it through the same
+   * approval-gated code as its own UI.
+   */
+  request(userId: string, type: string, payload: unknown, timeoutMs = 30_000): Promise<DesktopReply> {
+    const id = `srv-${crypto.randomUUID()}`;
+    const frame = JSON.stringify({ v: 1, id, type, payload: payload ?? {} });
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        resolve({ ok: false, error: { code: "DESKTOP_TIMEOUT", message: "Your desktop didn't answer in time. Try again." } });
+      }, timeoutMs);
+      this.pending.set(id, { resolve, timer });
+      if (!this.routeToDesktop(userId, frame)) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        resolve({ ok: false, error: { code: "DESKTOP_OFFLINE", message: "Your desktop is not online right now. Open Job Hunter on your computer." } });
+      }
+    });
+  }
+
+  /** A frame from a desktop: if it answers one of the server's own requests,
+   * resolve that and return true (it isn't meant for the phones). */
+  takeDesktopReply(text: string): boolean {
+    let frame: { id?: unknown; type?: unknown; payload?: unknown };
+    try {
+      frame = JSON.parse(text) as typeof frame;
+    } catch {
+      return false;
+    }
+    if (frame.type !== "response" || typeof frame.id !== "string") return false;
+    const pending = this.pending.get(frame.id);
+    if (!pending) return false;
+    this.pending.delete(frame.id);
+    clearTimeout(pending.timer);
+    pending.resolve((frame.payload ?? { ok: false }) as DesktopReply);
+    return true;
+  }
 
   private channelsFor(userId: string): UserChannels {
     let c = this.users.get(userId);

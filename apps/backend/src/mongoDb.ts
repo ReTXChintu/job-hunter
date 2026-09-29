@@ -28,6 +28,7 @@ interface DeviceDoc {
   tokenHash: string;
   createdAt: string;
   lastSeenAt: string | null;
+  pushToken?: string | null;
 }
 
 interface PairingCodeDoc {
@@ -187,6 +188,16 @@ export class MongoDb implements Db {
 
   async touchDeviceLastSeen(deviceId: string, now: Date): Promise<void> {
     await this.devices().updateOne({ _id: deviceId }, { $set: { lastSeenAt: now.toISOString() } });
+  }
+
+  async setDevicePushToken(userId: string, deviceId: string, token: string | null): Promise<boolean> {
+    const result = await this.devices().updateOne({ _id: deviceId, userId }, { $set: { pushToken: token } });
+    return result.matchedCount > 0;
+  }
+
+  async listPushTokens(userId: string): Promise<{ deviceId: string; token: string }[]> {
+    const docs = await this.devices().find({ userId, pushToken: { $type: "string" } }).toArray();
+    return docs.filter((d) => !!d.pushToken).map((d) => ({ deviceId: d._id, token: d.pushToken as string }));
   }
 
   async createPairingCode(code: string, userId: string, now: Date, expiresAt: Date): Promise<void> {

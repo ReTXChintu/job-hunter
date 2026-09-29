@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { BackendError, Errors } from "./errors.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDataRoutes } from "./routes/data.js";
+import { registerDesktopRoutes } from "./routes/desktop.js";
 import { registerDeviceRoutes } from "./routes/devices.js";
 import { registerPairingRoutes } from "./routes/pairing.js";
 import { registerStaticRoutes } from "./routes/static.js";
@@ -50,6 +51,7 @@ export async function buildApp(state: AppState, options: BuildAppOptions = {}): 
   registerDeviceRoutes(app, state);
   registerPairingRoutes(app, state);
   registerDataRoutes(app, state);
+  registerDesktopRoutes(app, state);
   registerWsRoute(app, state);
   await registerStaticRoutes(app, state, { serveWeb: options.serveWeb ?? true });
 

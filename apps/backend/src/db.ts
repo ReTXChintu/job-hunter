@@ -33,6 +33,12 @@ export interface Db {
   listDevices(userId: string): Promise<DeviceRecord[]>;
   deleteDevice(userId: string, deviceId: string): Promise<boolean>;
   touchDeviceLastSeen(deviceId: string, now: Date): Promise<void>;
+  /** The Firebase Cloud Messaging token a phone registered (null clears it).
+   * Returns false when the device isn't the account's. Never part of
+   * `DeviceRecord`, so device listings don't expose it. */
+  setDevicePushToken(userId: string, deviceId: string, token: string | null): Promise<boolean>;
+  /** Every push token registered for the account's devices. */
+  listPushTokens(userId: string): Promise<{ deviceId: string; token: string }[]>;
 
   // Pairing codes (single-use, short TTL)
   createPairingCode(code: string, userId: string, now: Date, expiresAt: Date): Promise<void>;

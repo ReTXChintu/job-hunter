@@ -9,15 +9,63 @@ use std::sync::Arc;
 use base64::Engine;
 use serde_json::{json, Value};
 
-use crate::agent::orchestrator;
+use crate::agent::{inbox, orchestrator, profile_sync};
 use crate::context::AppContext;
-use crate::domain::{AnswerSource, ApplicationAnswer, ApplicationStatus};
+use crate::domain::{AnswerRecord, AnswerSource, ApplicationAnswer, ApplicationStatus};
 use crate::error::{CoreError, CoreResult};
 
 use super::protocol::{
-    AnswerQuestionsPayload, MarkManualCompletePayload, RejectPayload, RequestFilePayload,
-    SetStatusPayload, WithId,
+    AnswerPayload, AnswerQuestionsPayload, MarkManualCompletePayload, RejectPayload,
+    RequestFilePayload, SetStatusPayload, WithId,
 };
+
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct JobHuntPayload {
+    sources: Vec<String>,
+    discover_only: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JobIdPayload {
+    job_id: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlatformPayload {
+    platform: String,
+    #[serde(default)]
+    resume: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlatformAnswersPayload {
+    platform: String,
+    answers: Vec<AnswerPayload>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveAnswerPayload {
+    #[serde(default)]
+    id: String,
+    question: String,
+    answer: String,
+}
+
+fn user_answers(answers: Vec<AnswerPayload>) -> Vec<ApplicationAnswer> {
+    answers
+        .into_iter()
+        .map(|a| ApplicationAnswer {
+            question: a.question,
+            answer: a.answer,
+            source: AnswerSource::User,
+        })
+        .collect()
+}
 
 /// Defensive cap on any single string field sent to the phone (a job
 /// description, a note, ...): the mobile app is a review surface, not a
@@ -99,10 +147,100 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
             let p: RequestFilePayload = parse(payload)?;
             request_file(app, &p.path).await
         }
+        // ---- the agent ---------------------------------------------------
+        "get_agent_status" => {
+            let s = app.agent.status().await;
+            Ok(json!({
+                "state": s.state, "paused": s.paused, "runKind": s.run_kind, "progress": s.progress,
+            }))
+        }
+        "start_job_hunt" => {
+            let p: JobHuntPayload = parse_or_default(payload)?;
+            let run = orchestrator::start_job_hunt(
+                app.clone(),
+                orchestrator::JobHuntOptions {
+                    discover_only: p.discover_only,
+                    sources: p.sources,
+                },
+            )
+            .await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        "stop_job_hunt" => Ok(json!({ "stopped": app.agent.request_stop().await })),
+        "check_inbox" => {
+            let run = inbox::start_inbox_check(app.clone()).await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        // ---- jobs ----------------------------------------------------------
+        "list_jobs" => {
+            let mut v = serde_json::to_value(app.list_jobs()?)?;
+            // A list, not a reader: the full text comes with `get_job`.
+            cap_strings(&mut v, 1_500);
+            Ok(v)
+        }
+        "get_job" => {
+            let WithId { id } = parse(payload)?;
+            let mut v = serde_json::to_value(app.job_detail(&id)?)?;
+            cap_strings(&mut v, MAX_STRING_LEN);
+            Ok(v)
+        }
+        "generate_resume" => {
+            let p: JobIdPayload = parse(payload)?;
+            let run = orchestrator::generate_resume(app.clone(), p.job_id).await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        "reject_job" => {
+            let WithId { id } = parse(payload)?;
+            Ok(serde_json::to_value(app.reject_job(&id)?)?)
+        }
+        // ---- job-site profiles -------------------------------------------
+        "list_platform_profiles" => Ok(serde_json::to_value(
+            profile_sync::platform_profiles(app).await?,
+        )?),
+        "sync_platform_profile" => {
+            let p: PlatformPayload = parse(payload)?;
+            let run = profile_sync::start_profile_sync(app.clone(), &p.platform, vec![], p.resume)
+                .await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        "answer_platform_questions" => {
+            let p: PlatformAnswersPayload = parse(payload)?;
+            let run = profile_sync::answer_platform_questions(
+                app.clone(),
+                &p.platform,
+                user_answers(p.answers),
+            )
+            .await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        // ---- saved answers (Candidate > Additional details) --------------
+        "list_answers" => Ok(serde_json::to_value(app.list_answers()?)?),
+        "save_answer" => {
+            let p: SaveAnswerPayload = parse(payload)?;
+            let mut record = match app
+                .list_answers()?
+                .into_iter()
+                .find(|a| !p.id.is_empty() && a.id == p.id)
+            {
+                Some(existing) => existing,
+                None => AnswerRecord::new(&app.user_id(), &p.question, &p.answer, "profile"),
+            };
+            record.question = p.question;
+            record.answer = p.answer;
+            Ok(serde_json::to_value(app.save_answer(record)?)?)
+        }
         other => Err(CoreError::Validation(format!(
             "unknown request type '{other}'"
         ))),
     }
+}
+
+/// Like [`parse`], but an empty or missing payload means "defaults".
+fn parse_or_default<T: serde::de::DeserializeOwned + Default>(payload: Value) -> CoreResult<T> {
+    if payload.is_null() || payload.as_object().is_some_and(|o| o.is_empty()) {
+        return Ok(T::default());
+    }
+    parse(payload)
 }
 
 fn parse<T: serde::de::DeserializeOwned>(payload: Value) -> CoreResult<T> {
@@ -269,5 +407,62 @@ mod tests {
         .unwrap();
         assert_eq!(ok["name"], "probe.txt");
         assert!(!ok["base64"].as_str().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_phone_and_web_can_answer_and_trigger_things_through_the_desktop() {
+        let app = ctx().await;
+        // Saved answers: create, then edit the same record.
+        let saved = dispatch(
+            &app,
+            "save_answer",
+            json!({"question": "What is your current annual CTC?", "answer": "12 LPA"}),
+        )
+        .await
+        .unwrap();
+        let id = saved["id"].as_str().unwrap().to_string();
+        dispatch(
+            &app,
+            "save_answer",
+            json!({"id": id, "question": "What is your current annual CTC?", "answer": "13 LPA"}),
+        )
+        .await
+        .unwrap();
+        let list = dispatch(&app, "list_answers", json!({})).await.unwrap();
+        assert_eq!(list.as_array().unwrap().len(), 1);
+        assert_eq!(list[0]["answer"], "13 LPA");
+
+        let status = dispatch(&app, "get_agent_status", json!({})).await.unwrap();
+        assert!(status.get("state").is_some());
+        assert!(
+            status.get("currentActivity").is_none(),
+            "no free text to the phone"
+        );
+        assert!(dispatch(&app, "list_jobs", json!({}))
+            .await
+            .unwrap()
+            .is_array());
+        assert_eq!(
+            dispatch(&app, "list_platform_profiles", json!({}))
+                .await
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .len(),
+            crate::domain::PROFILE_PLATFORMS.len()
+        );
+
+        // Starting a hunt goes through the orchestrator (the mock profile is
+        // incomplete, so the run itself fails its preflight, as on desktop).
+        let started = dispatch(
+            &app,
+            "start_job_hunt",
+            json!({"sources": ["LinkedIn Posts"]}),
+        )
+        .await
+        .unwrap();
+        assert!(started["runId"].is_string());
+        // The Gmail check refuses when nothing was sent yet, like the desktop button.
+        assert!(dispatch(&app, "check_inbox", json!({})).await.is_err());
     }
 }

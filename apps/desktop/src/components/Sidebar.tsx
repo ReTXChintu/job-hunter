@@ -1,7 +1,8 @@
-import { Box, Flex, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Box, Flex, HStack, IconButton, Image, Text, VStack } from "@chakra-ui/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useTheme } from "next-themes";
-import { Bot, Briefcase, FileText, Globe, LayoutDashboard, Moon, Send, Settings, Sun, UserRound, Crosshair } from "lucide-react";
+import { Bot, Briefcase, FileText, Globe, LayoutDashboard, Moon, Send, Settings, Sun, UserRound } from "lucide-react";
+import logo from "../assets/logo.png";
 import type { ReactNode } from "react";
 import { useAboutInfo, useDashboard, useUpdateCheck } from "../lib/queries";
 import { NotificationBell } from "./NotificationBell";
@@ -31,9 +32,7 @@ export function Sidebar() {
   return (
     <Flex direction="column" w="232px" flexShrink={0} bg="bg.sidebar" borderRightWidth="1px" borderColor="border.muted" px={3} py={4}>
       <HStack px={3} pb={5} gap={2.5}>
-        <Flex w={8} h={8} align="center" justify="center" borderRadius="md" bg="brand.solid" color="brand.contrast">
-          <Crosshair size={18} />
-        </Flex>
+        <Image src={logo} alt="" w={8} h={8} borderRadius="md" flexShrink={0} />
         <Box>
           <Text fontWeight="bold" lineHeight="1.1">
             Job Hunter

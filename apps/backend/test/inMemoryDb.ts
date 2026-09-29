@@ -29,6 +29,7 @@ export class InMemoryDb implements Db {
   private usersByEmail = new Map<string, string>();
   private devices = new Map<string, DeviceRecord>();
   private devicesByTokenHash = new Map<string, string>();
+  private pushTokens = new Map<string, string>();
   private pairingCodes = new Map<string, StoredPairingCode>();
   private refreshTokens = new Map<string, StoredRefreshToken>();
   private domainDocs = new Map<string, Map<string, JsonDoc>>();
@@ -83,6 +84,20 @@ export class InMemoryDb implements Db {
   async touchDeviceLastSeen(deviceId: string, now: Date): Promise<void> {
     const d = this.devices.get(deviceId);
     if (d) d.lastSeenAt = now.toISOString();
+  }
+
+  async setDevicePushToken(userId: string, deviceId: string, token: string | null): Promise<boolean> {
+    const d = this.devices.get(deviceId);
+    if (!d || d.userId !== userId) return false;
+    if (token) this.pushTokens.set(deviceId, token);
+    else this.pushTokens.delete(deviceId);
+    return true;
+  }
+
+  async listPushTokens(userId: string): Promise<{ deviceId: string; token: string }[]> {
+    return [...this.pushTokens.entries()]
+      .filter(([deviceId]) => this.devices.get(deviceId)?.userId === userId)
+      .map(([deviceId, token]) => ({ deviceId, token }));
   }
 
   async createPairingCode(code: string, userId: string, now: Date, expiresAt: Date): Promise<void> {
