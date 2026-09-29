@@ -40,3 +40,10 @@ apps/backend/downloads/
 
 # PM2 runtime files
 .pm2/
+
+# Firebase credentials and their encodings: secrets, never committed.
+# (The server reads the service account from JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT,
+# CI gets google-services.json from the GOOGLE_SERVICES_JSON secret.)
+*firebase-adminsdk*.json
+/google-services.json
+*.b64

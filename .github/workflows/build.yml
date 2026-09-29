@@ -238,9 +238,11 @@ jobs:
           chmod 600 "$key"
           port="${DEPLOY_PORT:-22}"
           repo="${DEPLOY_PATH:-job-hunter}"
-          # A login shell, so node/pnpm/pm2 installed via nvm or similar are on PATH.
+          # Pull first (git is always on PATH), so the checkout has this release's
+          # scripts/server-update.sh, which finds node/pnpm/pm2 even when they
+          # are installed per user (nvm, fnm, Volta, pnpm's installer).
           ssh -i "$key" -o StrictHostKeyChecking=accept-new -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "bash -lc 'cd \"$repo\" && pnpm server:update && pnpm server:status'"
+            "cd \"$repo\" && git pull --ff-only && bash scripts/server-update.sh"
           rm -f "$key"
 
   release:
