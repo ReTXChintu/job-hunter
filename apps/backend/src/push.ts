@@ -6,6 +6,9 @@
  */
 import { createSign } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+
+import { REPO_ROOT } from "./paths.js";
 
 export interface ServiceAccount {
   project_id: string;
@@ -33,24 +36,39 @@ export interface PushSender {
 
 type Fetch = typeof fetch;
 
-/** The service account from JSON text, base64 of it, or a file path. */
-export function parseServiceAccount(raw: string | undefined): ServiceAccount | null {
-  const value = raw?.trim();
+const looksLikePath = (value: string) => /\.json$/i.test(value) || /[\\/]/.test(value);
+
+/**
+ * The service account from JSON text, base64 of it, or a path to the JSON
+ * file. A relative path is relative to the repository root, like the rest
+ * of the .env (PM2 runs the server from apps/backend, so the working
+ * directory is not the place to look).
+ */
+export function parseServiceAccount(raw: string | undefined, baseDir: string = REPO_ROOT): ServiceAccount | null {
+  const value = raw?.trim().replace(/^["']|["']$/g, "");
   if (!value) return null;
-  const candidates = [value];
-  if (!value.startsWith("{")) {
-    if (existsSync(value)) candidates.unshift(readFileSync(value, "utf8"));
-    else candidates.push(Buffer.from(value, "base64").toString("utf8"));
-  }
-  for (const text of candidates) {
-    try {
-      const parsed = JSON.parse(text) as Partial<ServiceAccount>;
-      if (parsed.project_id && parsed.client_email && parsed.private_key) return parsed as ServiceAccount;
-    } catch {
-      // try the next form
+  let text: string;
+  if (value.startsWith("{")) {
+    text = value;
+  } else if (looksLikePath(value)) {
+    const file = path.resolve(baseDir, value);
+    if (!existsSync(file)) {
+      throw new Error(`JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT points to ${file}, which doesn't exist (relative paths are relative to the repository root).`);
     }
+    text = readFileSync(file, "utf8");
+  } else {
+    text = Buffer.from(value, "base64").toString("utf8");
   }
-  throw new Error("JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT is set but isn't a Firebase service account (JSON, base64 JSON, or a path to the JSON file).");
+  let parsed: Partial<ServiceAccount>;
+  try {
+    parsed = JSON.parse(text) as Partial<ServiceAccount>;
+  } catch {
+    throw new Error("JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT isn't valid JSON (give the JSON, base64 of it, or a path to the file).");
+  }
+  if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
+    throw new Error("JOB_HUNTER_BACKEND_FCM_SERVICE_ACCOUNT is JSON but not a Firebase service account (needs project_id, client_email and private_key).");
+  }
+  return parsed as ServiceAccount;
 }
 
 const base64url = (input: Buffer | string) => Buffer.from(input).toString("base64url");
@@ -124,7 +142,17 @@ export class FcmSender implements PushSender {
   }
 }
 
+/** The push sender, or null when push isn't configured -- or is configured
+ * wrongly: push is optional, so a bad setting is logged and the server runs
+ * without it rather than failing to start. */
 export function createPushSender(raw: string | undefined, fetchImpl?: Fetch): PushSender | null {
-  const account = parseServiceAccount(raw);
-  return account ? new FcmSender(account, fetchImpl) : null;
+  try {
+    const account = parseServiceAccount(raw);
+    if (!account) return null;
+    console.log(`Push notifications on (Firebase project ${account.project_id}).`);
+    return new FcmSender(account, fetchImpl);
+  } catch (e) {
+    console.error(`Push notifications off: ${(e as Error).message}`);
+    return null;
+  }
 }

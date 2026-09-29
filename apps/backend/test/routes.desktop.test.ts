@@ -1,9 +1,12 @@
 import { generateKeyPairSync } from "node:crypto";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { FastifyInstance } from "fastify";
-import { FcmSender, parseServiceAccount, type PushMessage, type PushSender, type PushTarget } from "../src/push.js";
+import { createPushSender, FcmSender, parseServiceAccount, type PushMessage, type PushSender, type PushTarget } from "../src/push.js";
 import type { AppState } from "../src/state.js";
 import { buildTestApp } from "./testApp.js";
 
@@ -154,6 +157,27 @@ describe("push notifications to phones", () => {
 describe("Firebase sender", () => {
   const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
   const sa = { project_id: "job-hunter-test", client_email: "push@job-hunter-test.iam.gserviceaccount.com", private_key: privateKey };
+
+  it("reads a key file relative to the repository root, whatever the working directory", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "jh-root-"));
+    writeFileSync(path.join(root, "service-account.json"), JSON.stringify(sa));
+    const cwd = process.cwd();
+    process.chdir(tmpdir()); // like PM2 running the server from apps/backend
+    try {
+      // Exactly the user's .env value, quotes included.
+      expect(parseServiceAccount('"./service-account.json"', root)?.project_id).toBe("job-hunter-test");
+      expect(parseServiceAccount("service-account.json", root)?.project_id).toBe("job-hunter-test");
+      expect(() => parseServiceAccount("./missing.json", root)).toThrow(/doesn't exist/);
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+
+  it("a bad push setting turns push off instead of stopping the server", () => {
+    expect(createPushSender("./missing.json")).toBeNull();
+    expect(createPushSender("{not json")).toBeNull();
+    expect(createPushSender(JSON.stringify(sa))).not.toBeNull();
+  });
 
   it("reads the service account as JSON or base64", () => {
     expect(parseServiceAccount(JSON.stringify(sa))?.project_id).toBe("job-hunter-test");
