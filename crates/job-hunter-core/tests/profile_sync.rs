@@ -430,3 +430,21 @@ async fn a_site_asking_for_details_notifies_and_answering_resumes_the_session() 
     assert!(resumed, "answers continue the stopped session");
     assert_eq!(platform(&ctx, "naukri").status, PlatformSyncStatus::Synced);
 }
+
+#[test]
+fn linkedin_updates_never_notify_the_network() {
+    let prompt = job_hunter_core::prompts::profile_sync_prompt(
+        &job_hunter_core::prompts::ProfileSyncParams {
+            platform: "LinkedIn",
+            profile: &serde_json::json!({}),
+            remove_projects: &[],
+            known_answers: &[],
+            previously_answered: &[],
+            resume_path: None,
+            resuming: false,
+        },
+    );
+    assert!(prompt.contains("https://www.linkedin.com/mypreferences/d/share-profile-updates"));
+    assert!(prompt.contains("off before every Save"));
+    assert!(prompt.contains("Never save with it on"));
+}

@@ -22,6 +22,9 @@ pub const PROFILE_PLATFORMS: &[&str] = &[
     "Instahyre",
     "Hirist",
     "Foundit",
+    "Welcome to the Jungle",
+    "Himalayas",
+    "Y Combinator",
 ];
 
 /// The canonical platform name for a loosely written one ("linkedin" → "LinkedIn").

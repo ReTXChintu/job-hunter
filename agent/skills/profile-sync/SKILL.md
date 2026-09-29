@@ -17,7 +17,7 @@ Do not attempt to defeat anti-bot protections.
 
 ## Inputs
 
-- `platform`: LinkedIn, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist or Foundit.
+- `platform`: LinkedIn, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Welcome to the Jungle, Himalayas or Y Combinator.
 - `profile`: the facts: personal details, `headline` (current title),
   `summary`, `skills`, `experiences`, `projects` (only the ones the candidate
   chose to feature), `education`, `certifications`, `languages`,
@@ -87,13 +87,24 @@ your job; adding facts is not.
    - Instahyre: `https://www.instahyre.com/candidate/profile/` (or the account menu → Profile)
    - Hirist: `https://www.hirist.tech/` → the account menu → My Profile
    - Foundit: `https://www.foundit.in/` → the account menu → My Profile
-2. If the site shows a login page, CAPTCHA, OTP/verification, or "unusual
+   - Welcome to the Jungle: `https://www.welcometothejungle.com/en/me/profile`
+   - Himalayas: `https://himalayas.app/` → the account menu → Profile
+   - Y Combinator: `https://www.workatastartup.com/application` (the Work at a Startup candidate profile)
+2. **LinkedIn only, before any edit: no broadcasts.** Open
+   `https://www.linkedin.com/mypreferences/d/share-profile-updates`
+   ("Share profile updates with your network") and make sure it is **Off**;
+   switch it off if it's on. This is the one setting you may change. Then,
+   in every edit dialog, find the "Notify network" / "Share with network" /
+   "Share this update" toggle and make sure it's **off before every Save**.
+   Never save with it on; if you can't find it, check the settings page
+   again. Report "Kept LinkedIn network notifications off" in `changes`.
+3. If the site shows a login page, CAPTCHA, OTP/verification, or "unusual
    activity": stop and return `MANUAL_ACTION_REQUIRED` with the reason. Don't
    try to sign in.
-3. Read the whole profile first. Plan the edits, then go section by section.
+4. Read the whole profile first. Plan the edits, then go section by section.
    Edit only what differs from what you would write. Save each section with
    the site's own Save button and check it saved before moving on.
-4. Keep moving. When a field needs a fact that is in neither `profile`,
+5. Keep moving. When a field needs a fact that is in neither `profile`,
    `knownAnswers` nor `previouslyAnswered` (and can't be derived from them),
    don't guess and don't stop: skip that field, finish everything else, and
    collect it. At the end, if any **required** field is still empty, return
@@ -101,7 +112,7 @@ your job; adding facts is not.
    (question as the site words it, field type, options, whether required),
    all at once. List optional fields you skipped for lack of data in
    `skipped` so the candidate can add them to their profile.
-5. Return `UPDATED` when every section the site has is complete and saved.
+6. Return `UPDATED` when every section the site has is complete and saved.
    List what you changed in `changes` ("Rewrote headline", "Added skill
    Next.js", "Added project Sort-A-Snap"), sections the site has no place
    for, that already matched, or that lack data in `skipped`, the names of
@@ -110,9 +121,9 @@ your job; adding facts is not.
 
 ## Never
 
-- post, share, or publish an update to the feed. On LinkedIn, switch off
-  "Share with network" / "Notify network" before saving when the toggle is
-  shown;
+- post, share, or publish an update to the feed, or save a LinkedIn edit
+  with "Notify network" / "Share with network" on: the candidate's network
+  must never see a notification or post about profile changes;
 - send messages, connection requests, follows, or endorsements;
 - apply to jobs, change job alerts, open-to-work visibility, privacy or
   account settings, email, phone, or password;

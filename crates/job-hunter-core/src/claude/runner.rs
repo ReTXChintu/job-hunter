@@ -58,7 +58,14 @@ impl CliClaudeRunner {
         }
         if req.disable_builtin_tools {
             args.push("--tools".into());
-            args.push(String::new());
+            // Claude in Chrome's file_upload needs the session to be able
+            // to read the file, which it can't with Read switched off. Read
+            // stays limited to the run folder and `add_dirs` (see `run`).
+            args.push(if req.add_dirs.is_empty() {
+                String::new()
+            } else {
+                "Read".into()
+            });
         }
         if !req.allowed_tools.is_empty() {
             args.push("--allowedTools".into());
@@ -101,8 +108,21 @@ impl ClaudeRunner for CliClaudeRunner {
         cancel: CancellationToken,
     ) -> CoreResult<ClaudeResponse> {
         std::fs::create_dir_all(&req.cwd)?;
-        let args = Self::build_args(&req);
+        let mut args = Self::build_args(&req);
         let stem = file_stem(&req.label);
+        if !req.add_dirs.is_empty() {
+            // Claude in Chrome uploads only files the session may *read*
+            // under its permission rules; `--add-dir` alone doesn't grant
+            // that in dontAsk mode. A settings file (not --allowedTools)
+            // because the paths contain spaces.
+            let settings_path = req.cwd.join(format!("{stem}-settings.json"));
+            std::fs::write(
+                &settings_path,
+                serde_json::to_vec_pretty(&upload_settings(&req.add_dirs))?,
+            )?;
+            args.push("--settings".into());
+            args.push(settings_path.to_string_lossy().to_string());
+        }
         let log_path: PathBuf = req.cwd.join(format!(
             "{}-{}.ndjson",
             stem,
@@ -269,6 +289,34 @@ impl ClaudeRunner for CliClaudeRunner {
 /// Shared handle type used throughout the agent.
 pub type SharedRunner = Arc<dyn ClaudeRunner>;
 
+/// A permission rule letting the session read everything under `dir`, in
+/// Claude Code's form for absolute paths: POSIX separators, the Windows
+/// drive as `/c`, and a leading `//` (e.g. `Read(//c/Users/Ada Lovelace/x/**)`).
+pub fn read_rule(dir: &std::path::Path) -> String {
+    let mut s = dir.to_string_lossy().replace('\\', "/");
+    for prefix in ["//?/", "//./"] {
+        if let Some(rest) = s.strip_prefix(prefix) {
+            s = rest.to_string();
+        }
+    }
+    let bytes = s.as_bytes();
+    if bytes.len() >= 2 && bytes[1] == b':' && bytes[0].is_ascii_alphabetic() {
+        s = format!("/{}{}", (bytes[0] as char).to_ascii_lowercase(), &s[2..]);
+    }
+    let s = s.trim_end_matches('/');
+    format!("Read(/{s}/**)")
+}
+
+/// Settings granting read access to exactly these folders (see `run`).
+pub fn upload_settings(dirs: &[PathBuf]) -> serde_json::Value {
+    serde_json::json!({
+        "permissions": {
+            "allow": dirs.iter().map(|d| read_rule(d)).collect::<Vec<_>>(),
+            "additionalDirectories": dirs.iter().map(|d| d.to_string_lossy().to_string()).collect::<Vec<_>>(),
+        }
+    })
+}
+
 /// Labels like `discover:linkedin` are fine in logs but not in file names: on
 /// Windows a `:` makes NTFS write an alternate data stream on a file named
 /// `discover` instead, hiding the transcript.
@@ -323,6 +371,25 @@ mod tests {
     }
 
     #[test]
+    fn read_rules_use_claude_codes_absolute_path_form() {
+        assert_eq!(
+            read_rule(std::path::Path::new(
+                r"C:\Users\Ada Lovelace\AppData\Roaming\JobHunter\resumes\generated\acme\v1"
+            )),
+            "Read(//c/Users/Ada Lovelace/AppData/Roaming/JobHunter/resumes/generated/acme/v1/**)"
+        );
+        assert_eq!(
+            read_rule(std::path::Path::new("/home/ada/resumes/")),
+            "Read(//home/ada/resumes/**)"
+        );
+        let settings = upload_settings(&[PathBuf::from("/home/ada/resumes")]);
+        assert_eq!(
+            settings["permissions"]["allow"][0],
+            "Read(//home/ada/resumes/**)"
+        );
+    }
+
+    #[test]
     fn upload_folders_are_granted_with_add_dir() {
         let mut req = ClaudeRequest::new("apply", "hi".into(), PathBuf::from("."));
         req.add_dirs = vec![PathBuf::from("resumes/generated/acme/v1")];
@@ -332,5 +399,14 @@ mod tests {
             .position(|a| a == "--add-dir")
             .expect("--add-dir passed");
         assert!(args[i + 1].ends_with("v1"));
+        let t = args.iter().position(|a| a == "--tools").unwrap();
+        assert_eq!(args[t + 1], "Read", "uploads need Read available");
+        let plain = CliClaudeRunner::build_args(&ClaudeRequest::new(
+            "analyze",
+            "hi".into(),
+            PathBuf::from("."),
+        ));
+        let t = plain.iter().position(|a| a == "--tools").unwrap();
+        assert_eq!(plain[t + 1], "", "other runs keep every built-in tool off");
     }
 }

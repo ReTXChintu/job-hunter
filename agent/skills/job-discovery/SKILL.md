@@ -4,7 +4,7 @@ Find recent job postings on one job source using Claude in Chrome.
 
 ## Inputs
 
-- `source`: one of LinkedIn, LinkedIn Posts, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Greenhouse, Lever, Workday, or a company careers URL.
+- `source`: one of LinkedIn, LinkedIn Posts, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Hiring Cafe, Welcome to the Jungle, Himalayas, Y Combinator, Greenhouse, Lever, Workday, or a company careers URL.
 - `queries`: search phrases derived from the candidate's target roles.
 - `locations`, `remotePreference`, `recencyDays`, `maxJobs`.
 - Optional `seenUrls`: postings already known; skip them.
@@ -31,6 +31,10 @@ Find recent job postings on one job source using Claude in Chrome.
 - **Instahyre**: open `https://www.instahyre.com/search-jobs/` and search the query; open each opportunity for the description.
 - **Hirist**: open `https://www.hirist.tech/` and search the query with the site's search; open each job for the description.
 - **Foundit**: `https://www.foundit.in/srp/results?query=<query>&locations=<location>`; open each job for the description.
+- **Hiring Cafe**: open `https://hiring.cafe/`, search the query with its search box and filters (location, remote, date posted); each result links to the employer's own posting: open that for the description, and use its URL as `url`.
+- **Welcome to the Jungle**: `https://www.welcometothejungle.com/en/jobs?query=<query>` with the location/remote filters; open each job (`/en/companies/<company>/jobs/<slug>`).
+- **Himalayas** (remote jobs): `https://himalayas.app/jobs?q=<query>`; filter by the candidate's country/time zone where offered; open each job (`/companies/<company>/jobs/<slug>`).
+- **Y Combinator** (Work at a Startup, YC companies): `https://www.workatastartup.com/jobs?query=<query>` (uses the candidate's signed-in account; if it asks to sign in, return `blocked`); open each role for the description.
 - **Greenhouse / Lever / Workday / company pages**: open the given careers URL, use its search, and read each posting page.
 
 ### LinkedIn Posts (hiring posts that ask for resumes by email)

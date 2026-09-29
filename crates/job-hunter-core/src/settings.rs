@@ -147,6 +147,10 @@ pub const KNOWN_SOURCES: &[(&str, bool)] = &[
     ("Instahyre", false),
     ("Hirist", false),
     ("Foundit", false),
+    ("Hiring Cafe", true),
+    ("Welcome to the Jungle", true),
+    ("Himalayas", true),
+    ("Y Combinator", true),
 ];
 
 fn default_sources() -> Vec<JobSourceConfig> {
