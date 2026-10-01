@@ -19,6 +19,7 @@ use crate::context::AppContext;
 use crate::domain::*;
 use crate::error::{CoreError, CoreResult};
 use crate::prompts;
+use crate::settings::ProfileSyncMode;
 use crate::util::{new_id, now, slugify};
 
 /// How long the profile must stay unedited before an automatic update runs,
@@ -668,12 +669,54 @@ pub async fn answer_platform_questions(
 // Automatic updates
 // ---------------------------------------------------------------------------
 
-/// Start an update for the first site that has auto-sync on, was updated
-/// successfully before, and is now behind the desktop profile. Waits until
-/// the agent is idle and the profile has been left alone for `quiet`.
+/// Sites behind the desktop profile that are allowed to update without the
+/// user clicking Update: auto-sync on and updated successfully before.
+fn sites_behind(app: &AppContext, hash: &str) -> CoreResult<Vec<PlatformProfile>> {
+    let mut out = Vec::new();
+    for platform in PROFILE_PLATFORMS {
+        let Some(record) = app.store.get::<PlatformProfile>(&slugify(platform))? else {
+            continue;
+        };
+        if record.auto_sync
+            && record.status == PlatformSyncStatus::Synced
+            && record.synced_hash.as_deref() != Some(hash)
+        {
+            out.push(record);
+        }
+    }
+    Ok(out)
+}
+
+/// The user approved updating every site that's behind ("Update all now"):
+/// they run one after another as soon as the agent is free. Returns how
+/// many were queued.
+pub async fn queue_out_of_date(app: &AppContext) -> CoreResult<usize> {
+    let Some(hash) = current_hash(app).await? else {
+        return Err(CoreError::Validation(
+            "Choose which projects to show on your profiles first.".into(),
+        ));
+    };
+    let mut queued = 0;
+    for mut record in sites_behind(app, &hash)? {
+        if record.queued_at.is_none() {
+            record.queued_at = Some(now());
+            record.updated_at = now();
+            app.store.put(&record)?;
+        }
+        queued += 1;
+    }
+    Ok(queued)
+}
+
+/// Update a site that's behind when that's allowed: right away if the user
+/// queued it, otherwise as `settings.profile_sync` says (overnight by
+/// default; "Ask" only notifies). Never while the agent is busy or the
+/// profile is still being edited (`quiet`). `local_hour` is the computer's
+/// local hour, for the nightly window.
 pub async fn auto_sync_tick(
     app: &Arc<AppContext>,
     quiet: Duration,
+    local_hour: u8,
 ) -> CoreResult<Option<AgentRun>> {
     if app.agent.is_busy().await {
         return Ok(None);
@@ -686,6 +729,15 @@ pub async fn auto_sync_tick(
     if !truth.profile.completeness().ready {
         return Ok(None);
     }
+    let hash = content_hash(&platform_content(&truth, &plan));
+    let behind = sites_behind(app, &hash)?;
+    if behind.is_empty() {
+        return Ok(None);
+    }
+    // Approved by the user: no waiting for the night or for edits to settle.
+    if let Some(record) = behind.iter().find(|r| r.queued_at.is_some()) {
+        return start_queued(app, record).await.map(Some);
+    }
     let last_edit = truth
         .experiences
         .iter()
@@ -697,31 +749,76 @@ pub async fn auto_sync_tick(
     if now() - last_edit < quiet {
         return Ok(None);
     }
-    let hash = content_hash(&platform_content(&truth, &plan));
-    for platform in PROFILE_PLATFORMS {
-        let Some(record) = app.store.get::<PlatformProfile>(&slugify(platform))? else {
-            continue;
-        };
-        if record.auto_sync
-            && record.status == PlatformSyncStatus::Synced
-            && record.synced_hash.as_deref() != Some(hash.as_str())
-        {
-            tracing::info!(platform, "profile changed; updating the job-site profile");
-            return start_profile_sync(app.clone(), platform, vec![], false)
-                .await
-                .map(Some);
+    let settings = app.settings().await.profile_sync;
+    match settings.mode {
+        ProfileSyncMode::Off => Ok(None),
+        ProfileSyncMode::Ask => {
+            announce_behind(app, &behind, &hash)?;
+            Ok(None)
+        }
+        ProfileSyncMode::Nightly if !settings.in_night_window(local_hour) => Ok(None),
+        ProfileSyncMode::Nightly | ProfileSyncMode::Immediate => {
+            let record = &behind[0];
+            tracing::info!(platform = %record.platform, "profile changed; updating the job-site profile");
+            start_queued(app, record).await.map(Some)
         }
     }
-    Ok(None)
+}
+
+async fn start_queued(app: &Arc<AppContext>, record: &PlatformProfile) -> CoreResult<AgentRun> {
+    let mut record = record.clone();
+    record.queued_at = None;
+    record.updated_at = now();
+    app.store.put(&record)?;
+    let platform = canonical_platform(&record.platform).unwrap_or(PROFILE_PLATFORMS[0]);
+    start_profile_sync(app.clone(), platform, vec![], false).await
+}
+
+/// Ask mode: tell the user once per change which sites are behind.
+fn announce_behind(app: &AppContext, behind: &[PlatformProfile], hash: &str) -> CoreResult<()> {
+    if behind
+        .iter()
+        .all(|r| r.announced_hash.as_deref() == Some(hash))
+    {
+        return Ok(());
+    }
+    for record in behind {
+        let mut r = record.clone();
+        r.announced_hash = Some(hash.to_string());
+        r.updated_at = now();
+        app.store.put(&r)?;
+    }
+    let names: Vec<&str> = behind.iter().map(|r| r.platform.as_str()).collect();
+    app.notify(
+        Notification::new(
+            &app.user_id(),
+            EventLevel::Info,
+            "PROFILES_BEHIND",
+            format!(
+                "{} job-site profile{} can be updated",
+                names.len(),
+                if names.len() == 1 { "" } else { "s" }
+            ),
+            format!(
+                "{} {} behind your profile. Update them from Job sites when it suits you.",
+                names.join(", "),
+                if names.len() == 1 { "is" } else { "are" }
+            ),
+        )
+        .link("job-sites", None),
+    );
+    Ok(())
 }
 
 /// Check for sites to update automatically, once a minute, for the life of
 /// the app. The host spawns this on its runtime.
 pub async fn run_auto_sync(app: Arc<AppContext>) {
+    use chrono::Timelike;
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
     loop {
         interval.tick().await;
-        if let Err(e) = auto_sync_tick(&app, AUTO_SYNC_QUIET).await {
+        let hour = chrono::Local::now().hour() as u8;
+        if let Err(e) = auto_sync_tick(&app, AUTO_SYNC_QUIET, hour).await {
             tracing::warn!(error = %e, "automatic profile update check failed");
         }
     }

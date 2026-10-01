@@ -203,6 +203,9 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
                 .await?;
             Ok(json!({ "runId": run.id }))
         }
+        "queue_profile_updates" => Ok(json!({
+            "queued": profile_sync::queue_out_of_date(app).await?
+        })),
         "answer_platform_questions" => {
             let p: PlatformAnswersPayload = parse(payload)?;
             let run = profile_sync::answer_platform_questions(

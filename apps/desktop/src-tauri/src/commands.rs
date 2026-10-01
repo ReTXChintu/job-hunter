@@ -322,6 +322,15 @@ pub async fn answer_platform_questions(
         .map_err(Into::into)
 }
 
+/// "Update all now": queue every site that's behind; they run one after
+/// another as soon as the agent is free. Returns how many.
+#[tauri::command]
+pub async fn queue_profile_updates(ctx: Ctx<'_>) -> R<usize> {
+    profile_sync::queue_out_of_date(&ctx)
+        .await
+        .map_err(Into::into)
+}
+
 #[tauri::command]
 pub async fn set_platform_auto_sync(
     ctx: Ctx<'_>,

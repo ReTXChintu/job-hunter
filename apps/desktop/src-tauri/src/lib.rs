@@ -206,6 +206,7 @@ pub fn run() {
             commands::sync_platform_profile,
             commands::answer_platform_questions,
             commands::set_platform_auto_sync,
+            commands::queue_profile_updates,
             commands::list_notifications,
             commands::check_inbox_now,
             commands::restore_application_files,

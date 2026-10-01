@@ -559,6 +559,16 @@ export interface AppSettings {
   backend: BackendSettings;
   /** Hours between Gmail checks for employers' replies (inbox and spam); 0 = off. */
   inboxCheckHours: number;
+  profileSync: ProfileSyncSettings;
+}
+
+/** When job-site profiles that fell behind update without clicking Update. */
+export type ProfileSyncMode = "NIGHTLY" | "ASK" | "IMMEDIATE" | "OFF";
+
+export interface ProfileSyncSettings {
+  mode: ProfileSyncMode;
+  /** Local hour (0-23); nightly updates start only in the 6 hours after it. */
+  nightlyHour: number;
 }
 
 export interface ClaudeStatus {
@@ -696,6 +706,9 @@ export interface PlatformProfile {
   runId: string | null;
   /** Session of an update that stopped part-way; "Resume" continues it. */
   resumeSessionId: string | null;
+  /** Set by "Update all now": runs as soon as the agent is free. */
+  queuedAt: string | null;
+  announcedHash: string | null;
   createdAt: string;
   updatedAt: string;
 }

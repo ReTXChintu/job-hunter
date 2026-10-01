@@ -133,6 +133,7 @@ export interface Commands {
   sync_platform_profile: { args: { platform: string; resume?: boolean }; result: AgentRun };
   answer_platform_questions: { args: { platform: string; answers: ApplicationAnswer[] }; result: AgentRun };
   set_platform_auto_sync: { args: { platform: string; enabled: boolean }; result: PlatformProfile };
+  queue_profile_updates: { args: Record<string, never>; result: number };
 
   list_notifications: { args: { limit?: number }; result: Notification[] };
   check_inbox_now: { args: Record<string, never>; result: AgentRun };

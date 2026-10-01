@@ -42,6 +42,55 @@ pub struct AppSettings {
     /// hours, while the agent is idle. 0 turns it off.
     #[serde(default = "default_inbox_check_hours")]
     pub inbox_check_hours: u32,
+    /// When job-site profiles that fell behind the desktop profile are
+    /// updated without the user clicking Update.
+    #[serde(default)]
+    pub profile_sync: ProfileSyncSettings,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ProfileSyncMode {
+    /// Overnight, from `nightly_hour`, so it never gets in the way of
+    /// applications during the day.
+    #[default]
+    Nightly,
+    /// Notify, and wait for "Update all now".
+    Ask,
+    /// As soon as the profile changes and the agent is free.
+    Immediate,
+    /// Never automatically.
+    Off,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileSyncSettings {
+    #[serde(default)]
+    pub mode: ProfileSyncMode,
+    /// Local hour (0-23) nightly updates may start; they start only in the
+    /// six hours after it.
+    #[serde(default)]
+    pub nightly_hour: u8,
+}
+
+impl Default for ProfileSyncSettings {
+    fn default() -> Self {
+        Self {
+            mode: ProfileSyncMode::Nightly,
+            nightly_hour: 0,
+        }
+    }
+}
+
+impl ProfileSyncSettings {
+    /// Hours after `nightly_hour` during which nightly updates may start.
+    pub const NIGHT_WINDOW_HOURS: u8 = 6;
+
+    pub fn in_night_window(&self, local_hour: u8) -> bool {
+        let start = self.nightly_hour % 24;
+        (local_hour + 24 - start) % 24 < Self::NIGHT_WINDOW_HOURS
+    }
 }
 
 fn default_inbox_check_hours() -> u32 {
@@ -180,6 +229,7 @@ impl Default for AppSettings {
             remote: RemoteSettings::default(),
             backend: BackendSettings::default(),
             inbox_check_hours: default_inbox_check_hours(),
+            profile_sync: ProfileSyncSettings::default(),
         }
     }
 }

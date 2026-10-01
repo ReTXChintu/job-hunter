@@ -4,6 +4,7 @@ import type { ApplicationAnswer, PlatformProfileView, PlatformSyncStatus } from 
 import { ExternalLink, Play, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
 import { ActivityFeed } from "../components/ActivityFeed";
+import { AutoUpdatePanel } from "../components/AutoUpdatePanel";
 import { BulletList, ErrorBanner, InfoBanner, PageHeader, Panel } from "../components/common";
 import { ProjectPicker } from "../components/ProjectPicker";
 import { QuestionField } from "../components/QuestionField";
@@ -39,6 +40,8 @@ export function JobSitesPage() {
         subtitle="Fill in your own LinkedIn, Naukri, Indeed and Wellfound profiles from this app, so applications don't stop to ask for details and every site says the same thing."
       />
       <ErrorBanner error={sync.error ?? platforms.error ?? plan.error} />
+
+      {platforms.data ? <AutoUpdatePanel views={platforms.data} busy={busy} /> : null}
 
       <Panel
         title="Projects on your profiles"
@@ -200,7 +203,7 @@ function PlatformCard({ view, busy, updating, onUpdate, onResume }: { view: Plat
             <Switch.HiddenInput />
             <Switch.Control />
             <Switch.Label fontSize="sm" color={neverSynced ? "fg.subtle" : "fg"}>
-              Keep in sync automatically
+              Include in automatic updates
             </Switch.Label>
           </Switch.Root>
           <HStack gap={2}>

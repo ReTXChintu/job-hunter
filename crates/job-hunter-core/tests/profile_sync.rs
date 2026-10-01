@@ -8,6 +8,7 @@ use std::time::Duration;
 use job_hunter_core::agent::profile_sync::{self as ps, AUTO_SYNC_QUIET};
 use job_hunter_core::domain::*;
 use job_hunter_core::error::CoreError;
+use job_hunter_core::settings::ProfileSyncMode;
 use job_hunter_core::util::now;
 use job_hunter_core::AppContext;
 
@@ -77,6 +78,30 @@ async fn confirm_suggested_projects(ctx: &Arc<AppContext>) -> PublishingPlan {
 
 fn platform(ctx: &AppContext, slug: &str) -> PlatformProfile {
     ctx.store.require::<PlatformProfile>(slug).unwrap()
+}
+
+/// Midday and 1 a.m., local time: outside and inside the default night window.
+const NOON: u8 = 12;
+const ONE_AM: u8 = 1;
+
+async fn set_mode(ctx: &AppContext, mode: ProfileSyncMode) {
+    let mut settings = ctx.settings().await;
+    settings.profile_sync.mode = mode;
+    ctx.save_settings(settings).await.unwrap();
+}
+
+/// LinkedIn updated once, then the profile changed (and settled): LinkedIn
+/// is behind.
+async fn linkedin_behind(ctx: &Arc<AppContext>) {
+    confirm_suggested_projects(ctx).await;
+    ps::start_profile_sync(ctx.clone(), "LinkedIn", vec![], false)
+        .await
+        .unwrap();
+    wait_idle(ctx).await;
+    let mut profile = ctx.profile().unwrap();
+    profile.summary = "Changed".into();
+    ctx.save_profile(profile).unwrap();
+    settle_edits(ctx);
 }
 
 /// Backdate every profile edit so the auto-sync quiet period has passed.
@@ -213,9 +238,10 @@ async fn a_site_question_is_answered_once_and_remembered() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn editing_the_profile_re_syncs_only_the_sites_already_updated() {
     let (ctx, _dir) = ctx_with_profile().await;
+    set_mode(&ctx, ProfileSyncMode::Immediate).await;
     // Nothing happens before the user has confirmed a plan.
     settle_edits(&ctx);
-    assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET)
+    assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
         .await
         .unwrap()
         .is_none());
@@ -228,7 +254,7 @@ async fn editing_the_profile_re_syncs_only_the_sites_already_updated() {
     let first_sync = platform(&ctx, "linkedin").last_synced_at;
     settle_edits(&ctx);
     assert!(
-        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET)
+        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
             .await
             .unwrap()
             .is_none(),
@@ -256,14 +282,14 @@ async fn editing_the_profile_re_syncs_only_the_sites_already_updated() {
         .iter()
         .any(|v| v.profile.platform == "LinkedIn" && v.out_of_date));
     assert!(
-        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET)
+        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
             .await
             .unwrap()
             .is_none(),
         "waits for the edits to settle"
     );
     settle_edits(&ctx);
-    let run = ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET)
+    let run = ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
         .await
         .unwrap()
         .expect("LinkedIn is behind and gets updated");
@@ -273,7 +299,7 @@ async fn editing_the_profile_re_syncs_only_the_sites_already_updated() {
     assert!(li.last_synced_at > first_sync);
     assert!(!li.synced_project_names.contains(&dropped_name));
     assert!(
-        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET)
+        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
             .await
             .unwrap()
             .is_none(),
@@ -286,7 +312,7 @@ async fn editing_the_profile_re_syncs_only_the_sites_already_updated() {
     profile.summary = "Changed again".into();
     ctx.save_profile(profile).unwrap();
     settle_edits(&ctx);
-    assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET)
+    assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
         .await
         .unwrap()
         .is_none());
@@ -447,4 +473,83 @@ fn linkedin_updates_never_notify_the_network() {
     assert!(prompt.contains("https://www.linkedin.com/mypreferences/d/share-profile-updates"));
     assert!(prompt.contains("off before every Save"));
     assert!(prompt.contains("Never save with it on"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn by_default_profiles_update_only_at_night() {
+    let (ctx, _dir) = ctx_with_profile().await;
+    assert_eq!(
+        ctx.settings().await.profile_sync.mode,
+        ProfileSyncMode::Nightly
+    );
+    linkedin_behind(&ctx).await;
+    assert!(
+        ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
+            .await
+            .unwrap()
+            .is_none(),
+        "not during the day, when applications run"
+    );
+    assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, ONE_AM)
+        .await
+        .unwrap()
+        .is_some());
+    wait_idle(&ctx).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ask_mode_notifies_once_and_waits_for_approval() {
+    let (ctx, _dir) = ctx_with_profile().await;
+    set_mode(&ctx, ProfileSyncMode::Ask).await;
+    linkedin_behind(&ctx).await;
+    for hour in [NOON, ONE_AM, NOON] {
+        assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, hour)
+            .await
+            .unwrap()
+            .is_none());
+    }
+    let notices: Vec<_> = ctx
+        .list_notifications(20)
+        .unwrap()
+        .into_iter()
+        .filter(|n| n.kind == "PROFILES_BEHIND")
+        .collect();
+    assert_eq!(notices.len(), 1, "announced once, not every minute");
+    assert!(notices[0].body.contains("LinkedIn"));
+
+    // "Update all now" is the approval: it runs at once, even at noon.
+    assert_eq!(ps::queue_out_of_date(&ctx).await.unwrap(), 1);
+    let run = ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
+        .await
+        .unwrap();
+    assert!(run.is_some());
+    wait_idle(&ctx).await;
+    assert!(platform(&ctx, "linkedin").queued_at.is_none());
+    assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, NOON)
+        .await
+        .unwrap()
+        .is_none());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn off_mode_never_updates_by_itself() {
+    let (ctx, _dir) = ctx_with_profile().await;
+    set_mode(&ctx, ProfileSyncMode::Off).await;
+    linkedin_behind(&ctx).await;
+    for hour in [NOON, ONE_AM] {
+        assert!(ps::auto_sync_tick(&ctx, AUTO_SYNC_QUIET, hour)
+            .await
+            .unwrap()
+            .is_none());
+    }
+}
+
+#[test]
+fn the_night_window_wraps_past_midnight() {
+    let mut s = job_hunter_core::settings::ProfileSyncSettings::default();
+    assert!(s.in_night_window(0) && s.in_night_window(5));
+    assert!(!s.in_night_window(6) && !s.in_night_window(23));
+    s.nightly_hour = 22;
+    assert!(s.in_night_window(22) && s.in_night_window(23) && s.in_night_window(3));
+    assert!(!s.in_night_window(4) && !s.in_night_window(21));
 }

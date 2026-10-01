@@ -91,6 +91,14 @@ pub struct PlatformProfile {
     /// browser tab where it left off, instead of starting over.
     #[serde(default)]
     pub resume_session_id: Option<String>,
+    /// The user approved updating this site ("Update all now"): it runs as
+    /// soon as the agent is free, whatever the automatic-update setting.
+    #[serde(default)]
+    pub queued_at: Option<DateTime<Utc>>,
+    /// The content fingerprint the user was last told about (Ask mode), so
+    /// a change is announced once, not every minute.
+    #[serde(default)]
+    pub announced_hash: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -119,6 +127,8 @@ impl PlatformProfile {
             pending_questions: vec![],
             run_id: None,
             resume_session_id: None,
+            queued_at: None,
+            announced_hash: None,
             created_at: ts,
             updated_at: ts,
         }

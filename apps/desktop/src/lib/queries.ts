@@ -212,6 +212,12 @@ export function useAnswerPlatformQuestions() {
   });
 }
 
+/** "Update all now": queue every site that's behind. */
+export function useQueueProfileUpdates() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: () => invoke("queue_profile_updates"), onSuccess: () => inv([keys.platformProfiles, keys.agentStatus]) });
+}
+
 export function useSetPlatformAutoSync() {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (args: { platform: string; enabled: boolean }) => invoke("set_platform_auto_sync", args), onSuccess: () => inv([keys.platformProfiles]) });
