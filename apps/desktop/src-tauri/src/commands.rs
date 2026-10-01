@@ -322,6 +322,28 @@ pub async fn answer_platform_questions(
         .map_err(Into::into)
 }
 
+/// A job the user found: pasted text and/or screenshots/PDFs. Claude reads
+/// it, the resume and cover letter are generated, and (with `draft_email`)
+/// the email is saved as a Gmail draft for the user to send.
+#[tauri::command]
+pub async fn add_shared_job(
+    ctx: Ctx<'_>,
+    text: String,
+    files: Vec<String>,
+    draft_email: Option<bool>,
+) -> R<AgentRun> {
+    job_hunter_core::agent::shared_job::start_shared_job(
+        ctx.inner().clone(),
+        job_hunter_core::agent::shared_job::SharedJobInput {
+            text,
+            files: files.into_iter().map(PathBuf::from).collect(),
+            draft_email: draft_email.unwrap_or(true),
+        },
+    )
+    .await
+    .map_err(Into::into)
+}
+
 /// "Update all now": queue every site that's behind; they run one after
 /// another as soon as the agent is free. Returns how many.
 #[tauri::command]

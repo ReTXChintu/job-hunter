@@ -43,6 +43,9 @@ pub mod skills {
     pub const PROFILE_SYNC: &str = include_str!("../../../agent/skills/profile-sync/SKILL.md");
     pub const EMAIL_APPLICATION: &str =
         include_str!("../../../agent/skills/email-application/SKILL.md");
+    pub const SHARED_JOB_READING: &str =
+        include_str!("../../../agent/skills/shared-job-reading/SKILL.md");
+    pub const EMAIL_DRAFT: &str = include_str!("../../../agent/skills/email-draft/SKILL.md");
     pub const INBOX_TRACKING: &str = include_str!("../../../agent/skills/inbox-tracking/SKILL.md");
 }
 
@@ -127,6 +130,20 @@ pub mod schemas {
     });
     pub fn inbox_check() -> Value {
         INBOX_CHECK.clone()
+    }
+    static SHARED_JOB: Lazy<Value> = Lazy::new(|| {
+        serde_json::from_str(include_str!("../../../agent/schemas/shared-job.json"))
+            .expect("shared-job schema")
+    });
+    pub fn shared_job() -> Value {
+        SHARED_JOB.clone()
+    }
+    static EMAIL_DRAFT: Lazy<Value> = Lazy::new(|| {
+        serde_json::from_str(include_str!("../../../agent/schemas/email-draft.json"))
+            .expect("email-draft schema")
+    });
+    pub fn email_draft() -> Value {
+        EMAIL_DRAFT.clone()
     }
 }
 
@@ -399,6 +416,26 @@ pub fn email_message(
     if to.is_empty() {
         return None;
     }
+    Some(compose_email(to, job, truth, cover_letter))
+}
+
+/// The email for a Gmail draft: like [`email_message`], but `to` may be
+/// empty (the posting gave no address; the candidate fills it in).
+pub fn draft_email_message(
+    job: &Job,
+    truth: &CandidateTruth,
+    cover_letter: Option<&str>,
+) -> EmailMessage {
+    let to = job.apply_email.as_deref().unwrap_or("").trim();
+    compose_email(to, job, truth, cover_letter)
+}
+
+fn compose_email(
+    to: &str,
+    job: &Job,
+    truth: &CandidateTruth,
+    cover_letter: Option<&str>,
+) -> EmailMessage {
     let personal = &truth.profile.personal;
     let body = match cover_letter.map(str::trim).filter(|c| !c.is_empty()) {
         Some(letter) => letter.to_string(),
@@ -432,11 +469,51 @@ Regards,
             )
         }
     };
-    Some(EmailMessage {
+    EmailMessage {
         to: to.to_string(),
         subject: format!("Application for {} - {}", job.title, personal.name),
         body,
-    })
+    }
+}
+
+/// Prompt for reading a job the candidate shared (text, screenshots, PDFs).
+pub fn shared_job_prompt(text: &str, files: &[String]) -> String {
+    let mut s = String::from(
+        "# Task: read a job posting the candidate shared
+
+Follow the shared-job-reading skill exactly. Read every file with the Read tool.",
+    );
+    s.push_str(&section("Skill", skills::SHARED_JOB_READING));
+    s.push_str(&section(
+        "Inputs",
+        &json_block(&json!({ "text": truncate(text, 20_000), "files": files })),
+    ));
+    s.push_str(
+        "
+
+Return only the structured output.",
+    );
+    s
+}
+
+/// Prompt for saving (never sending) an application email as a Gmail draft.
+pub fn email_draft_prompt(email: &EmailMessage, resume_pdf: Option<&str>) -> String {
+    let mut s = String::from(
+        "# Task: save a job-application email as a Gmail draft
+
+Follow the email-draft skill exactly. NEVER click Send: the candidate reviews and sends it.",
+    );
+    s.push_str(&section("Skill: email-draft", skills::EMAIL_DRAFT));
+    s.push_str(&section(
+        "Inputs",
+        &json_block(&json!({ "email": email, "documents": { "resumePdf": resume_pdf } })),
+    ));
+    s.push_str(
+        "
+
+Return only the structured output.",
+    );
+    s
 }
 
 pub fn apply_prompt(p: &ApplyParams<'_>) -> String {

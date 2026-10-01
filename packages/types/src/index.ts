@@ -386,6 +386,8 @@ export interface Application {
   manualCompleted: boolean;
   /** Employers' replies found in Gmail (inbox or spam). */
   replies: EmailReply[];
+  /** Saved as a Gmail draft for the user to review and send (shared jobs). */
+  emailDraftedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -463,7 +465,7 @@ export interface RunStats {
   claudeCostUsd: number;
 }
 
-export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC" | "INBOX_CHECK";
+export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC" | "INBOX_CHECK" | "SHARED_JOB";
 
 export interface AgentRun {
   id: string;

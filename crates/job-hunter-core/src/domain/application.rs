@@ -176,6 +176,10 @@ pub struct Application {
     /// Replies from the employer found in the user's Gmail (inbox or spam).
     #[serde(default)]
     pub replies: Vec<EmailReply>,
+    /// When the application email was saved as a Gmail draft for the user
+    /// to review and send (jobs they shared).
+    #[serde(default)]
+    pub email_drafted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -244,6 +248,7 @@ impl Application {
             run_id: None,
             manual_completed: false,
             replies: vec![],
+            email_drafted_at: None,
             created_at: ts,
             updated_at: ts,
         }

@@ -212,6 +212,15 @@ export function useAnswerPlatformQuestions() {
   });
 }
 
+/** A job the user found: text and/or screenshots/PDFs → resume, application, Gmail draft. */
+export function useAddSharedJob() {
+  const inv = useInvalidate();
+  return useMutation({
+    mutationFn: (args: { text: string; files: string[]; draftEmail: boolean }) => invoke("add_shared_job", args),
+    onSuccess: () => inv([keys.agentStatus, keys.runs]),
+  });
+}
+
 /** "Update all now": queue every site that's behind. */
 export function useQueueProfileUpdates() {
   const inv = useInvalidate();

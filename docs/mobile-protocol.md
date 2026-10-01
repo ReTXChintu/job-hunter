@@ -131,6 +131,7 @@ Every frame, both directions, is one JSON object:
 | `reject_job` | `{id}` | `Job` |
 | `list_platform_profiles` | `{}` | `PlatformProfileView[]` |
 | `sync_platform_profile` | `{platform, resume?}` | `{runId}` |
+| `add_shared_job` | `{text, attachments?: [{name, base64}], draftEmail?}` | `{runId}`: read a job the user found (images/PDFs ≤ 15 MB total), prepare the application and save a Gmail draft |
 | `queue_profile_updates` | `{}` | `{queued}` ("Update all now": every site behind runs when the agent is free) |
 | `answer_platform_questions` | `{platform, answers: [{question, answer}]}` | `{runId}` |
 | `list_answers` | `{}` | `AnswerRecord[]` |

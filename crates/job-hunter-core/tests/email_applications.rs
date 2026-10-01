@@ -123,3 +123,93 @@ fn an_email_posting_is_applied_to_by_gmail_with_the_approved_letter() {
     });
     assert!(prompt.contains("Skill: chrome-application"));
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_shared_job_becomes_a_review_ready_application_and_a_gmail_draft() {
+    use job_hunter_core::agent::shared_job::{self, SharedJobInput};
+    let (ctx, dir) = fixture_context().await;
+    let shot = dir.path().join("whatsapp forward.png");
+    std::fs::write(&shot, b"not really a png").unwrap();
+
+    // Nothing to read is refused up front.
+    let empty = SharedJobInput {
+        text: "hi".into(),
+        files: vec![],
+        draft_email: true,
+    };
+    assert!(shared_job::start_shared_job(ctx.clone(), empty)
+        .await
+        .is_err());
+    let wrong = SharedJobInput {
+        text: String::new(),
+        files: vec![dir.path().join("a.exe")],
+        draft_email: true,
+    };
+    assert!(shared_job::start_shared_job(ctx.clone(), wrong)
+        .await
+        .is_err());
+
+    let run = shared_job::start_shared_job(
+        ctx.clone(),
+        SharedJobInput {
+            text: "Hiring Node.js developer, send CV to jobs@acmelabs.example".into(),
+            files: vec![shot],
+            draft_email: true,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(run.kind, RunKind::SharedJob);
+    wait_idle(&ctx).await;
+
+    let shared_copy = ctx
+        .paths
+        .run_dir(&run.id)
+        .join("shared")
+        .join("01-whatsapp-forward.png");
+    assert!(shared_copy.is_file(), "the screenshot is kept with the run");
+    let job = ctx
+        .store
+        .list::<Job>()
+        .unwrap()
+        .into_iter()
+        .find(|j| j.source == "Shared")
+        .expect("job saved");
+    assert_eq!(job.apply_email.as_deref(), Some("jobs@acmelabs.example"));
+    let app = ctx
+        .store
+        .list::<Application>()
+        .unwrap()
+        .into_iter()
+        .find(|a| a.job_id == job.id)
+        .expect("application prepared");
+    assert_eq!(
+        app.status,
+        ApplicationStatus::ReadyForReview,
+        "drafting never sends"
+    );
+    assert!(app.email_drafted_at.is_some());
+    assert!(app.resume_id.is_some());
+    let told = ctx.list_notifications(5).unwrap();
+    assert_eq!(told[0].kind, "EMAIL_DRAFTED");
+    assert!(told[0].body.contains("jobs@acmelabs.example"));
+}
+
+#[test]
+fn a_draft_needs_no_address() {
+    let job = Job::new(LOCAL_USER_ID, "Shared", "shared://1", "Acme", "Dev");
+    let mut profile = CandidateProfile::new(LOCAL_USER_ID);
+    profile.personal.name = "Biswajit Panda".into();
+    let truth = CandidateTruth {
+        profile,
+        experiences: vec![],
+        projects: vec![],
+        master_resume_text: None,
+    };
+    let email = prompts::draft_email_message(&job, &truth, Some("Dear team,"));
+    assert_eq!(email.to, "");
+    assert_eq!(email.subject, "Application for Dev - Biswajit Panda");
+    let prompt = prompts::email_draft_prompt(&email, Some("C:/x/Biswajit_Resume.pdf"));
+    assert!(prompt.contains("NEVER click Send"));
+    assert!(prompt.contains("Biswajit_Resume.pdf"));
+}

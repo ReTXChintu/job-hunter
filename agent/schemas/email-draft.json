@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": { "type": "string", "enum": ["DRAFTED", "MANUAL_ACTION_REQUIRED", "FAILED"] },
+    "reason": { "type": "string" },
+    "evidence": { "type": "string" }
+  },
+  "required": ["outcome", "reason"]
+}

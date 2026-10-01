@@ -265,7 +265,17 @@ export function ApplicationReviewPage() {
           </Box>
         ) : null}
 
-        {byEmail ? (
+        {application.emailDraftedAt && application.status !== "APPLIED" ? (
+          <Box px={6} py={4} borderBottomWidth="1px" borderColor="border.muted" bg="green.subtle">
+            <Text fontSize="sm">
+              <Text as="span" fontWeight="semibold">
+                Email draft saved in Gmail
+              </Text>{" "}
+              {formatDateTime(application.emailDraftedAt)}, with the resume attached{job.applyEmail ? `, to ${job.applyEmail}` : "; add the recipient"}. Open Gmail Drafts, review it and
+              send it, then click Mark as Applied.
+            </Text>
+          </Box>
+        ) : byEmail ? (
           <Box px={6} py={4} borderBottomWidth="1px" borderColor="border.muted" bg="blue.subtle">
             <Text fontSize="sm">
               <Text as="span" fontWeight="semibold">

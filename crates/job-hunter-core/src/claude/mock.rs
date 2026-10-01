@@ -643,6 +643,28 @@ impl ClaudeRunner for MockClaudeRunner {
                     .await?;
                 Self::draft_project()
             }
+            "read_shared_job" => {
+                self.step(&sink, &cancel, "Reading the shared job (mock)")
+                    .await?;
+                json!({
+                    "found": true,
+                    "job": {
+                        "title": "Node.js Developer",
+                        "company": "Acme Labs",
+                        "location": "Remote",
+                        "description": "Acme Labs is hiring a Node.js Developer to build REST APIs with Express.js and MongoDB. Send your resume to jobs@acmelabs.example.",
+                        "requirements": ["3+ years Node.js", "Express.js", "MongoDB"],
+                        "skills": ["Node.js", "Express.js", "MongoDB"],
+                        "applyEmail": "jobs@acmelabs.example",
+                        "contactName": "Priya"
+                    }
+                })
+            }
+            "draft_email" => {
+                self.step(&sink, &cancel, "Saving a Gmail draft (mock)")
+                    .await?;
+                json!({ "outcome": "DRAFTED", "reason": "Mock draft: nothing real was touched.", "evidence": "MOCK: Drafts shows the message" })
+            }
             "check_inbox" => {
                 self.step(&sink, &cancel, "Searching Gmail (mock)").await?;
                 Self::check_inbox(ctx)

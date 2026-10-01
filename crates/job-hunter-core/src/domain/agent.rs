@@ -160,6 +160,7 @@ pub enum RunKind {
     Analysis,
     ProfileSync,
     InboxCheck,
+    SharedJob,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

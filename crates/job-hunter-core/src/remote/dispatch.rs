@@ -9,7 +9,7 @@ use std::sync::Arc;
 use base64::Engine;
 use serde_json::{json, Value};
 
-use crate::agent::{inbox, orchestrator, profile_sync};
+use crate::agent::{inbox, orchestrator, profile_sync, shared_job};
 use crate::context::AppContext;
 use crate::domain::{AnswerRecord, AnswerSource, ApplicationAnswer, ApplicationStatus};
 use crate::error::{CoreError, CoreResult};
@@ -54,6 +54,65 @@ struct SaveAnswerPayload {
     id: String,
     question: String,
     answer: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SharedJobPayload {
+    #[serde(default)]
+    text: String,
+    /// Screenshots/PDFs from the phone or web: `{name, base64}`.
+    #[serde(default)]
+    attachments: Vec<Attachment>,
+    #[serde(default)]
+    draft_email: Option<bool>,
+}
+
+#[derive(serde::Deserialize)]
+struct Attachment {
+    name: String,
+    base64: String,
+}
+
+/// Total size of attachments a phone or browser may send in one request.
+const MAX_ATTACHMENT_BYTES: usize = 15 * 1024 * 1024;
+
+/// Decode shared attachments into a temporary folder (the run copies them).
+fn write_attachments(
+    app: &AppContext,
+    attachments: &[Attachment],
+) -> CoreResult<Vec<std::path::PathBuf>> {
+    let dir = app
+        .paths
+        .temp_dir()
+        .join(format!("shared-{}", crate::util::new_id()));
+    let mut total = 0;
+    let mut out = Vec::new();
+    for (i, a) in attachments.iter().enumerate() {
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(a.base64.trim())
+            .map_err(|_| CoreError::Validation(format!("{} isn't valid base64", a.name)))?;
+        total += bytes.len();
+        if total > MAX_ATTACHMENT_BYTES {
+            return Err(CoreError::Validation(
+                "Attachments are larger than 15 MB in total.".into(),
+            ));
+        }
+        std::fs::create_dir_all(&dir)?;
+        let name = std::path::Path::new(&a.name);
+        let ext = name
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let stem = name
+            .file_stem()
+            .map(|s| crate::util::slugify(&s.to_string_lossy()))
+            .unwrap_or_default();
+        let path = dir.join(format!("{i:02}-{stem}.{ext}"));
+        std::fs::write(&path, bytes)?;
+        out.push(path);
+    }
+    Ok(out)
 }
 
 fn user_answers(answers: Vec<AnswerPayload>) -> Vec<ApplicationAnswer> {
@@ -201,6 +260,20 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
             let p: PlatformPayload = parse(payload)?;
             let run = profile_sync::start_profile_sync(app.clone(), &p.platform, vec![], p.resume)
                 .await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        "add_shared_job" => {
+            let p: SharedJobPayload = parse(payload)?;
+            let files = write_attachments(app, &p.attachments)?;
+            let run = shared_job::start_shared_job(
+                app.clone(),
+                shared_job::SharedJobInput {
+                    text: p.text,
+                    files,
+                    draft_email: p.draft_email.unwrap_or(true),
+                },
+            )
+            .await?;
             Ok(json!({ "runId": run.id }))
         }
         "queue_profile_updates" => Ok(json!({
