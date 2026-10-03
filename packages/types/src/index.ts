@@ -465,7 +465,7 @@ export interface RunStats {
   claudeCostUsd: number;
 }
 
-export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC" | "INBOX_CHECK" | "SHARED_JOB";
+export type RunKind = "JOB_HUNT" | "APPLICATION" | "RESUME_GENERATION" | "ANALYSIS" | "PROFILE_SYNC" | "INBOX_CHECK" | "SHARED_JOB" | "JOB_LINK";
 
 export interface AgentRun {
   id: string;

@@ -71,7 +71,8 @@ export function SettingsPage() {
             <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} mt={6}>
               <Field.Root>
                 <Field.Label>Max jobs per source</Field.Label>
-                <Input type="number" value={draft.maxJobsPerSource} onChange={(e) => update((s) => { s.maxJobsPerSource = num(e.target.value, 10); })} />
+                <Input type="number" min={1} max={100} value={draft.maxJobsPerSource} onChange={(e) => update((s) => { s.maxJobsPerSource = num(e.target.value, 10); })} />
+                <Field.HelperText>Postings collected from each site per hunt. More takes longer and costs more Claude usage.</Field.HelperText>
               </Field.Root>
               <Field.Root>
                 <Field.Label>Only jobs posted in the last (days)</Field.Label>
@@ -86,7 +87,8 @@ export function SettingsPage() {
             <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
               <Field.Root>
                 <Field.Label>Max applications prepared per run</Field.Label>
-                <Input type="number" value={draft.maxApplicationsPerRun} onChange={(e) => update((s) => { s.maxApplicationsPerRun = num(e.target.value, 10); })} />
+                <Input type="number" min={1} max={100} value={draft.maxApplicationsPerRun} onChange={(e) => update((s) => { s.maxApplicationsPerRun = num(e.target.value, 10); })} />
+                <Field.HelperText>Of the jobs a hunt finds, the best matches above the minimum score get a tailored resume and an application for your review, up to this many. The rest stay in Jobs.</Field.HelperText>
               </Field.Root>
               <Field.Root>
                 <Field.Label>Minimum match score to prepare (0-100)</Field.Label>

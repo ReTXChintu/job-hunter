@@ -11,6 +11,7 @@ pub fn can_transition(from: AgentState, to: AgentState) -> bool {
         S::Initializing => matches!(
             to,
             S::Discovering
+                | S::Extracting
                 | S::Analyzing
                 | S::PreparingApplications
                 | S::Applying
@@ -26,7 +27,7 @@ pub fn can_transition(from: AgentState, to: AgentState) -> bool {
         ),
         S::Extracting => matches!(
             to,
-            S::Deduplicating | S::Paused | S::Stopping | S::Failed | S::Completed
+            S::Deduplicating | S::Analyzing | S::Paused | S::Stopping | S::Failed | S::Completed
         ),
         S::Deduplicating => matches!(to, S::Analyzing | S::Completed | S::Stopping | S::Failed),
         S::Analyzing => matches!(

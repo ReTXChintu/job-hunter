@@ -4,6 +4,7 @@
 pub mod events;
 pub mod handle;
 pub mod inbox;
+pub mod job_link;
 pub mod orchestrator;
 pub mod profile_sync;
 pub mod shared_job;

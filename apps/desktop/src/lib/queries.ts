@@ -212,6 +212,12 @@ export function useAnswerPlatformQuestions() {
   });
 }
 
+/** Apply from a pasted job link (applyNow = approve and apply when the resume is ready). */
+export function useApplyFromLink() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (args: { url: string; applyNow: boolean }) => invoke("apply_from_link", args), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+}
+
 /** A job the user found: text and/or screenshots/PDFs → resume, application, Gmail draft. */
 export function useAddSharedJob() {
   const inv = useInvalidate();

@@ -208,6 +208,7 @@ pub fn run() {
             commands::set_platform_auto_sync,
             commands::queue_profile_updates,
             commands::add_shared_job,
+            commands::apply_from_link,
             commands::list_notifications,
             commands::check_inbox_now,
             commands::restore_application_files,

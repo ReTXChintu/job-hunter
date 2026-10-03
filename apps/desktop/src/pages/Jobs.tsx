@@ -2,9 +2,10 @@ import { Badge, Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui
 import { useNavigate } from "@tanstack/react-router";
 import { filterJobs, JOB_FILTERS, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
-import { Bookmark, FilePlus, Mail, Search } from "lucide-react";
+import { Bookmark, FilePlus, Link2, Mail, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
+import { JobLinkDialog } from "../components/JobLinkDialog";
 import { SharedJobDialog } from "../components/SharedJobDialog";
 import { useDiscoverJobs, useJobs, useAgentStatus, useStartJobHunt } from "../lib/queries";
 import { isAgentRunning } from "@job-hunter/shared";
@@ -15,6 +16,7 @@ export function JobsPage() {
   const discover = useDiscoverJobs();
   const huntPosts = useStartJobHunt();
   const [sharing, setSharing] = useState(false);
+  const [linking, setLinking] = useState(false);
   const navigate = useNavigate();
   const [filter, setFilter] = useState<JobFilter>("ALL");
   const [query, setQuery] = useState("");
@@ -29,6 +31,9 @@ export function JobsPage() {
         subtitle={`${jobs.data?.length ?? 0} jobs discovered`}
         actions={
           <HStack gap={2}>
+            <Button colorPalette="brand" onClick={() => setLinking(true)} disabled={running} title="Paste a job link and start applying">
+              <Link2 size={16} /> Apply from a link
+            </Button>
             <Button variant="outline" onClick={() => setSharing(true)} disabled={running} title="Paste a job post or add screenshots/PDFs; get a resume and a Gmail draft">
               <FilePlus size={16} /> Add a job I found
             </Button>
@@ -49,6 +54,7 @@ export function JobsPage() {
       />
       <ErrorBanner error={jobs.error ?? discover.error ?? huntPosts.error} onRetry={() => jobs.refetch()} />
       <SharedJobDialog open={sharing} onClose={() => setSharing(false)} />
+      <JobLinkDialog open={linking} onClose={() => setLinking(false)} />
       <HStack mb={4} gap={4} align="center">
         <Tabs.Root value={filter} onValueChange={(e) => setFilter(e.value as JobFilter)} variant="subtle" size="sm" flex="1">
           <Tabs.List>

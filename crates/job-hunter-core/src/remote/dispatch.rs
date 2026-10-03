@@ -9,7 +9,7 @@ use std::sync::Arc;
 use base64::Engine;
 use serde_json::{json, Value};
 
-use crate::agent::{inbox, orchestrator, profile_sync, shared_job};
+use crate::agent::{inbox, job_link, orchestrator, profile_sync, shared_job};
 use crate::context::AppContext;
 use crate::domain::{AnswerRecord, AnswerSource, ApplicationAnswer, ApplicationStatus};
 use crate::error::{CoreError, CoreResult};
@@ -54,6 +54,14 @@ struct SaveAnswerPayload {
     id: String,
     question: String,
     answer: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LinkPayload {
+    url: String,
+    #[serde(default)]
+    apply_now: Option<bool>,
 }
 
 #[derive(serde::Deserialize)]
@@ -260,6 +268,12 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
             let p: PlatformPayload = parse(payload)?;
             let run = profile_sync::start_profile_sync(app.clone(), &p.platform, vec![], p.resume)
                 .await?;
+            Ok(json!({ "runId": run.id }))
+        }
+        "apply_from_link" => {
+            let p: LinkPayload = parse(payload)?;
+            let run =
+                job_link::start_job_link(app.clone(), &p.url, p.apply_now.unwrap_or(true)).await?;
             Ok(json!({ "runId": run.id }))
         }
         "add_shared_job" => {

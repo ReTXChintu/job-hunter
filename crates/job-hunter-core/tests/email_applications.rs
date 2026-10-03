@@ -213,3 +213,91 @@ fn a_draft_needs_no_address() {
     assert!(prompt.contains("NEVER click Send"));
     assert!(prompt.contains("Biswajit_Resume.pdf"));
 }
+
+async fn wait_for(ctx: &Arc<AppContext>, done: impl Fn(&AppContext) -> bool) {
+    for _ in 0..600 {
+        if done(ctx) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("condition not reached");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_pasted_link_is_read_prepared_and_applied_to_when_asked() {
+    use job_hunter_core::agent::job_link;
+    let (ctx, _dir) = fixture_context().await;
+    assert!(job_link::start_job_link(ctx.clone(), "not a link", true)
+        .await
+        .is_err());
+
+    let url = "https://www.naukri.com/job-listings-full-stack-developer-linkline-123";
+    let run = job_link::start_job_link(ctx.clone(), url, true)
+        .await
+        .unwrap();
+    assert_eq!(run.kind, RunKind::JobLink);
+    let job_url = url.to_string();
+    // Prepared, then approved and applied in its own run (the mock never
+    // submits, so it ends in manual action).
+    wait_for(&ctx, |c| {
+        c.store
+            .list::<Application>()
+            .unwrap()
+            .iter()
+            .any(|a| a.status == ApplicationStatus::ManualActionRequired)
+    })
+    .await;
+    wait_idle(&ctx).await;
+    let job = ctx
+        .store
+        .list::<Job>()
+        .unwrap()
+        .into_iter()
+        .find(|j| j.url == job_url)
+        .unwrap();
+    assert_eq!(
+        (
+            job.source.as_str(),
+            job.title.as_str(),
+            job.company.as_str()
+        ),
+        ("Naukri", "Full Stack Developer", "Linkline Labs")
+    );
+    let app = ctx
+        .store
+        .list::<Application>()
+        .unwrap()
+        .into_iter()
+        .find(|a| a.job_id == job.id)
+        .unwrap();
+    assert!(
+        app.approved_at.is_some(),
+        "approved through the normal gate"
+    );
+    assert!(app
+        .status_history
+        .iter()
+        .any(|h| h.status == ApplicationStatus::Approved));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn without_apply_now_a_link_stops_at_review() {
+    use job_hunter_core::agent::job_link;
+    let (ctx, _dir) = fixture_context().await;
+    job_link::start_job_link(ctx.clone(), "https://www.linkedin.com/jobs/view/42/", false)
+        .await
+        .unwrap();
+    wait_idle(&ctx).await;
+    let apps = ctx.store.list::<Application>().unwrap();
+    assert_eq!(apps.len(), 1);
+    assert_eq!(apps[0].status, ApplicationStatus::ReadyForReview);
+    // Sent right after the run finishes.
+    wait_for(&ctx, |c| {
+        c.list_notifications(5)
+            .unwrap()
+            .iter()
+            .any(|n| n.kind == "JOB_LINK_READY")
+    })
+    .await;
+}

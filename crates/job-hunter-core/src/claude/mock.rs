@@ -111,6 +111,20 @@ impl MockClaudeRunner {
         {
             job["description"] = Value::String("Mock extracted description. The role involves building web applications with React and Node.js.".into());
         }
+        // A pasted link: only the URL is known.
+        for (key, value) in [
+            ("title", "Full Stack Developer"),
+            ("company", "Linkline Labs"),
+        ] {
+            if job
+                .get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .is_empty()
+            {
+                job[key] = Value::String(value.into());
+            }
+        }
         job["detailsComplete"] = Value::Bool(true);
         json!({ "found": true, "blocked": false, "job": job })
     }

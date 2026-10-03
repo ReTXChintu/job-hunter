@@ -344,6 +344,19 @@ pub async fn add_shared_job(
     .map_err(Into::into)
 }
 
+/// Apply from a pasted job link: read it, prepare the resume and, with
+/// `apply_now`, approve and apply as soon as it's ready.
+#[tauri::command]
+pub async fn apply_from_link(ctx: Ctx<'_>, url: String, apply_now: Option<bool>) -> R<AgentRun> {
+    job_hunter_core::agent::job_link::start_job_link(
+        ctx.inner().clone(),
+        &url,
+        apply_now.unwrap_or(true),
+    )
+    .await
+    .map_err(Into::into)
+}
+
 /// "Update all now": queue every site that's behind; they run one after
 /// another as soon as the agent is free. Returns how many.
 #[tauri::command]

@@ -442,6 +442,16 @@ pub async fn extract_details(step: &StepCtx, job: &mut Job) -> CoreResult<bool> 
         return Ok(false);
     }
     if let Some(d) = out.job {
+        // A job started from a pasted link knows only its URL until now.
+        if job.title.trim().is_empty() && !d.title.trim().is_empty() {
+            job.title = d.title.trim().to_string();
+        }
+        if job.company.trim().is_empty() && !d.company.trim().is_empty() {
+            job.company = d.company.trim().to_string();
+        }
+        if job.apply_email.is_none() {
+            job.apply_email = d.apply_email.clone().filter(|e| looks_like_email(e));
+        }
         if !d.description.trim().is_empty() {
             job.description = d.description;
         }
