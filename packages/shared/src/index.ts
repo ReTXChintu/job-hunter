@@ -54,7 +54,7 @@ export function filterJobs(items: JobListItem[], filter: JobFilter, query = ""):
   return items.filter((item) => {
     if (!matchesJobFilter(item, filter)) return false;
     if (!q) return true;
-    const hay = `${item.job.title} ${item.job.company} ${item.job.location} ${item.job.skills.join(" ")}`.toLowerCase();
+    const hay = `${item.job.title} ${item.job.company} ${item.job.location} ${item.job.source} ${item.job.skills.join(" ")}`.toLowerCase();
     return hay.includes(q);
   });
 }

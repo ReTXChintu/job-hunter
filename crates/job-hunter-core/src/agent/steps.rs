@@ -291,6 +291,32 @@ pub fn build_queries(profile: &CandidateProfile) -> Vec<String> {
     q
 }
 
+/// The Telegram channels to read, each with where the last scan stopped
+/// (`sinceMessageId`/`sinceTime`), or the recency window the first time.
+pub fn telegram_channel_inputs(
+    app: &AppContext,
+    settings: &crate::settings::AppSettings,
+) -> CoreResult<Value> {
+    let since =
+        (now() - chrono::Duration::days(i64::from(settings.recency_days.max(1)))).to_rfc3339();
+    let mut channels = Vec::new();
+    for channel in settings
+        .telegram_channels
+        .iter()
+        .filter(|c| !c.trim().is_empty())
+    {
+        let cursor = app
+            .store
+            .get::<ScanCursor>(&ScanCursor::key("Telegram", channel))?;
+        channels.push(json!({
+            "channel": normalize_feed(channel),
+            "sinceMessageId": cursor.as_ref().map(|c| c.last_message_id.clone()).filter(|v| !v.is_empty()),
+            "sinceTime": cursor.as_ref().map(|c| c.last_message_at.clone()).filter(|v| !v.is_empty()).unwrap_or_else(|| since.clone()),
+        }));
+    }
+    Ok(Value::Array(channels))
+}
+
 pub async fn discover_source(
     step: &StepCtx,
     truth: &CandidateTruth,
@@ -307,6 +333,26 @@ pub async fn discover_source(
         .map(|j| j.url)
         .collect();
     let remote = format!("{:?}", profile.preferences.remote_preference).to_uppercase();
+    // Telegram: the channels the user follows, each read from where the
+    // last scan stopped (or the recency window, the first time).
+    let telegram = source.eq_ignore_ascii_case("Telegram");
+    let telegram_channels = if telegram {
+        if settings
+            .telegram_channels
+            .iter()
+            .all(|c| c.trim().is_empty())
+        {
+            step.event(
+                EventLevel::Warn,
+                "MESSAGE",
+                "Telegram: no channels yet. Add the ones you follow in Settings > Job sources.",
+            );
+            return Ok(vec![]);
+        }
+        Some(telegram_channel_inputs(&step.app, &settings)?)
+    } else {
+        None
+    };
     let params = prompts::DiscoveryParams {
         source,
         queries: &queries,
@@ -316,6 +362,7 @@ pub async fn discover_source(
         max_jobs: settings.max_jobs_per_source,
         seen_urls: &seen,
         careers_url: None,
+        telegram_channels: telegram_channels.as_ref(),
     };
     let mut req = step
         .request(
@@ -327,8 +374,12 @@ pub async fn discover_source(
     req.allowed_tools = prompts::chrome_tools(false);
     req.json_schema = Some(prompts::schemas::discovery());
     req.max_turns = settings.claude.max_turns_browser;
-    req.mock_context =
-        json!({ "source": source, "maxJobs": settings.max_jobs_per_source, "seenUrls": seen });
+    req.mock_context = json!({
+        "source": source,
+        "maxJobs": settings.max_jobs_per_source,
+        "seenUrls": seen,
+        "telegramChannels": telegram_channels,
+    });
     let resp = step.run_claude(req).await?;
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -341,8 +392,33 @@ pub async fn discover_source(
         blocked: bool,
         #[serde(default)]
         blocked_reason: String,
+        /// Telegram: the newest message read in each channel.
+        #[serde(default)]
+        cursors: Vec<CursorOut>,
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct CursorOut {
+        channel: String,
+        #[serde(default)]
+        last_message_id: String,
+        #[serde(default)]
+        last_message_at: String,
     }
     let out: DiscoveryOut = structured(&resp, "discovery result")?;
+    for c in &out.cursors {
+        if c.last_message_id.is_empty() && c.last_message_at.is_empty() {
+            continue;
+        }
+        let ts = now();
+        step.app.store.put(&ScanCursor {
+            id: ScanCursor::key(source, &c.channel),
+            last_message_id: c.last_message_id.clone(),
+            last_message_at: c.last_message_at.clone(),
+            scanned_at: ts,
+            updated_at: ts,
+        })?;
+    }
     if out.blocked {
         step.event(
             EventLevel::Warn,

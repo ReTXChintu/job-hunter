@@ -3,7 +3,7 @@ import { formatDateTime } from "@job-hunter/shared";
 import type { AppSettings } from "@job-hunter/types";
 import { LogIn, LogOut, Save, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ErrorBanner, InfoBanner, PageHeader, Panel } from "../components/common";
+import { ErrorBanner, InfoBanner, LinesInput, PageHeader, Panel } from "../components/common";
 import { MobileAppSettings } from "../components/MobileAppSettings";
 import { LogViewer } from "./Agent";
 import { useBackendLogin, useBackendLogout, useBackendRegister, useSaveSettings, useSettings, useSetupStatus, useServerInfo, useSyncStatus, useTestBackend } from "../lib/queries";
@@ -68,6 +68,18 @@ export function SettingsPage() {
                 </Switch.Root>
               ))}
             </VStack>
+            <Field.Root mt={6}>
+              <Field.Label>Telegram channels and groups</Field.Label>
+              <LinesInput
+                rows={4}
+                value={draft.telegramChannels}
+                placeholder="One per line, e.g. @techjobsindia or https://t.me/remotejobs"
+                onChange={(v) => update((s) => { s.telegramChannels = v; })}
+              />
+              <Field.HelperText>
+                Read in Telegram Web: sign in once at web.telegram.org in Chrome. Each scan reads only the messages posted since the last one and keeps the job posts, with their apply links or email addresses.
+              </Field.HelperText>
+            </Field.Root>
             <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} mt={6}>
               <Field.Root>
                 <Field.Label>Max jobs per source</Field.Label>

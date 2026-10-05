@@ -203,5 +203,48 @@
       "applyEmail": "careers@brightpath.example",
       "contactName": "Priya Sharma"
     }
+  ],
+  "Telegram": [
+    {
+      "title": "Backend Developer (Node.js)",
+      "company": "Quickpay",
+      "url": "https://careers.quickpay.example/jobs/backend-node",
+      "location": "Bengaluru",
+      "postedAt": "2026-10-05T09:12:00Z",
+      "sourceJobId": "@techjobsindia/1001",
+      "description": "Quickpay is hiring Backend Developers (Node.js, Express.js, MongoDB), 3-5 years, Bengaluru. Apply: https://careers.quickpay.example/jobs/backend-node",
+      "requirements": [
+        "3-5 years",
+        "Node.js",
+        "MongoDB"
+      ],
+      "skills": [
+        "Node.js",
+        "Express.js",
+        "MongoDB"
+      ],
+      "detailsComplete": true
+    },
+    {
+      "title": "MERN Stack Developer",
+      "company": "Zentro Labs",
+      "url": "https://t.me/techjobsindia/1002",
+      "location": "Remote",
+      "postedAt": "2026-10-05T11:40:00Z",
+      "sourceJobId": "@techjobsindia/1002",
+      "description": "Referral: Zentro Labs needs a MERN Stack Developer (React.js, Node.js, MongoDB), remote. Send your CV to hiring@zentrolabs.example",
+      "requirements": [
+        "React.js",
+        "Node.js",
+        "MongoDB"
+      ],
+      "skills": [
+        "React.js",
+        "Node.js",
+        "MongoDB"
+      ],
+      "detailsComplete": true,
+      "applyEmail": "hiring@zentrolabs.example"
+    }
   ]
 }

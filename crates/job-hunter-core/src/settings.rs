@@ -46,6 +46,10 @@ pub struct AppSettings {
     /// updated without the user clicking Update.
     #[serde(default)]
     pub profile_sync: ProfileSyncSettings,
+    /// Telegram channels and groups to scan for job posts (`@name` or a
+    /// `t.me/...` link), read in Telegram Web by the "Telegram" source.
+    #[serde(default)]
+    pub telegram_channels: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -200,6 +204,8 @@ pub const KNOWN_SOURCES: &[(&str, bool)] = &[
     ("Welcome to the Jungle", true),
     ("Himalayas", true),
     ("Y Combinator", true),
+    // Does nothing until channels are added in Settings.
+    ("Telegram", true),
 ];
 
 fn default_sources() -> Vec<JobSourceConfig> {
@@ -230,6 +236,7 @@ impl Default for AppSettings {
             backend: BackendSettings::default(),
             inbox_check_hours: default_inbox_check_hours(),
             profile_sync: ProfileSyncSettings::default(),
+            telegram_channels: vec![],
         }
     }
 }

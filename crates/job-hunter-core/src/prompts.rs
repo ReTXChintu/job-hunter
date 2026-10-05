@@ -262,6 +262,8 @@ pub struct DiscoveryParams<'a> {
     pub max_jobs: u32,
     pub seen_urls: &'a [String],
     pub careers_url: Option<&'a str>,
+    /// Telegram source only: `[{channel, sinceMessageId, sinceTime}]`.
+    pub telegram_channels: Option<&'a Value>,
 }
 
 pub fn discovery_prompt(p: &DiscoveryParams<'_>) -> String {
@@ -277,6 +279,7 @@ pub fn discovery_prompt(p: &DiscoveryParams<'_>) -> String {
         "recencyDays": p.recency_days,
         "maxJobs": p.max_jobs,
         "seenUrls": p.seen_urls.iter().take(200).collect::<Vec<_>>(),
+        "telegramChannels": p.telegram_channels,
     });
     s.push_str(&section("Inputs", &json_block(&input)));
     s.push_str("\n\nReturn the result using the structured output schema. Include full descriptions whenever you opened the posting.");

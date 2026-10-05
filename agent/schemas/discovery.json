@@ -28,6 +28,18 @@
       }
     },
     "notes": { "type": "string" },
+    "cursors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "channel": { "type": "string" },
+          "lastMessageId": { "type": "string" },
+          "lastMessageAt": { "type": "string" }
+        },
+        "required": ["channel"]
+      }
+    },
     "blocked": { "type": "boolean" },
     "blockedReason": { "type": "string" }
   },

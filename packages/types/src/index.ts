@@ -562,6 +562,8 @@ export interface AppSettings {
   /** Hours between Gmail checks for employers' replies (inbox and spam); 0 = off. */
   inboxCheckHours: number;
   profileSync: ProfileSyncSettings;
+  /** Telegram channels/groups the "Telegram" source scans (`@name` or t.me links). */
+  telegramChannels: string[];
 }
 
 /** When job-site profiles that fell behind update without clicking Update. */

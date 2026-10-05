@@ -4,7 +4,7 @@ Find recent job postings on one job source using Claude in Chrome.
 
 ## Inputs
 
-- `source`: one of LinkedIn, LinkedIn Posts, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Hiring Cafe, Welcome to the Jungle, Himalayas, Y Combinator, Greenhouse, Lever, Workday, or a company careers URL.
+- `source`: one of LinkedIn, LinkedIn Posts, Telegram, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Hiring Cafe, Welcome to the Jungle, Himalayas, Y Combinator, Greenhouse, Lever, Workday, or a company careers URL.
 - `queries`: search phrases derived from the candidate's target roles.
 - `locations`, `remotePreference`, `recencyDays`, `maxJobs`.
 - Optional `seenUrls`: postings already known; skip them.
@@ -36,6 +36,42 @@ Find recent job postings on one job source using Claude in Chrome.
 - **Himalayas** (remote jobs): `https://himalayas.app/jobs?q=<query>`; filter by the candidate's country/time zone where offered; open each job (`/companies/<company>/jobs/<slug>`).
 - **Y Combinator** (Work at a Startup, YC companies): `https://www.workatastartup.com/jobs?query=<query>` (uses the candidate's signed-in account; if it asks to sign in, return `blocked`); open each role for the description.
 - **Greenhouse / Lever / Workday / company pages**: open the given careers URL, use its search, and read each posting page.
+
+### Telegram (job channels and groups the candidate follows)
+
+`source` = "Telegram". `telegramChannels` lists each channel or group with
+where the last scan stopped: `sinceMessageId` and/or `sinceTime`.
+
+1. Open `https://web.telegram.org/k/`. If it shows the sign-in screen (QR
+   code or phone number), stop and return `blocked: true`,
+   `blockedReason`: "Sign in to Telegram Web (web.telegram.org) in Chrome".
+2. For each channel, open it (`https://web.telegram.org/k/#@<name>` without
+   the `@` doubled, or the search box). Read every message **newer than**
+   `sinceMessageId`/`sinceTime`, oldest first, scrolling up as needed; if
+   there's no cursor, go back to `recencyDays`. Don't stop at `maxJobs` per
+   channel: in Telegram the limit is per channel, not overall.
+3. A message counts when it advertises a job, internship or referral
+   ("hiring", "opening", "referral", "apply", "send your CV", ...) that fits
+   the candidate's queries. Forwarded posts and "referral by employee"
+   messages count. Skip chatter, courses, paid "job assistance" offers and
+   anything asking for money.
+4. For each job: `title`, `company`, `location`, `postedAt` (the message
+   time), `description` = the full message text (expand "Show more"; read
+   any linked post only if the message itself is too short to judge),
+   `skills`/`requirements` from it, `applyEmail` when it gives an address
+   to send the resume to, `contactName` if named, and:
+   - `url` = the apply link from the message when there is one (copy it
+     exactly; open it only if needed to read the posting);
+   - otherwise `url` = the message's own link
+     (`https://t.me/<channel>/<messageId>`).
+   `sourceJobId` = `<channel>/<messageId>`. `detailsComplete: true` when the
+   message text holds the description.
+5. Return `cursors`: for every channel you read, the newest message's id
+   (`lastMessageId`) and time (`lastMessageAt`, ISO 8601), even when it had
+   no jobs, so the next scan starts after it.
+6. Read-only: never send, react, forward, join, leave, mute or click
+   buttons that act ("Apply via bot" counts as acting: take its link as
+   `url` instead).
 
 ### LinkedIn Posts (hiring posts that ask for resumes by email)
 

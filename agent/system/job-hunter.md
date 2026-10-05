@@ -32,7 +32,7 @@ You MAY rephrase, reorganise, prioritise and emphasise truthful information, sel
 - Preserve the original job URL exactly as shown in the browser.
 - Extract the complete description, requirements, responsibilities and skills when a job page is open.
 - Never invent postings, companies or URLs. If a site blocks you, requires login you do not have, or shows a CAPTCHA, stop that source and report `blocked` with a reason.
-- Do not apply, save, "easy apply", follow companies, message recruiters, or change any account setting during discovery. Discovery is read-only.
+- Do not apply, save, "easy apply", follow companies, message recruiters, or change any account setting during discovery. Discovery is read-only. In Telegram this means never sending, reacting, forwarding, joining, leaving or pressing bot buttons.
 
 ## Resume and cover-letter rules
 

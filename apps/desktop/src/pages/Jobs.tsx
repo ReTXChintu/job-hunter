@@ -2,7 +2,7 @@ import { Badge, Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui
 import { useNavigate } from "@tanstack/react-router";
 import { filterJobs, JOB_FILTERS, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
-import { Bookmark, FilePlus, Link2, Mail, Search } from "lucide-react";
+import { Bookmark, FilePlus, Link2, Mail, Search, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
 import { JobLinkDialog } from "../components/JobLinkDialog";
@@ -36,6 +36,15 @@ export function JobsPage() {
             </Button>
             <Button variant="outline" onClick={() => setSharing(true)} disabled={running} title="Paste a job post or add screenshots/PDFs; get a resume and a Gmail draft">
               <FilePlus size={16} /> Add a job I found
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => huntPosts.mutate({ sources: ["Telegram"] })}
+              loading={huntPosts.isPending && huntPosts.variables?.sources?.[0] === "Telegram"}
+              disabled={running}
+              title="Read your Telegram channels since the last scan and prepare the job posts for review"
+            >
+              <Send size={16} /> Scan Telegram
             </Button>
             <Button
               variant="outline"

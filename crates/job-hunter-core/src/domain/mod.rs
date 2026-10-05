@@ -33,7 +33,7 @@ pub trait Entity:
 }
 
 /// Collections kept on this computer only (never sent to the backend).
-pub const LOCAL_COLLECTIONS: &[&str] = &["platform_profiles", "publishing_plans"];
+pub const LOCAL_COLLECTIONS: &[&str] = &["platform_profiles", "publishing_plans", "scan_cursors"];
 
 /// Names of every persisted collection (local store and MongoDB share them).
 pub const COLLECTIONS: &[&str] = &[

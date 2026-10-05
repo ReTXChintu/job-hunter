@@ -204,6 +204,51 @@ impl Entity for PublishingPlan {
     }
 }
 
+/// How far a feed (a Telegram channel, ...) has been read, so the next scan
+/// picks up exactly where the last one stopped. Local-only.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanCursor {
+    /// `<source>:<feed>`, e.g. "telegram:@remotejobsindia".
+    pub id: String,
+    #[serde(default)]
+    pub last_message_id: String,
+    #[serde(default)]
+    pub last_message_at: String,
+    pub scanned_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl ScanCursor {
+    pub fn key(source: &str, feed: &str) -> String {
+        format!("{}:{}", source.to_lowercase(), normalize_feed(feed))
+    }
+}
+
+/// `https://t.me/foo`, `t.me/foo`, `@Foo` and `foo` are the same channel.
+pub fn normalize_feed(feed: &str) -> String {
+    let f = feed.trim().trim_end_matches('/');
+    let f = f
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_start_matches("t.me/")
+        .trim_start_matches("telegram.me/")
+        .trim_start_matches("s/")
+        .trim_start_matches('@');
+    format!("@{}", f.to_lowercase())
+}
+
+impl Entity for ScanCursor {
+    const COLLECTION: &'static str = "scan_cursors";
+    const SYNCED: bool = false;
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,5 +259,18 @@ mod tests {
         assert_eq!(canonical_platform("NAUKRI"), Some("Naukri"));
         assert_eq!(canonical_platform("Monster"), None);
         assert_eq!(PlatformProfile::new("u", "LinkedIn").id, "linkedin");
+    }
+
+    #[test]
+    fn telegram_channels_are_recognised_however_written() {
+        for f in [
+            "https://t.me/RemoteJobsIndia",
+            "t.me/remotejobsindia/",
+            "@RemoteJobsIndia",
+            "remotejobsindia",
+        ] {
+            assert_eq!(normalize_feed(f), "@remotejobsindia");
+        }
+        assert_eq!(ScanCursor::key("Telegram", "t.me/x"), "telegram:@x");
     }
 }

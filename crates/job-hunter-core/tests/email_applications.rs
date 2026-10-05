@@ -301,3 +301,80 @@ async fn without_apply_now_a_link_stops_at_review() {
     })
     .await;
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn telegram_channels_are_scanned_from_where_the_last_scan_stopped() {
+    let (ctx, _dir) = fixture_context().await;
+    let hunt = |ctx: Arc<AppContext>| async move {
+        let run = orchestrator::start_job_hunt(
+            ctx.clone(),
+            JobHuntOptions {
+                discover_only: true,
+                sources: vec!["Telegram".into()],
+            },
+        )
+        .await
+        .unwrap();
+        wait_idle(&ctx).await;
+        run
+    };
+
+    // No channels configured: nothing to read, and the user is told why.
+    hunt(ctx.clone()).await;
+    assert!(ctx
+        .store
+        .list::<Job>()
+        .unwrap()
+        .iter()
+        .all(|j| j.source != "Telegram"));
+
+    let mut settings = ctx.settings().await;
+    settings.telegram_channels = vec!["https://t.me/TechJobsIndia".into()];
+    ctx.save_settings(settings).await.unwrap();
+    hunt(ctx.clone()).await;
+    let jobs: Vec<Job> = ctx
+        .store
+        .list::<Job>()
+        .unwrap()
+        .into_iter()
+        .filter(|j| j.source == "Telegram")
+        .collect();
+    assert_eq!(jobs.len(), 2);
+    assert!(
+        jobs.iter()
+            .any(|j| j.url == "https://careers.quickpay.example/jobs/backend-node"),
+        "apply link kept"
+    );
+    assert!(
+        jobs.iter()
+            .any(|j| j.apply_email.as_deref() == Some("hiring@zentrolabs.example")),
+        "email kept"
+    );
+    let cursor = ctx
+        .store
+        .require::<ScanCursor>("telegram:@techjobsindia")
+        .unwrap();
+    assert_eq!(cursor.last_message_id, "1002");
+
+    // The next scan starts after the last message read.
+    let inputs =
+        job_hunter_core::agent::steps::telegram_channel_inputs(&ctx, &ctx.settings().await)
+            .unwrap();
+    assert_eq!(inputs[0]["channel"], "@techjobsindia");
+    assert_eq!(inputs[0]["sinceMessageId"], "1002");
+    assert_eq!(inputs[0]["sinceTime"], "2026-10-05T11:40:00Z");
+    let prompt =
+        job_hunter_core::prompts::discovery_prompt(&job_hunter_core::prompts::DiscoveryParams {
+            source: "Telegram",
+            queries: &[],
+            locations: &[],
+            remote_preference: "ANY",
+            recency_days: 7,
+            max_jobs: 10,
+            seen_urls: &[],
+            careers_url: None,
+            telegram_channels: Some(&inputs),
+        });
+    assert!(prompt.contains(r#""sinceMessageId": "1002""#));
+    assert!(prompt.contains("web.telegram.org"));
+}

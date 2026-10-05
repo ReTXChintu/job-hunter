@@ -98,7 +98,19 @@ impl MockClaudeRunner {
             })
             .take(max)
             .collect();
-        json!({ "jobs": jobs, "notes": format!("mock discovery on {source}"), "blocked": false })
+        // Telegram: report where each channel was read up to.
+        let cursors: Vec<Value> = ctx
+            .get("telegramChannels")
+            .and_then(|c| c.as_array())
+            .map(|channels| {
+                channels
+                    .iter()
+                    .filter_map(|c| c.get("channel").and_then(|v| v.as_str()))
+                    .map(|channel| json!({ "channel": channel, "lastMessageId": "1002", "lastMessageAt": "2026-10-05T11:40:00Z" }))
+                    .collect()
+            })
+            .unwrap_or_default();
+        json!({ "jobs": jobs, "notes": format!("mock discovery on {source}"), "blocked": false, "cursors": cursors })
     }
 
     fn extract(ctx: &Value) -> Value {
