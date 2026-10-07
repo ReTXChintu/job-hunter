@@ -480,6 +480,10 @@ export interface AgentRun {
   error: string | null;
   mock: boolean;
   sources: string[];
+  /** A search that only found and scored jobs, preparing no applications. */
+  discoverOnly: boolean;
+  /** Prepared applications for jobs found earlier, without searching. */
+  prepareOnly: boolean;
   jobIds: string[];
   applicationId: string | null;
   updatedAt: string;
@@ -760,6 +764,7 @@ export interface Notification {
 
 export interface JobHuntOptions {
   discoverOnly?: boolean;
+  prepareOnly?: boolean;
   sources?: string[];
 }
 

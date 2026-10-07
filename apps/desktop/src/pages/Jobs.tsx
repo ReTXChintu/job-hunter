@@ -2,18 +2,19 @@ import { Badge, Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui
 import { useNavigate } from "@tanstack/react-router";
 import { filterJobs, JOB_FILTERS, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
-import { Bookmark, FilePlus, Link2, Mail, Search, Send } from "lucide-react";
+import { Bookmark, FilePlus, Link2, Mail, Search, Send, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
 import { JobLinkDialog } from "../components/JobLinkDialog";
 import { SharedJobDialog } from "../components/SharedJobDialog";
-import { useDiscoverJobs, useJobs, useAgentStatus, useStartJobHunt } from "../lib/queries";
+import { useDiscoverJobs, useJobs, useAgentStatus, usePrepareApplications, useStartJobHunt } from "../lib/queries";
 import { isAgentRunning } from "@job-hunter/shared";
 
 export function JobsPage() {
   const jobs = useJobs();
   const agent = useAgentStatus();
   const discover = useDiscoverJobs();
+  const prepare = usePrepareApplications();
   const huntPosts = useStartJobHunt();
   const [sharing, setSharing] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -55,13 +56,28 @@ export function JobsPage() {
             >
               <Mail size={16} /> Find hiring posts
             </Button>
-            <Button variant="subtle" onClick={() => discover.mutate(undefined)} loading={discover.isPending} disabled={running}>
-              <Search size={16} /> Discover jobs
+            <Button
+              variant="outline"
+              onClick={() => prepare.mutate()}
+              loading={prepare.isPending}
+              disabled={running || counts.RELEVANT === 0}
+              title="Generate resumes and prepare applications for the best jobs already found (no new search); they wait for your approval"
+            >
+              <Wand2 size={16} /> Prepare applications
+            </Button>
+            <Button
+              variant="subtle"
+              onClick={() => discover.mutate(undefined)}
+              loading={discover.isPending}
+              disabled={running}
+              title="Search your enabled sources and score the jobs only. No resumes or applications are prepared; use Start job hunt for that."
+            >
+              <Search size={16} /> Search only
             </Button>
           </HStack>
         }
       />
-      <ErrorBanner error={jobs.error ?? discover.error ?? huntPosts.error} onRetry={() => jobs.refetch()} />
+      <ErrorBanner error={jobs.error ?? discover.error ?? prepare.error ?? huntPosts.error} onRetry={() => jobs.refetch()} />
       <SharedJobDialog open={sharing} onClose={() => setSharing(false)} />
       <JobLinkDialog open={linking} onClose={() => setLinking(false)} />
       <HStack mb={4} gap={4} align="center">
@@ -80,7 +96,7 @@ export function JobsPage() {
         <Input size="sm" maxW="260px" placeholder="Search title, company, skill" value={query} onChange={(e) => setQuery(e.target.value)} />
       </HStack>
       {items.length === 0 ? (
-        <EmptyState title={jobs.data?.length ? "No jobs match this filter" : "No jobs yet"} description={jobs.data?.length ? "Try another filter or search." : "Start a job hunt from the dashboard or use Discover jobs to search your enabled sources."} />
+        <EmptyState title={jobs.data?.length ? "No jobs match this filter" : "No jobs yet"} description={jobs.data?.length ? "Try another filter or search." : "Start a job hunt from the dashboard, or use Search only to find and score jobs without preparing applications."} />
       ) : (
         <Table.Root size="sm" interactive borderWidth="1px" borderColor="border.muted" borderRadius="md">
           <Table.Header>

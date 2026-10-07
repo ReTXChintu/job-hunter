@@ -187,6 +187,12 @@ pub struct AgentRun {
     /// Sources this run searched.
     #[serde(default)]
     pub sources: Vec<String>,
+    /// A search that only found and scored jobs, preparing no applications.
+    #[serde(default)]
+    pub discover_only: bool,
+    /// Prepared applications for jobs found earlier, without searching.
+    #[serde(default)]
+    pub prepare_only: bool,
     /// Ids of jobs discovered in this run.
     #[serde(default)]
     pub job_ids: Vec<String>,
@@ -212,6 +218,8 @@ impl AgentRun {
             error: None,
             mock,
             sources: vec![],
+            discover_only: false,
+            prepare_only: false,
             job_ids: vec![],
             application_id: None,
             updated_at: ts,

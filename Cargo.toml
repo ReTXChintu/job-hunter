@@ -31,6 +31,13 @@ regex = "1"
 once_cell = "1"
 url = "2"
 
+# Full debug info made target/ grow to ~90 GB; line numbers in backtraces are enough.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 codegen-units = 1
 lto = true

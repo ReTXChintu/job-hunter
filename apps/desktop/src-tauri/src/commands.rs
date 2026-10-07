@@ -619,6 +619,21 @@ pub async fn discover_jobs(ctx: Ctx<'_>, sources: Option<Vec<String>>) -> R<Agen
         JobHuntOptions {
             discover_only: true,
             sources: sources.unwrap_or_default(),
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(Into::into)
+}
+
+/// Prepare applications for the best jobs already found, without searching.
+#[tauri::command]
+pub async fn prepare_applications(ctx: Ctx<'_>) -> R<AgentRun> {
+    orchestrator::start_job_hunt(
+        ctx.inner().clone(),
+        JobHuntOptions {
+            prepare_only: true,
+            ..Default::default()
         },
     )
     .await

@@ -95,7 +95,11 @@ export function AgentPage() {
                           <Text fontSize="sm">{formatDateTime(r.startedAt)}</Text>
                           {r.mock ? <Text fontSize="xs" color="orange.fg">mock</Text> : null}
                         </Table.Cell>
-                        <Table.Cell><Text fontSize="sm">{r.kind.replace("_", " ").toLowerCase()}</Text></Table.Cell>
+                        <Table.Cell>
+                          <Text fontSize="sm">{r.kind.replace("_", " ").toLowerCase()}</Text>
+                          {r.discoverOnly ? <Text fontSize="xs" color="fg.muted">search only, no applications</Text> : null}
+                          {r.prepareOnly ? <Text fontSize="xs" color="fg.muted">prepared jobs found earlier</Text> : null}
+                        </Table.Cell>
                         <Table.Cell>
                           <Text fontSize="sm" color={r.state === "FAILED" ? "red.fg" : undefined}>{AGENT_STATE_LABELS[r.state]}</Text>
                           {r.error ? <Text fontSize="xs" color="red.fg" maxW="240px" truncate>{r.error}</Text> : null}

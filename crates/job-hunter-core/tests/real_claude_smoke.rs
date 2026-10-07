@@ -208,6 +208,7 @@ async fn real_chrome_discovery_is_read_only() {
         orchestrator::JobHuntOptions {
             discover_only: true,
             sources: vec![],
+            ..Default::default()
         },
     )
     .await

@@ -40,6 +40,7 @@ async fn a_hiring_post_is_discovered_with_the_address_to_email() {
         JobHuntOptions {
             discover_only: true,
             sources: vec!["LinkedIn Posts".into()],
+            ..Default::default()
         },
     )
     .await
@@ -311,6 +312,7 @@ async fn telegram_channels_are_scanned_from_where_the_last_scan_stopped() {
             JobHuntOptions {
                 discover_only: true,
                 sources: vec!["Telegram".into()],
+                ..Default::default()
             },
         )
         .await

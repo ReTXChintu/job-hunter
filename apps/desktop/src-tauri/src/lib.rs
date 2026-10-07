@@ -243,6 +243,7 @@ pub fn run() {
             commands::pause_agent,
             commands::resume_agent,
             commands::discover_jobs,
+            commands::prepare_applications,
             commands::analyze_job,
             commands::generate_resume,
             commands::generate_cover_letter,

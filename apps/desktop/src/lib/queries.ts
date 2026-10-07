@@ -343,6 +343,11 @@ export function useDiscoverJobs() {
   return useMutation({ mutationFn: (sources?: string[]) => invoke("discover_jobs", { sources }), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
 }
 
+export function usePrepareApplications() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: () => invoke("prepare_applications"), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+}
+
 export function useAnalyzeJob() {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (jobId: string) => invoke("analyze_job", { jobId }), onSuccess: () => inv([keys.agentStatus, keys.runs]) });

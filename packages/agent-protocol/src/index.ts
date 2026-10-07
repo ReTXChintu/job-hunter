@@ -173,6 +173,7 @@ export interface Commands {
   pause_agent: { args: Record<string, never>; result: null };
   resume_agent: { args: Record<string, never>; result: null };
   discover_jobs: { args: { sources?: string[] }; result: AgentRun };
+  prepare_applications: { args: Record<string, never>; result: AgentRun };
   analyze_job: { args: { jobId: string }; result: AgentRun };
   generate_resume: { args: { jobId: string }; result: AgentRun };
   generate_cover_letter: { args: { jobId: string }; result: AgentRun };

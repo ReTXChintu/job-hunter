@@ -24,6 +24,7 @@ use super::protocol::{
 struct JobHuntPayload {
     sources: Vec<String>,
     discover_only: bool,
+    prepare_only: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -227,6 +228,7 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
                 app.clone(),
                 orchestrator::JobHuntOptions {
                     discover_only: p.discover_only,
+                    prepare_only: p.prepare_only,
                     sources: p.sources,
                 },
             )

@@ -249,7 +249,7 @@ export class ApiClient {
     return this.desktop("set_application_status", { id, status, note });
   }
 
-  startJobHunt(options: { sources?: string[]; discoverOnly?: boolean } = {}): Promise<{ runId: string }> {
+  startJobHunt(options: { sources?: string[]; discoverOnly?: boolean; prepareOnly?: boolean } = {}): Promise<{ runId: string }> {
     return this.desktop("start_job_hunt", options);
   }
 

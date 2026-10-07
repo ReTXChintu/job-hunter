@@ -19,6 +19,10 @@ pub struct JobHuntOptions {
     /// Stop after discovery + analysis (no resume generation).
     #[serde(default)]
     pub discover_only: bool,
+    /// Skip searching: prepare applications for the best jobs already found
+    /// and scored that have none yet.
+    #[serde(default)]
+    pub prepare_only: bool,
     /// Restrict to these sources (defaults to enabled sources in settings).
     #[serde(default)]
     pub sources: Vec<String>,
@@ -44,18 +48,22 @@ fn step_ctx(
 pub async fn start_job_hunt(app: Arc<AppContext>, options: JobHuntOptions) -> CoreResult<AgentRun> {
     let settings = app.settings().await;
     let mut run = AgentRun::new(&app.user_id(), RunKind::JobHunt, app.is_mock().await);
-    run.sources = if options.sources.is_empty() {
+    run.sources = if options.prepare_only {
+        vec![]
+    } else if options.sources.is_empty() {
         settings.enabled_sources()
     } else {
         options.sources.clone()
     };
+    run.discover_only = options.discover_only;
+    run.prepare_only = options.prepare_only;
     let cancel = app.agent.begin(&run).await?;
     persist_run(&app, &mut run).await;
     let run_id = run.id.clone();
     let app2 = app.clone();
     let task = tokio::spawn(async move {
         let step = step_ctx(&app2, &run_id, cancel);
-        let outcome = run_job_hunt(&step, options).await;
+        let outcome = run_job_hunt(&step, options.clone()).await;
         let mut run: AgentRun = app2
             .store
             .get(&run_id)
@@ -65,7 +73,7 @@ pub async fn start_job_hunt(app: Arc<AppContext>, options: JobHuntOptions) -> Co
         let status = app2.agent.status().await;
         run.stats = status.stats.clone();
         run.finished_at = Some(now());
-        notify_job_hunt(&app2, &outcome, &status.stats);
+        notify_job_hunt(&app2, &options, &outcome, &status.stats);
         match outcome {
             Ok(final_state) => {
                 run.state = final_state;
@@ -101,8 +109,14 @@ pub async fn start_job_hunt(app: Arc<AppContext>, options: JobHuntOptions) -> Co
 }
 
 /// Tell the user how a job hunt ended, on every device.
-fn notify_job_hunt(app: &AppContext, outcome: &CoreResult<AgentState>, stats: &RunStats) {
+fn notify_job_hunt(
+    app: &AppContext,
+    options: &JobHuntOptions,
+    outcome: &CoreResult<AgentState>,
+    stats: &RunStats,
+) {
     let user = app.user_id();
+    let plural = |n: u32| if n == 1 { "" } else { "s" };
     let n = match outcome {
         Ok(AgentState::WaitingForApproval) => Notification::new(
             &user,
@@ -125,6 +139,29 @@ fn notify_job_hunt(app: &AppContext, outcome: &CoreResult<AgentState>, stats: &R
             ),
         )
         .link("applications", None),
+        Ok(_) if options.discover_only => Notification::new(
+            &user,
+            EventLevel::Info,
+            "JOB_HUNT_FINISHED",
+            format!("Found {} new job{}", stats.jobs_new, plural(stats.jobs_new)),
+            format!(
+                "{} relevant. This search only finds and scores jobs; use \"Prepare applications\" on the Jobs page to get resumes and applications for the best ones.",
+                stats.relevant
+            ),
+        )
+        .link("jobs", None),
+        Ok(_) if options.prepare_only => Notification::new(
+            &user,
+            EventLevel::Info,
+            "JOB_HUNT_FINISHED",
+            "No applications prepared",
+            if stats.errors > 0 {
+                "Preparing the applications failed; see the Agent page for why."
+            } else {
+                "None of the jobs found so far meets your minimum match score without an application already."
+            },
+        )
+        .link("jobs", None),
         Ok(_) => Notification::new(
             &user,
             EventLevel::Info,
@@ -198,13 +235,23 @@ async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<Age
     let settings = app.settings().await;
     step.event(EventLevel::Info, "STEP_STARTED", "Initializing job hunt");
 
-    let pre = steps::preflight(step, true).await?;
+    let pre = steps::preflight(step, !options.prepare_only).await?;
     let sources = if options.sources.is_empty() {
         pre.sources.clone()
     } else {
         options.sources.clone()
     };
     let truth = pre.truth;
+
+    if options.prepare_only {
+        let candidates = top_unprepared_matches(app, &settings)?;
+        {
+            let mut run: AgentRun = app.store.require(run_id)?;
+            run.job_ids = candidates.iter().map(|(j, _)| j.id.clone()).collect();
+            persist_run(app, &mut run).await;
+        }
+        return prepare_candidates(step, &truth, candidates).await;
+    }
 
     // ---- Discovery -------------------------------------------------------------
     app.agent
@@ -399,13 +446,15 @@ async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<Age
         ),
     );
     if options.discover_only {
+        step.event(
+            EventLevel::Info,
+            "MESSAGE",
+            "Search only: no applications prepared. Use \"Prepare applications\" to prepare the best matches.",
+        );
         return Ok(AgentState::Completed);
     }
 
     // ---- Prepare applications --------------------------------------------------
-    app.agent
-        .transition(AgentState::PreparingApplications, run_id)
-        .await?;
     let mut candidates: Vec<(Job, JobAnalysis)> = new_jobs
         .iter()
         .filter_map(|j| {
@@ -418,6 +467,62 @@ async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<Age
         .collect();
     candidates.sort_by_key(|(_, a)| std::cmp::Reverse(a.match_score));
     candidates.truncate(settings.max_applications_per_run as usize);
+    prepare_candidates(step, &truth, candidates).await
+}
+
+/// The best jobs already found and scored that have no application yet,
+/// best match first, at most `max_applications_per_run`.
+fn top_unprepared_matches(
+    app: &AppContext,
+    settings: &crate::settings::AppSettings,
+) -> CoreResult<Vec<(Job, JobAnalysis)>> {
+    let mut candidates: Vec<(Job, JobAnalysis)> = app
+        .store
+        .find::<Job>(|j| matches!(j.status, JobStatus::Shortlisted | JobStatus::Analyzed))?
+        .into_iter()
+        .filter_map(|j| {
+            let analysis = app
+                .store
+                .get::<JobAnalysis>(j.analysis_id.as_deref()?)
+                .ok()
+                .flatten()?;
+            Some((j, analysis))
+        })
+        .filter(|(_, a)| a.relevant && a.match_score >= settings.minimum_match_score)
+        .collect();
+    let live: std::collections::HashSet<String> = app
+        .store
+        .find::<Application>(|a| {
+            !matches!(
+                a.status,
+                ApplicationStatus::Discovered | ApplicationStatus::Analyzed
+            )
+        })?
+        .into_iter()
+        .map(|a| a.job_id)
+        .collect();
+    candidates.retain(|(j, _)| !live.contains(&j.id));
+    candidates.sort_by(|(ja, a), (jb, b)| {
+        b.match_score
+            .cmp(&a.match_score)
+            .then(jb.discovered_at.cmp(&ja.discovered_at))
+    });
+    candidates.truncate(settings.max_applications_per_run as usize);
+    Ok(candidates)
+}
+
+/// Generate a resume and prepare an application for each candidate, leaving
+/// them waiting for the user's approval.
+async fn prepare_candidates(
+    step: &StepCtx,
+    truth: &CandidateTruth,
+    candidates: Vec<(Job, JobAnalysis)>,
+) -> CoreResult<AgentState> {
+    let app = &step.app;
+    let run_id = &step.run_id;
+    app.agent
+        .transition(AgentState::PreparingApplications, run_id)
+        .await?;
     let n = candidates.len();
     if n == 0 {
         step.event(
@@ -450,34 +555,30 @@ async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<Age
                 continue;
             }
         }
-        match steps::generate_resume(step, &truth, &job, Some(&analysis)).await {
-            Ok(generated) => match steps::prepare_application(
-                step,
-                &truth,
-                &mut job,
-                Some(&analysis),
-                &generated,
-            )
-            .await
-            {
-                Ok(_) => {
-                    prepared += 1;
-                    app.agent.update(|s| s.stats.awaiting_approval += 1).await;
+        match steps::generate_resume(step, truth, &job, Some(&analysis)).await {
+            Ok(generated) => {
+                match steps::prepare_application(step, truth, &mut job, Some(&analysis), &generated)
+                    .await
+                {
+                    Ok(_) => {
+                        prepared += 1;
+                        app.agent.update(|s| s.stats.awaiting_approval += 1).await;
+                    }
+                    Err(e) => {
+                        app.agent.update(|s| s.stats.errors += 1).await;
+                        step.event(
+                            EventLevel::Error,
+                            "STEP_FAILED",
+                            format!(
+                                "Could not prepare {} at {}: {}",
+                                job.title,
+                                job.company,
+                                e.user_message()
+                            ),
+                        );
+                    }
                 }
-                Err(e) => {
-                    app.agent.update(|s| s.stats.errors += 1).await;
-                    step.event(
-                        EventLevel::Error,
-                        "STEP_FAILED",
-                        format!(
-                            "Could not prepare {} at {}: {}",
-                            job.title,
-                            job.company,
-                            e.user_message()
-                        ),
-                    );
-                }
-            },
+            }
             Err(CoreError::Cancelled) => return Err(CoreError::Cancelled),
             Err(e) => {
                 app.agent.update(|s| s.stats.errors += 1).await;

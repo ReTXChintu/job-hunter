@@ -44,6 +44,7 @@ async fn applied_application() -> (Arc<AppContext>, tempfile::TempDir, Applicati
         JobHuntOptions {
             discover_only: false,
             sources: vec!["LinkedIn".into()],
+            ..Default::default()
         },
     )
     .await
