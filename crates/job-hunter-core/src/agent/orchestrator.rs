@@ -298,6 +298,7 @@ async fn run_job_hunt(step: &StepCtx, options: JobHuntOptions) -> CoreResult<Age
                     CoreError::ClaudeNotAuthenticated { .. }
                         | CoreError::ClaudeCliUnavailable { .. }
                         | CoreError::ClaudeInChromeUnavailable { .. }
+                        | CoreError::ChromeNotConnected { .. }
                 ) {
                     return Err(e);
                 }

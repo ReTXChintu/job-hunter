@@ -82,6 +82,10 @@ pub struct ClaudeResponse {
     pub permission_denials: Vec<String>,
     pub raw_log_path: Option<String>,
     pub duration_ms: u64,
+    /// Claude in Chrome said the extension isn't connected, and no browser
+    /// action worked after that: nothing was done in the browser.
+    #[serde(default)]
+    pub chrome_disconnected: bool,
 }
 
 /// Live events surfaced while Claude works, shown in the Agent Activity feed.
@@ -108,7 +112,13 @@ pub struct StreamParser {
     pub session_id: Option<String>,
     pub result: Option<Value>,
     pub last_text: String,
+    /// Ids of Claude in Chrome tool calls that act on a tab.
+    chrome_calls: std::collections::HashSet<String>,
+    chrome_disconnected: bool,
 }
+
+/// What Claude in Chrome answers when its extension isn't connected.
+const CHROME_NOT_CONNECTED: &str = "browser extension is not connected";
 
 impl Default for StreamParser {
     fn default() -> Self {
@@ -122,6 +132,8 @@ impl StreamParser {
             session_id: None,
             result: None,
             last_text: String::new(),
+            chrome_calls: Default::default(),
+            chrome_disconnected: false,
         }
     }
 
@@ -177,6 +189,13 @@ impl StreamParser {
                                     .unwrap_or("tool")
                                     .to_string();
                                 let input = block.get("input").cloned().unwrap_or(Value::Null);
+                                if name.starts_with("mcp__claude-in-chrome__")
+                                    && !name.ends_with("list_connected_browsers")
+                                {
+                                    if let Some(id) = block.get("id").and_then(|i| i.as_str()) {
+                                        self.chrome_calls.insert(id.to_string());
+                                    }
+                                }
                                 events.push(ClaudeEvent::ToolUse {
                                     summary: describe_tool_use(&name, &input),
                                     name,
@@ -196,6 +215,16 @@ impl StreamParser {
                                 .and_then(|b| b.as_bool())
                                 .unwrap_or(false);
                             let text = tool_result_text(block);
+                            let chrome_call = block
+                                .get("tool_use_id")
+                                .and_then(|i| i.as_str())
+                                .is_some_and(|id| self.chrome_calls.contains(id));
+                            if text.to_lowercase().contains(CHROME_NOT_CONNECTED) {
+                                self.chrome_disconnected = true;
+                            } else if chrome_call && !is_error {
+                                // It connected after all.
+                                self.chrome_disconnected = false;
+                            }
                             events.push(ClaudeEvent::ToolResult {
                                 ok: !is_error,
                                 summary: crate::util::truncate(&text, 160),
@@ -229,6 +258,7 @@ impl StreamParser {
                 subtype: "no_result".into(),
                 is_error: true,
                 text: self.last_text,
+                chrome_disconnected: self.chrome_disconnected,
                 ..Default::default()
             };
         };
@@ -281,6 +311,7 @@ impl StreamParser {
             permission_denials: denials,
             raw_log_path: None,
             duration_ms: r.get("duration_ms").and_then(|n| n.as_u64()).unwrap_or(0),
+            chrome_disconnected: self.chrome_disconnected,
         }
     }
 }
@@ -371,6 +402,43 @@ mod tests {
         p.parse_line(r#"{"type":"result","subtype":"success","is_error":false,"result":"```json\n{\"jobs\":[]}\n```"}"#);
         let resp = p.into_response();
         assert_eq!(resp.structured.unwrap()["jobs"], serde_json::json!([]));
+    }
+
+    fn chrome_stream(lines: &[&str]) -> ClaudeResponse {
+        let mut p = StreamParser::new();
+        for l in lines {
+            p.parse_line(l);
+        }
+        p.parse_line(r#"{"type":"result","subtype":"success","is_error":false,"result":"done"}"#);
+        p.into_response()
+    }
+
+    const TABS_CALL: &str = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"mcp__claude-in-chrome__tabs_context_mcp","input":{"createIfEmpty":true}}]}}"#;
+    const NOT_CONNECTED: &str = r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"Browser extension is not connected. Please ensure the Claude browser extension is installed and running"}]}]}}"#;
+
+    #[test]
+    fn notices_when_chrome_is_not_connected() {
+        let resp = chrome_stream(&[
+            TABS_CALL,
+            NOT_CONNECTED,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"mcp__claude-in-chrome__list_connected_browsers","input":{}}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":[{"type":"text","text":"[]"}]}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"StructuredOutput","input":{}}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t3","content":"Structured output provided successfully"}]}}"#,
+        ]);
+        assert!(resp.chrome_disconnected);
+    }
+
+    #[test]
+    fn a_browser_that_connects_later_is_fine() {
+        let resp = chrome_stream(&[
+            TABS_CALL,
+            NOT_CONNECTED,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t4","name":"mcp__claude-in-chrome__tabs_context_mcp","input":{}}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t4","content":[{"type":"text","text":"Tabs: 123 https://web.telegram.org"}]}]}}"#,
+        ]);
+        assert!(!resp.chrome_disconnected);
+        assert!(!chrome_stream(&[]).chrome_disconnected);
     }
 
     #[test]

@@ -719,6 +719,7 @@ impl ClaudeRunner for MockClaudeRunner {
                     .await?;
                 Self::profile_sync(ctx)
             }
+            "chrome_check" => json!({ "connected": true }),
             other => {
                 return Err(CoreError::other(format!(
                     "mock runner has no behaviour for task '{other}'"
@@ -740,6 +741,11 @@ impl ClaudeRunner for MockClaudeRunner {
             permission_denials: vec![],
             raw_log_path: None,
             duration_ms: 0,
+            // Tests simulate Chrome's extension being unreachable.
+            chrome_disconnected: ctx
+                .get("mockChromeDisconnected")
+                .and_then(|d| d.as_bool())
+                .unwrap_or(false),
         })
     }
 

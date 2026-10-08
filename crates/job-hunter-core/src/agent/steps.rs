@@ -91,8 +91,92 @@ impl StepCtx {
         Ok(req)
     }
 
-    /// Run Claude, streaming activity into the event feed.
+    /// Run Claude, streaming activity into the event feed. A browser task
+    /// that finds Chrome's Claude extension not connected (it takes a few
+    /// minutes after Chrome starts) waits for it and runs once more.
     pub async fn run_claude(&self, req: ClaudeRequest) -> CoreResult<ClaudeResponse> {
+        if !req.chrome {
+            return self.run_claude_once(req).await;
+        }
+        let response = self.run_claude_once(req.clone()).await?;
+        if !response.chrome_disconnected {
+            return Ok(response);
+        }
+        self.wait_for_chrome().await?;
+        let response = self.run_claude_once(req).await?;
+        if response.chrome_disconnected {
+            return Err(chrome_not_connected());
+        }
+        Ok(response)
+    }
+
+    /// Wait until Claude in Chrome reports a connected browser, checking
+    /// every half minute for up to [`CHROME_CONNECT_WAIT`].
+    async fn wait_for_chrome(&self) -> CoreResult<()> {
+        self.event(
+            EventLevel::Warn,
+            "MESSAGE",
+            "Chrome's Claude extension isn't connected yet; waiting for it (click the Claude icon in Chrome's toolbar to connect it now)",
+        );
+        let previous_activity = self.app.agent.status().await.current_activity;
+        self.activity("Waiting for Chrome's Claude extension to connect")
+            .await;
+        let deadline = tokio::time::Instant::now() + CHROME_CONNECT_WAIT;
+        loop {
+            if self.chrome_connected().await? {
+                self.event(EventLevel::Success, "STEP_DONE", "Chrome is connected");
+                if let Some(text) = previous_activity {
+                    self.activity(&text).await;
+                }
+                return Ok(());
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(chrome_not_connected());
+            }
+            tokio::select! {
+                _ = self.cancel.cancelled() => return Err(CoreError::Cancelled),
+                _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {}
+            }
+        }
+    }
+
+    /// Ask Claude in Chrome whether a browser is connected (a small, quick run).
+    async fn chrome_connected(&self) -> CoreResult<bool> {
+        let run_dir = self.run_dir();
+        std::fs::create_dir_all(&run_dir)?;
+        let mut req = ClaudeRequest::new(
+            "chrome_check",
+            "Call mcp__claude-in-chrome__list_connected_browsers once. Set connected to true if it lists at least one browser, otherwise false. Do nothing else.".into(),
+            run_dir,
+        );
+        req.chrome = true;
+        req.allowed_tools = vec!["mcp__claude-in-chrome__list_connected_browsers".into()];
+        req.json_schema = Some(json!({
+            "type": "object",
+            "properties": { "connected": { "type": "boolean" } },
+            "required": ["connected"]
+        }));
+        req.max_turns = 4;
+        req.model = Some("haiku".into());
+        req.timeout = std::time::Duration::from_secs(120);
+        req.max_duration = std::time::Duration::from_secs(180);
+        match self.run_claude_once(req).await {
+            Ok(resp) => Ok(!resp.chrome_disconnected
+                && resp
+                    .structured
+                    .as_ref()
+                    .and_then(|s| s.get("connected"))
+                    .and_then(|c| c.as_bool())
+                    .unwrap_or(false)),
+            Err(CoreError::Cancelled) => Err(CoreError::Cancelled),
+            Err(e) => {
+                tracing::warn!(error = %e, "could not check the Chrome connection");
+                Ok(false)
+            }
+        }
+    }
+
+    async fn run_claude_once(&self, req: ClaudeRequest) -> CoreResult<ClaudeResponse> {
         let runner = self.app.runner().await?;
         let app = self.app.clone();
         let run_id = self.run_id.clone();
@@ -149,6 +233,18 @@ impl StepCtx {
                 .await;
         }
         Ok(response)
+    }
+}
+
+/// How long a browser task waits for Chrome's Claude extension to connect.
+const CHROME_CONNECT_WAIT: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+fn chrome_not_connected() -> CoreError {
+    CoreError::ChromeNotConnected {
+        details: format!(
+            "Claude in Chrome reported no connected browser for {} minutes",
+            CHROME_CONNECT_WAIT.as_secs() / 60
+        ),
     }
 }
 

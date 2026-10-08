@@ -14,6 +14,8 @@ pub enum CoreError {
     ClaudeRunFailed { message: String, details: String },
     #[error("Claude in Chrome is not available")]
     ClaudeInChromeUnavailable { details: String },
+    #[error("Claude in Chrome is not connected")]
+    ChromeNotConnected { details: String },
     #[error("Google Chrome could not be found")]
     ChromeUnavailable { details: String },
     #[error("Backend is unavailable: {message}")]
@@ -65,6 +67,7 @@ impl CoreError {
             CoreError::ClaudeNotAuthenticated { .. } => "CLAUDE_NOT_AUTHENTICATED",
             CoreError::ClaudeRunFailed { .. } => "CLAUDE_RUN_FAILED",
             CoreError::ClaudeInChromeUnavailable { .. } => "CLAUDE_IN_CHROME_UNAVAILABLE",
+            CoreError::ChromeNotConnected { .. } => "CHROME_NOT_CONNECTED",
             CoreError::ChromeUnavailable { .. } => "CHROME_UNAVAILABLE",
             CoreError::BackendUnavailable { .. } => "BACKEND_UNAVAILABLE",
             CoreError::BackendNotConfigured => "BACKEND_NOT_CONFIGURED",
@@ -89,6 +92,7 @@ impl CoreError {
             | CoreError::ClaudeNotAuthenticated { details }
             | CoreError::ClaudeRunFailed { details, .. }
             | CoreError::ClaudeInChromeUnavailable { details }
+            | CoreError::ChromeNotConnected { details }
             | CoreError::ChromeUnavailable { details } => Some(details.clone()),
             CoreError::Io(e) => Some(e.to_string()),
             CoreError::Serde(e) => Some(e.to_string()),
@@ -106,6 +110,9 @@ impl CoreError {
             }
             CoreError::ClaudeInChromeUnavailable { .. } => {
                 "Claude in Chrome is not available. Install the Claude in Chrome extension, open Chrome, and make sure the extension is enabled.".into()
+            }
+            CoreError::ChromeNotConnected { .. } => {
+                "Chrome's Claude extension isn't connected, so Claude can't open a tab. This happens for a few minutes after Chrome starts. Click the Claude icon in Chrome's toolbar (sign in to claude.ai with the same account if it asks), then try again.".into()
             }
             CoreError::ChromeUnavailable { .. } => {
                 "Google Chrome could not be found. Install Chrome or set its path in Settings.".into()
