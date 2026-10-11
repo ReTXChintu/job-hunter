@@ -4,49 +4,65 @@ import 'package:provider/provider.dart';
 import '../services/relay_client.dart';
 import '../state/connection_controller.dart';
 import '../util/format.dart';
+import 'common.dart';
 
-/// A thin banner showing whether the desktop is reachable right now. This
-/// reflects the relay's own `presence` push, never a guess made on the
-/// phone.
+/// Says when the desktop can't be reached right now, from the relay's own
+/// `presence` push (never a guess made on the phone). Shows nothing while
+/// everything is fine.
 class PresenceBanner extends StatelessWidget {
   const PresenceBanner({super.key});
 
   @override
   Widget build(BuildContext context) {
     final connection = context.watch<ConnectionController>();
-    final scheme = Theme.of(context).colorScheme;
-
     if (connection.socketState != SocketState.connected) {
-      return _Bar(color: Colors.orange, icon: Icons.cloud_off, text: connection.socketState == SocketState.connecting ? 'Connecting to your Job Hunter server…' : 'Not connected to your Job Hunter server');
+      return InlineNotice(
+        color: Colors.orange,
+        icon: Icons.cloud_off,
+        text: connection.socketState == SocketState.connecting ? 'Connecting to your Job Hunter server…' : 'Not connected to your Job Hunter server',
+      );
     }
     if (!connection.desktopOnline) {
       final seen = connection.desktopLastSeenAt;
-      return _Bar(color: Colors.orange, icon: Icons.desktop_access_disabled, text: seen == null ? 'Desktop offline — actions need it running' : 'Desktop offline · last seen ${timeAgo(seen)}');
+      return InlineNotice(
+        color: Colors.orange,
+        icon: Icons.desktop_access_disabled,
+        text: seen == null ? 'Desktop offline — actions need it running' : 'Desktop offline · last seen ${timeAgo(seen)}',
+      );
     }
-    return _Bar(color: Colors.green, icon: Icons.desktop_windows, text: 'Desktop online', background: scheme.surface);
+    return const SizedBox.shrink();
   }
 }
 
-class _Bar extends StatelessWidget {
-  final Color color;
-  final IconData icon;
-  final String text;
-  final Color? background;
-  const _Bar({required this.color, required this.icon, required this.text, this.background});
+/// The connection in one small pill: online, offline or connecting.
+class ConnectionPill extends StatelessWidget {
+  /// Draw for a dark (hero) background.
+  final bool onDark;
+  const ConnectionPill({super.key, this.onDark = false});
 
   @override
   Widget build(BuildContext context) {
+    final connection = context.watch<ConnectionController>();
+    final (label, color, icon) = switch (connection.socketState) {
+      SocketState.connected when connection.desktopOnline => ('Desktop online', Colors.greenAccent.shade400, Icons.desktop_windows),
+      SocketState.connected => ('Desktop offline', Colors.orangeAccent, Icons.desktop_access_disabled),
+      SocketState.connecting => ('Connecting…', Colors.orangeAccent, Icons.sync),
+      SocketState.disconnected => ('No connection', Colors.orangeAccent, Icons.cloud_off),
+    };
+    final fg = onDark ? Colors.white : Theme.of(context).colorScheme.onSurface;
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: background ?? color.withValues(alpha: 0.12),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600))),
-        ],
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: onDark ? Colors.white.withValues(alpha: 0.16) : Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
       ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Icon(icon, size: 13, color: fg),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w700)),
+      ]),
     );
   }
 }

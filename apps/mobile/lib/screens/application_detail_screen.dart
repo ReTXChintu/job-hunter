@@ -13,7 +13,7 @@ import '../theme/theme.dart';
 import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/match_score_bar.dart';
+import '../widgets/job_tile.dart';
 import '../widgets/question_form.dart';
 import '../widgets/status_badge.dart';
 
@@ -133,9 +133,13 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
 
   Widget _approvalBar(Application app, Job job, String? disabledReason) {
     final enabled = !_acting && disabledReason == null;
-    return SafeArea(
-      minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      elevation: 8,
+      shadowColor: Colors.black26,
+      child: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (disabledReason != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(disabledReason, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.error))),
         Row(children: [
           Expanded(
@@ -168,6 +172,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
           ),
         ]),
       ]),
+      ),
     );
   }
 
@@ -298,36 +303,46 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final facts = [job.employmentType, job.remote, job.seniority].whereType<String>().where((s) => s.isNotEmpty).map((s) => s.replaceAll('_', ' ').toLowerCase()).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(job.title.isEmpty ? 'Untitled job' : job.title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 4),
-        Text(job.companyLine, style: theme.textTheme.titleMedium),
-        if (job.salary != null) Text(job.salary!, style: theme.textTheme.bodyMedium),
-        if (facts.isNotEmpty) Text(facts.join(' · '), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          StatusBadge(status: app.status),
-          MatchScoreBar(score: analysis?.matchScore, relevant: analysis?.relevant),
-          if (job.source.isNotEmpty) Tag(job.source, color: theme.colorScheme.secondary),
-        ]),
-        if (job.isEmailPost) ...[
-          const SizedBox(height: 10),
-          Row(children: [
-            const Icon(Icons.mail_outline, size: 18, color: Colors.indigo),
-            const SizedBox(width: 6),
-            Expanded(child: Text('Applies by email to ${job.contactName != null ? '${job.contactName} · ' : ''}${job.applyEmail}', style: theme.textTheme.bodyMedium)),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(job.title.isEmpty ? 'Untitled job' : job.title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.3, height: 1.15)),
+                const SizedBox(height: 4),
+                Text(job.companyLine, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                MetaLine([if (job.salary != null) job.salary!, ...facts]),
+              ]),
+            ),
+            const SizedBox(width: 12),
+            MatchRing(score: analysis?.matchScore, relevant: analysis?.relevant, size: 54),
           ]),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            StatusBadge(status: app.status),
+            if (job.source.isNotEmpty) Tag(job.source, color: theme.colorScheme.secondary),
+            if (app.appliedAt != null) Tag('Applied ${formatDateTime(context, app.appliedAt)}', color: Colors.green, icon: Icons.check),
+          ]),
+          if (job.isEmailPost) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              const Icon(Icons.mail_outline, size: 18, color: Colors.indigo),
+              const SizedBox(width: 6),
+              Expanded(child: Text('Applies by email to ${job.contactName != null ? '${job.contactName} · ' : ''}${job.applyEmail}', style: theme.textTheme.bodyMedium)),
+            ]),
+          ],
+          if (job.url.isNotEmpty || (app.applicationUrl.isNotEmpty && app.applicationUrl != job.url)) ...[
+            const SizedBox(height: 6),
+            Wrap(spacing: 4, children: [
+              if (job.url.isNotEmpty) TextButton.icon(onPressed: () => openExternal(context, job.url), icon: const Icon(Icons.open_in_new, size: 16), label: const Text('View posting')),
+              if (app.applicationUrl.isNotEmpty && app.applicationUrl != job.url)
+                TextButton.icon(onPressed: () => openExternal(context, app.applicationUrl), icon: const Icon(Icons.link, size: 16), label: const Text('Application page')),
+            ]),
+          ],
         ],
-        const SizedBox(height: 4),
-        Wrap(spacing: 4, children: [
-          if (job.url.isNotEmpty) TextButton.icon(onPressed: () => openExternal(context, job.url), icon: const Icon(Icons.open_in_new, size: 16), label: const Text('View posting')),
-          if (app.applicationUrl.isNotEmpty && app.applicationUrl != job.url)
-            TextButton.icon(onPressed: () => openExternal(context, app.applicationUrl), icon: const Icon(Icons.link, size: 16), label: const Text('Application page')),
-        ]),
-        if (app.appliedAt != null) Text('Applied ${formatDateTime(context, app.appliedAt)}', style: theme.textTheme.bodySmall),
-      ],
+      ),
     );
   }
 }

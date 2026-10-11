@@ -12,6 +12,7 @@ import 'state/jobs_controller.dart';
 import 'state/nav_controller.dart';
 import 'state/notifications_controller.dart';
 import 'state/profiles_controller.dart';
+import 'state/queue_controller.dart';
 import 'state/update_controller.dart';
 
 Future<void> main() async {
@@ -59,6 +60,10 @@ Future<void> main() async {
         ChangeNotifierProxyProvider<ConnectionController, AgentController>(
           create: (context) => AgentController(context.read<ConnectionController>()),
           update: (_, connection, previous) => previous ?? AgentController(connection),
+        ),
+        ChangeNotifierProxyProvider<ConnectionController, QueueController>(
+          create: (context) => QueueController(context.read<ConnectionController>()),
+          update: (_, connection, previous) => previous ?? QueueController(connection),
         ),
         ChangeNotifierProxyProvider<ConnectionController, ProfilesController>(
           create: (context) => ProfilesController(context.read<ConnectionController>()),

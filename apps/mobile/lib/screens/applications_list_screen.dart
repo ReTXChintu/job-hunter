@@ -8,9 +8,8 @@ import '../state/nav_controller.dart';
 import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/match_score_bar.dart';
+import '../widgets/job_tile.dart';
 import '../widgets/presence_banner.dart';
-import '../widgets/status_badge.dart';
 import 'application_detail_screen.dart';
 
 /// Every application, filtered by what it needs (chips with counts) and
@@ -61,7 +60,7 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
     if (apps.items.isEmpty && apps.loading) {
       body = const Center(child: CircularProgressIndicator());
     } else if (apps.items.isEmpty) {
-      body = _Scrollable(
+      body = PullableEmpty(
         onRefresh: apps.refresh,
         child: EmptyState(
           icon: apps.error != null ? Icons.error_outline : Icons.inbox_outlined,
@@ -70,18 +69,17 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
         ),
       );
     } else if (rows.isEmpty) {
-      body = _Scrollable(
+      body = PullableEmpty(
         onRefresh: apps.refresh,
         child: EmptyState(icon: Icons.filter_alt_off_outlined, title: 'Nothing here', message: _search.text.trim().isNotEmpty ? 'No applications match "${_search.text.trim()}".' : _bucket.emptyMessage),
       );
     } else {
       body = RefreshIndicator(
         onRefresh: apps.refresh,
-        child: ListView.separated(
+        child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.only(top: 4, bottom: 24),
           itemCount: rows.length,
-          separatorBuilder: (context, index) => const Divider(height: 1),
           itemBuilder: (context, i) => ApplicationRow(item: rows[i]),
         ),
       );
@@ -93,44 +91,13 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
         children: [
           const PresenceBanner(),
           DataSourceBanner(apps.source),
-          if (apps.error != null && apps.items.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: Text(apps.error!, style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer, fontSize: 13)),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-            child: TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                isDense: true,
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'Search title or company',
-                suffixIcon: _search.text.isEmpty ? null : IconButton(icon: const Icon(Icons.clear), onPressed: () => setState(_search.clear)),
-              ),
-            ),
-          ),
-          SizedBox(
-            height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              children: [
-                for (final b in ApplicationBucket.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text('${b.label} (${counts[b]})'),
-                      selected: _bucket == b,
-                      onSelected: (_) => setState(() => _bucket = b),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-              ],
-            ),
+          if (apps.error != null && apps.items.isNotEmpty) InlineNotice(icon: Icons.error_outline, text: apps.error!, color: Theme.of(context).colorScheme.error),
+          SearchField(controller: _search, hint: 'Search title or company', onChanged: () => setState(() {})),
+          FilterChips<ApplicationBucket>(
+            values: ApplicationBucket.values,
+            selected: _bucket,
+            label: (b) => '${b.label} (${counts[b]})',
+            onSelected: (b) => setState(() => _bucket = b),
           ),
           if (apps.loading && apps.items.isNotEmpty) const LinearProgressIndicator(minHeight: 2),
           Expanded(child: body),
@@ -140,11 +107,70 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
   }
 }
 
+/// The search box above a list.
+class SearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final VoidCallback onChanged;
+  const SearchField({super.key, required this.controller, required this.hint, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        decoration: InputDecoration(
+          prefixIcon: const Icon(Icons.search, size: 20),
+          hintText: hint,
+          suffixIcon: controller.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged();
+                  },
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A horizontal row of filter chips with counts.
+class FilterChips<T> extends StatelessWidget {
+  final List<T> values;
+  final T selected;
+  final String Function(T) label;
+  final ValueChanged<T> onSelected;
+  const FilterChips({super.key, required this.values, required this.selected, required this.label, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 50,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        children: [
+          for (final v in values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(label: Text(label(v)), selected: selected == v, onSelected: (_) => onSelected(v)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Makes a non-list body pullable to refresh.
-class _Scrollable extends StatelessWidget {
+class PullableEmpty extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Widget child;
-  const _Scrollable({required this.onRefresh, required this.child});
+  const PullableEmpty({super.key, required this.onRefresh, required this.child});
 
   @override
   Widget build(BuildContext context) => RefreshIndicator(
@@ -166,37 +192,19 @@ class ApplicationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final job = item.job;
     final app = item.application;
-    final theme = Theme.of(context);
-    return InkWell(
+    return JobTile(
+      title: job.title,
+      subtitle: job.companyLine,
+      status: app.status,
+      score: item.analysis?.matchScore,
+      relevant: item.analysis?.relevant,
+      tags: [
+        if (job.isEmailPost) const Tag('email', color: Colors.indigo, icon: Icons.mail_outline),
+        if (app.replies.isNotEmpty) Tag('${app.replies.length} ${app.replies.length == 1 ? 'reply' : 'replies'}', color: Colors.teal, icon: Icons.forward_to_inbox),
+        if (app.pendingQuestions.isNotEmpty) Tag('${app.pendingQuestions.length} question${app.pendingQuestions.length == 1 ? '' : 's'}', color: Colors.orange, icon: Icons.help_outline),
+      ],
+      footnote: app.updatedAt.year > 1970 ? 'Updated ${timeAgo(app.updatedAt)}' : null,
       onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ApplicationDetailScreen(applicationId: app.id))),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(job.title.isEmpty ? 'Untitled job' : job.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
-            Text(job.companyLine, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(
-                child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  StatusBadge(status: app.status),
-                  if (job.isEmailPost) const Tag('email', color: Colors.indigo, icon: Icons.mail_outline),
-                  if (app.replies.isNotEmpty) Tag('${app.replies.length} ${app.replies.length == 1 ? 'reply' : 'replies'}', color: Colors.teal, icon: Icons.forward_to_inbox),
-                  if (app.pendingQuestions.isNotEmpty) Tag('${app.pendingQuestions.length} question${app.pendingQuestions.length == 1 ? '' : 's'}', color: Colors.orange),
-                ]),
-              ),
-              const SizedBox(width: 8),
-              MatchScoreBar(score: item.analysis?.matchScore, relevant: item.analysis?.relevant),
-            ]),
-            if (app.updatedAt.year > 1970) ...[
-              const SizedBox(height: 4),
-              Text('Updated ${timeAgo(app.updatedAt)}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

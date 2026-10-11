@@ -11,7 +11,7 @@ import '../theme/theme.dart';
 import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/match_score_bar.dart';
+import '../widgets/job_tile.dart';
 import '../widgets/status_badge.dart';
 import 'application_detail_screen.dart';
 
@@ -93,28 +93,38 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               children: [
-                Text(job.title.isEmpty ? 'Untitled job' : job.title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(job.companyLine, style: theme.textTheme.titleMedium),
-                if (job.salary != null) Text(job.salary!),
-                if (facts.isNotEmpty) Text(facts.join(' · '), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  StatusBadge(status: job.status),
-                  MatchScoreBar(score: analysis?.matchScore, relevant: analysis?.relevant),
-                  if (job.source.isNotEmpty) Tag(job.source, color: theme.colorScheme.secondary),
-                ]),
-                if (job.discoveredAt != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Found ${formatDateTime(context, job.discoveredAt)}', style: theme.textTheme.bodySmall)),
-                if (job.isEmailPost) ...[
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    const Icon(Icons.mail_outline, size: 18, color: Colors.indigo),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text('Hiring post: apply by email to ${job.contactName != null ? '${job.contactName} · ' : ''}${job.applyEmail}')),
+                AppCard(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(job.title.isEmpty ? 'Untitled job' : job.title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.3, height: 1.15)),
+                          const SizedBox(height: 4),
+                          Text(job.companyLine, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                          MetaLine([if (job.salary != null) job.salary!, ...facts]),
+                        ]),
+                      ),
+                      const SizedBox(width: 12),
+                      MatchRing(score: analysis?.matchScore, relevant: analysis?.relevant, size: 54),
+                    ]),
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                      StatusBadge(status: job.status),
+                      if (job.source.isNotEmpty) Tag(job.source, color: theme.colorScheme.secondary),
+                      if (job.discoveredAt != null) Tag('Found ${formatDateTime(context, job.discoveredAt)}', color: theme.colorScheme.onSurfaceVariant, icon: Icons.schedule),
+                    ]),
+                    if (job.isEmailPost) ...[
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        const Icon(Icons.mail_outline, size: 18, color: Colors.indigo),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('Hiring post: apply by email to ${job.contactName != null ? '${job.contactName} · ' : ''}${job.applyEmail}')),
+                      ]),
+                    ],
+                    if (job.url.isNotEmpty)
+                      Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: () => openExternal(context, job.url), icon: const Icon(Icons.open_in_new, size: 16), label: const Text('View source posting'))),
                   ]),
-                ],
-                if (job.url.isNotEmpty)
-                  Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: () => openExternal(context, job.url), icon: const Icon(Icons.open_in_new, size: 16), label: const Text('View source posting'))),
+                ),
                 if (application != null)
                   Callout(
                     icon: Icons.fact_check_outlined,
