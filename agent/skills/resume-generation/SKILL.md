@@ -15,7 +15,7 @@ Produce a tailored, ATS-friendly resume (as structured content) and, when reques
 2. Keep the candidate's real job titles and employers. Do not rename a title to match the posting.
 3. `headline`: the candidate's real current title or a truthful descriptor (e.g. "Full Stack Developer (React, Node.js)").
 4. `summary`: three to four sentences targeted at this job, naming the technologies the candidate actually has that the posting asks for.
-5. `skills`: grouped sections (e.g. Frontend, Backend, Databases, Cloud & DevOps, Testing, Other). Order the groups and items so the posting's keywords appear early, but include only skills the candidate listed.
+5. `skills`: grouped sections (e.g. Frontend, Backend, Databases, Cloud & DevOps, Testing, Other). Order the groups and items so the posting's keywords appear early, but include only skills the candidate listed. A listed skill may be written with the standard parts the posting asks for when that is how the posting phrases it ("React (hooks, context)", "Node.js (npm, REST APIs)"); a separate technology the candidate did not list never appears.
 6. `experience`: most relevant first if the dates allow (otherwise reverse-chronological). Three to six bullets each; start with a verb; include technologies and any real metrics from the records. Do not add metrics that are not in the records.
 7. `projects`: pick the two to four most relevant; each with a one-line description and technologies.
 8. `education`, `certifications`, `achievements`, `languages`: copy from the records.
