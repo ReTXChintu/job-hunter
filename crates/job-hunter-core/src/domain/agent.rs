@@ -258,6 +258,9 @@ pub struct AgentStatus {
     pub error: Option<String>,
     pub mock: bool,
     pub paused: bool,
+    /// Tasks waiting for the agent to be free (see `domain::queue`).
+    #[serde(default)]
+    pub queued: u32,
 }
 
 impl Default for AgentStatus {
@@ -273,6 +276,7 @@ impl Default for AgentStatus {
             error: None,
             mock: false,
             paused: false,
+            queued: 0,
         }
     }
 }

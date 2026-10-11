@@ -9,9 +9,11 @@ use std::sync::Arc;
 use base64::Engine;
 use serde_json::{json, Value};
 
-use crate::agent::{inbox, job_link, orchestrator, profile_sync, shared_job};
+use crate::agent::{orchestrator, profile_sync, queue};
 use crate::context::AppContext;
-use crate::domain::{AnswerRecord, AnswerSource, ApplicationAnswer, ApplicationStatus};
+use crate::domain::{
+    AgentTask, AnswerRecord, AnswerSource, ApplicationAnswer, ApplicationStatus, Submission,
+};
 use crate::error::{CoreError, CoreResult};
 
 use super::protocol::{
@@ -180,8 +182,17 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
         }
         "apply_application" => {
             let WithId { id } = parse(payload)?;
-            let run = orchestrator::apply_application(app.clone(), &id, false, None).await?;
-            Ok(json!({ "runId": run.id }))
+            submitted(
+                queue::submit(
+                    app.clone(),
+                    AgentTask::Application {
+                        application_id: id,
+                        resume: false,
+                        simulate: None,
+                    },
+                )
+                .await?,
+            )
         }
         "answer_application_questions" => {
             let p: AnswerQuestionsPayload = parse(payload)?;
@@ -220,26 +231,25 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
             let s = app.agent.status().await;
             Ok(json!({
                 "state": s.state, "paused": s.paused, "runKind": s.run_kind, "progress": s.progress,
+                "queued": s.queued,
             }))
         }
         "start_job_hunt" => {
             let p: JobHuntPayload = parse_or_default(payload)?;
-            let run = orchestrator::start_job_hunt(
-                app.clone(),
-                orchestrator::JobHuntOptions {
-                    discover_only: p.discover_only,
-                    prepare_only: p.prepare_only,
-                    sources: p.sources,
-                },
+            submitted(
+                queue::submit(
+                    app.clone(),
+                    AgentTask::JobHunt {
+                        discover_only: p.discover_only,
+                        prepare_only: p.prepare_only,
+                        sources: p.sources,
+                    },
+                )
+                .await?,
             )
-            .await?;
-            Ok(json!({ "runId": run.id }))
         }
         "stop_job_hunt" => Ok(json!({ "stopped": app.agent.request_stop().await })),
-        "check_inbox" => {
-            let run = inbox::start_inbox_check(app.clone()).await?;
-            Ok(json!({ "runId": run.id }))
-        }
+        "check_inbox" => submitted(queue::submit(app.clone(), AgentTask::InboxCheck).await?),
         // ---- jobs ----------------------------------------------------------
         "list_jobs" => {
             let mut v = serde_json::to_value(app.list_jobs()?)?;
@@ -255,8 +265,9 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
         }
         "generate_resume" => {
             let p: JobIdPayload = parse(payload)?;
-            let run = orchestrator::generate_resume(app.clone(), p.job_id).await?;
-            Ok(json!({ "runId": run.id }))
+            submitted(
+                queue::submit(app.clone(), AgentTask::GenerateResume { job_id: p.job_id }).await?,
+            )
         }
         "reject_job" => {
             let WithId { id } = parse(payload)?;
@@ -268,42 +279,69 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
         )?),
         "sync_platform_profile" => {
             let p: PlatformPayload = parse(payload)?;
-            let run = profile_sync::start_profile_sync(app.clone(), &p.platform, vec![], p.resume)
-                .await?;
-            Ok(json!({ "runId": run.id }))
+            submitted(
+                queue::submit(
+                    app.clone(),
+                    AgentTask::ProfileSync {
+                        platform: p.platform,
+                        resume: p.resume,
+                        answers: vec![],
+                    },
+                )
+                .await?,
+            )
         }
         "apply_from_link" => {
             let p: LinkPayload = parse(payload)?;
-            let run =
-                job_link::start_job_link(app.clone(), &p.url, p.apply_now.unwrap_or(true)).await?;
-            Ok(json!({ "runId": run.id }))
+            submitted(
+                queue::submit(
+                    app.clone(),
+                    AgentTask::JobLink {
+                        url: p.url,
+                        apply_now: p.apply_now.unwrap_or(true),
+                    },
+                )
+                .await?,
+            )
         }
         "add_shared_job" => {
             let p: SharedJobPayload = parse(payload)?;
-            let files = write_attachments(app, &p.attachments)?;
-            let run = shared_job::start_shared_job(
-                app.clone(),
-                shared_job::SharedJobInput {
-                    text: p.text,
-                    files,
-                    draft_email: p.draft_email.unwrap_or(true),
-                },
+            let files = write_attachments(app, &p.attachments)?
+                .into_iter()
+                .map(|f| f.to_string_lossy().into_owned())
+                .collect();
+            submitted(
+                queue::submit(
+                    app.clone(),
+                    AgentTask::SharedJob {
+                        text: p.text,
+                        files,
+                        draft_email: p.draft_email.unwrap_or(true),
+                    },
+                )
+                .await?,
             )
-            .await?;
-            Ok(json!({ "runId": run.id }))
         }
+        // ---- the queue -----------------------------------------------------
+        "list_queue" => Ok(serde_json::to_value(queue::list(app)?)?),
+        "remove_queued_task" => {
+            let WithId { id } = parse(payload)?;
+            Ok(json!({ "removed": queue::remove(app, &id).await? }))
+        }
+        "clear_queue" => Ok(json!({ "removed": queue::clear(app).await? })),
         "queue_profile_updates" => Ok(json!({
             "queued": profile_sync::queue_out_of_date(app).await?
         })),
         "answer_platform_questions" => {
             let p: PlatformAnswersPayload = parse(payload)?;
-            let run = profile_sync::answer_platform_questions(
-                app.clone(),
-                &p.platform,
-                user_answers(p.answers),
+            submitted(
+                profile_sync::answer_platform_questions(
+                    app.clone(),
+                    &p.platform,
+                    user_answers(p.answers),
+                )
+                .await?,
             )
-            .await?;
-            Ok(json!({ "runId": run.id }))
         }
         // ---- saved answers (Candidate > Additional details) --------------
         "list_answers" => Ok(serde_json::to_value(app.list_answers()?)?),
@@ -328,6 +366,17 @@ pub async fn dispatch(app: &Arc<AppContext>, kind: &str, payload: Value) -> Core
 }
 
 /// Like [`parse`], but an empty or missing payload means "defaults".
+/// What a start request answers: the run, or its place in the queue.
+fn submitted(s: Submission) -> CoreResult<Value> {
+    Ok(match (s.run, s.queued) {
+        (Some(run), _) => json!({ "runId": run.id, "queued": false }),
+        (None, Some(q)) => {
+            json!({ "queued": true, "queuedId": q.id, "position": s.position, "title": q.title })
+        }
+        (None, None) => json!({ "queued": false }),
+    })
+}
+
 fn parse_or_default<T: serde::de::DeserializeOwned + Default>(payload: Value) -> CoreResult<T> {
     if payload.is_null() || payload.as_object().is_some_and(|o| o.is_empty()) {
         return Ok(T::default());

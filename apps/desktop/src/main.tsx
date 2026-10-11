@@ -4,6 +4,7 @@ import { ChakraProvider } from "@chakra-ui/react";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
+import { Toaster } from "./components/ui/toaster";
 import { system } from "./theme";
 import { router } from "./router";
 import { BackendEvents } from "./lib/events";
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
           <BackendEvents />
           <RouterProvider router={router} />
+          <Toaster />
         </QueryClientProvider>
       </ThemeProvider>
     </ChakraProvider>

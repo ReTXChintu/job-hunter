@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Table, Tabs, Text } from "@chakra-ui/react";
 import { useNavigate } from "@tanstack/react-router";
-import { isAgentRunning, timeAgo } from "@job-hunter/shared";
+import { timeAgo } from "@job-hunter/shared";
 import type { ApplicationStatus } from "@job-hunter/types";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { Mail } from "lucide-react";
@@ -29,7 +29,6 @@ export function ApplicationsPage() {
   const checkInbox = useCheckInbox();
   const agent = useAgentStatus();
   const settings = useSettings();
-  const busy = agent.data ? isAgentRunning(agent.data.state) : false;
   const hours = settings.data?.inboxCheckHours ?? 0;
   const runs = useRuns(40);
   const lastCheck = runs.data?.find((r) => r.kind === "INBOX_CHECK");
@@ -45,7 +44,7 @@ export function ApplicationsPage() {
             variant="outline"
             onClick={() => checkInbox.mutate()}
             loading={checkInbox.isPending || agent.data?.state === "CHECKING_INBOX"}
-            disabled={busy || sent === 0}
+            disabled={sent === 0}
             title={hours ? `Also checked automatically every ${hours} hours` : "Automatic checks are off (Settings)"}
           >
             <Mail size={14} /> Check Gmail for replies
@@ -60,7 +59,7 @@ export function ApplicationsPage() {
               {lastCheck.error ?? "Claude couldn't read Gmail."} Make sure Chrome is open with the Claude extension connected and Gmail signed in.
               {hours ? " It retries by itself in 15 minutes." : ""}
             </Text>
-            <Button size="xs" colorPalette="brand" onClick={() => checkInbox.mutate()} loading={checkInbox.isPending} disabled={busy}>
+            <Button size="xs" colorPalette="brand" onClick={() => checkInbox.mutate()} loading={checkInbox.isPending}>
               <Mail size={12} /> Retry now
             </Button>
           </HStack>

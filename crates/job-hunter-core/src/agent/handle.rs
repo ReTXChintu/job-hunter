@@ -75,9 +75,19 @@ impl AgentHandle {
             error: None,
             mock: run.mock,
             paused: false,
+            queued: status.queued,
         };
         self.bus.emit_status(status.clone());
         Ok(token)
+    }
+
+    /// How many tasks wait in the queue; shown with the status everywhere.
+    pub async fn set_queued(&self, n: u32) {
+        let mut status = self.status.write().await;
+        if status.queued != n {
+            status.queued = n;
+            self.bus.emit_status(status.clone());
+        }
     }
 
     pub async fn set_task(&self, task: JoinHandle<()>) {

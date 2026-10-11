@@ -765,7 +765,16 @@ pub async fn approve_application(
         .with_data(json!({ "applicationId": application.id, "status": "APPROVED" })),
     );
     if apply_now {
-        apply_application(app, application_id, false, None).await?;
+        // Queued behind whatever the agent is doing, if anything.
+        super::queue::submit(
+            app,
+            AgentTask::Application {
+                application_id: application_id.to_string(),
+                resume: false,
+                simulate: None,
+            },
+        )
+        .await?;
     }
     Ok(application)
 }
@@ -972,8 +981,15 @@ pub async fn answer_questions(
     }
     application.updated_at = now();
     app.store.put(&application)?;
-    let id = application.id.clone();
-    apply_application(app, &id, true, None).await?;
+    super::queue::submit(
+        app,
+        AgentTask::Application {
+            application_id: application.id.clone(),
+            resume: true,
+            simulate: None,
+        },
+    )
+    .await?;
     Ok(application)
 }
 

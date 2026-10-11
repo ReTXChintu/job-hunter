@@ -27,6 +27,7 @@ export function DesktopActions({ desktopOnline }: { desktopOnline: boolean | nul
   const known = desktopOnline === true && status.isSuccess;
   const running = known && isAgentRunning(status.data.state);
   const progress = running && status.data.progress != null ? ` · ${Math.round(status.data.progress)}%` : "";
+  const queued = known && status.data.queued ? ` · ${status.data.queued} queued` : "";
 
   const start = (key: string, sources: string[] | undefined, success: string) =>
     action.run({ key, run: () => api.startJobHunt(sources ? { sources } : {}), success });
@@ -38,7 +39,7 @@ export function DesktopActions({ desktopOnline }: { desktopOnline: boolean | nul
           {desktopOnline === false
             ? "Your desktop is offline. Open Job Hunter on your computer to run these."
             : known
-              ? `${AGENT_STATE_LABELS[status.data.state] ?? status.data.state}${progress}`
+              ? `${AGENT_STATE_LABELS[status.data.state] ?? status.data.state}${progress}${queued}`
               : "Runs on your computer, the same as its own buttons."}
         </Text>
         <Flex gap={2} wrap="wrap">
@@ -48,7 +49,7 @@ export function DesktopActions({ desktopOnline }: { desktopOnline: boolean | nul
             onClick={() => start("hunt", undefined, "Job hunt started on your desktop. New matches show up here as they're found.")}
             loading={action.running("hunt")}
             loadingText="Starting…"
-            disabled={action.busy || running}
+            disabled={action.busy}
           >
             <Play size={14} /> Start job hunt
           </Button>
@@ -58,7 +59,7 @@ export function DesktopActions({ desktopOnline }: { desktopOnline: boolean | nul
             onClick={() => start("posts", ["LinkedIn Posts"], "Looking for hiring posts on LinkedIn from your desktop.")}
             loading={action.running("posts")}
             loadingText="Starting…"
-            disabled={action.busy || running}
+            disabled={action.busy}
           >
             <Megaphone size={14} /> Find hiring posts
           </Button>
@@ -68,7 +69,7 @@ export function DesktopActions({ desktopOnline }: { desktopOnline: boolean | nul
             onClick={() => action.run({ key: "inbox", run: () => api.checkInbox(), success: "Your desktop is checking Gmail for replies." })}
             loading={action.running("inbox")}
             loadingText="Starting…"
-            disabled={action.busy || running}
+            disabled={action.busy}
           >
             <Mail size={14} /> Check Gmail for replies
           </Button>

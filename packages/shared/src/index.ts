@@ -147,12 +147,13 @@ export interface ApplicationActions {
   canTrack: boolean;
 }
 
-export function applicationActions(status: ApplicationStatus, agentBusy: boolean): ApplicationActions {
+/** A busy agent doesn't disable anything: the request waits in its queue. */
+export function applicationActions(status: ApplicationStatus): ApplicationActions {
   return {
     canApprove: status === "READY_FOR_REVIEW" || status === "REJECTED",
     canReject: !["REJECTED", "WITHDRAWN", "APPLIED", "INTERVIEW", "OFFER"].includes(status),
-    canApply: status === "APPROVED" && !agentBusy,
-    canAnswer: status === "WAITING_FOR_USER" && !agentBusy,
+    canApply: status === "APPROVED",
+    canAnswer: status === "WAITING_FOR_USER",
     canMarkApplied: ["MANUAL_ACTION_REQUIRED", "WAITING_FOR_USER", "APPROVED"].includes(status),
     canApplyManually: ["MANUAL_ACTION_REQUIRED", "WAITING_FOR_USER", "APPROVED", "READY_FOR_REVIEW"].includes(status),
     canTrack: ["APPLIED", "INTERVIEW", "OFFER"].includes(status),

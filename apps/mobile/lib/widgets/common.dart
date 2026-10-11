@@ -197,11 +197,23 @@ class Callout extends StatelessWidget {
 bool showOutcome(BuildContext context, RelayResponse resp, {String? success}) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (resp.ok) {
-    if (success != null) messenger?.showSnackBar(SnackBar(content: Text(success)));
+    final data = resp.data;
+    // The desktop queued it behind what it's doing: say that, not "started".
+    final queued = data is Map && data['queued'] == true;
+    final text = queued ? queuedMessage(data) : success;
+    if (text != null) messenger?.showSnackBar(SnackBar(content: Text(text)));
     return true;
   }
   messenger?.showSnackBar(SnackBar(content: Text(friendlyError(resp)), duration: const Duration(seconds: 6)));
   return false;
+}
+
+String queuedMessage(Map data) {
+  final position = data['position'];
+  final title = data['title'];
+  final where = position is num && position > 0 ? ' (#${position.toInt()})' : '';
+  final what = title is String && title.isNotEmpty ? ': $title' : '';
+  return 'Queued on your desktop$where$what. It starts when the agent is free.';
 }
 
 /// A yes/no confirmation. Returns true only on confirm.

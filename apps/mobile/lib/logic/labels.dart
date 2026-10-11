@@ -33,8 +33,8 @@ const runKindLabels = <String, String>{
 
 String runKindLabel(String kind) => runKindLabels[kind] ?? kind;
 
-/// States in which the agent is doing something and a new run would be
-/// refused; the desktop is still the judge (it answers `AGENT_BUSY`).
+/// States in which the agent is doing something; a new request made now
+/// waits in the desktop's queue and starts by itself once the agent is free.
 const _busyStates = {'INITIALIZING', 'DISCOVERING', 'EXTRACTING', 'DEDUPLICATING', 'ANALYZING', 'PREPARING_APPLICATIONS', 'APPLYING', 'UPDATING_PROFILE', 'CHECKING_INBOX', 'PAUSED', 'STOPPING'};
 
 bool agentBusy(String state) => _busyStates.contains(state);

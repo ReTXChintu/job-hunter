@@ -60,7 +60,7 @@ export function ApplicationReviewPage() {
   const { application, job, analysis, resume, coverLetter } = detail.data;
   const busy = agent.data ? isAgentRunning(agent.data.state) : false;
   const thisRunActive = busy && agent.data?.runKind === "APPLICATION" && activity.some((e) => e.runId === agent.data?.runId);
-  const actions = applicationActions(application.status, busy);
+  const actions = applicationActions(application.status);
   const applyUrl = application.applicationUrl || job.url;
   const byEmail = !!job.applyEmail;
   const approveLabel = byEmail ? "Approve & Send email" : "Approve & Apply";
@@ -98,7 +98,7 @@ export function ApplicationReviewPage() {
             </Button>
           ) : null}
           {actions.canApprove ? (
-            <Button size="sm" colorPalette="brand" onClick={() => setConfirm("approve")} disabled={busy}>
+            <Button size="sm" colorPalette="brand" onClick={() => setConfirm("approve")}>
               <Check size={14} /> {approveLabel}
             </Button>
           ) : null}
@@ -144,7 +144,7 @@ export function ApplicationReviewPage() {
                   <Checkbox.Control />
                   <Checkbox.Label>Remember these answers for future applications</Checkbox.Label>
                 </Checkbox.Root>
-                <Button colorPalette="brand" onClick={submitAnswers} loading={answer.isPending} disabled={busy}>
+                <Button colorPalette="brand" onClick={submitAnswers} loading={answer.isPending}>
                   <Send size={14} /> Continue application
                 </Button>
               </HStack>
@@ -174,7 +174,7 @@ export function ApplicationReviewPage() {
                 <Check size={14} /> Mark as Applied
               </Button>
               {application.approvedAt ? (
-                <Button size="sm" variant="ghost" onClick={() => apply.mutate({ id: application.id })} loading={apply.isPending} disabled={busy}>
+                <Button size="sm" variant="ghost" onClick={() => apply.mutate({ id: application.id })} loading={apply.isPending}>
                   <RefreshCw size={14} /> {application.claudeSessionId ? "Resume where it stopped" : "Retry automatically"}
                 </Button>
               ) : null}
@@ -337,7 +337,7 @@ export function ApplicationReviewPage() {
               </Heading>
               <HStack gap={2}>
                 <FileLinks resume={resume} coverLetter={coverLetter} />
-                <Button size="xs" variant="ghost" onClick={() => regenerate.mutate(job.id)} loading={regenerate.isPending} disabled={busy || application.status === "APPLIED"}>
+                <Button size="xs" variant="ghost" onClick={() => regenerate.mutate(job.id)} loading={regenerate.isPending} disabled={application.status === "APPLIED"}>
                   <RefreshCw size={12} /> Regenerate
                 </Button>
               </HStack>
@@ -376,7 +376,7 @@ export function ApplicationReviewPage() {
                         <InfoBanner status="success" title={`Added ${markedSkills.join(", ")} to your skills`}>
                           <HStack justify="space-between" gap={3} wrap="wrap">
                             <Text fontSize="sm">This resume was written before. Regenerate it so it can include {markedSkills.length === 1 ? "it" : "them"}.</Text>
-                            <Button size="xs" colorPalette="brand" onClick={() => regenerate.mutate(job.id, { onSuccess: () => setMarkedSkills([]) })} loading={regenerate.isPending} disabled={busy || application.status === "APPLIED"}>
+                            <Button size="xs" colorPalette="brand" onClick={() => regenerate.mutate(job.id, { onSuccess: () => setMarkedSkills([]) })} loading={regenerate.isPending} disabled={application.status === "APPLIED"}>
                               <RefreshCw size={12} /> Regenerate resume
                             </Button>
                           </HStack>
@@ -500,7 +500,7 @@ export function ApplicationReviewPage() {
                   Mock mode: nothing will be submitted
                 </Text>
               ) : null}
-              <Button colorPalette="brand" size="lg" onClick={() => setConfirm("approve")} disabled={busy}>
+              <Button colorPalette="brand" size="lg" onClick={() => setConfirm("approve")}>
                 <Check size={16} /> {approveLabel}
               </Button>
             </HStack>

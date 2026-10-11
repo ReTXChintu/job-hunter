@@ -153,6 +153,7 @@ impl AppContext {
             claude_cli: RwLock::new(None),
         });
         ctx.ensure_user_and_profile()?;
+        tokio::spawn(crate::agent::queue::run_worker(ctx.clone()));
         tracing::info!(data_dir = %ctx.paths.root.display(), mock = ctx.settings().await.mock_mode, "Job Hunter core initialised");
         Ok(ctx)
     }

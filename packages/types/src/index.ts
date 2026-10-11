@@ -500,6 +500,37 @@ export interface AgentStatus {
   error: string | null;
   mock: boolean;
   paused: boolean;
+  /** Tasks waiting for the agent to be free. */
+  queued: number;
+}
+
+/** One unit of agent work, as the start commands take it. */
+export type AgentTask =
+  | { kind: "JOB_HUNT"; discoverOnly?: boolean; prepareOnly?: boolean; sources?: string[] }
+  | { kind: "APPLICATION"; applicationId: string; resume?: boolean; simulate?: string | null }
+  | { kind: "ANALYZE_JOB"; jobId: string }
+  | { kind: "GENERATE_RESUME"; jobId: string }
+  | { kind: "PROFILE_SYNC"; platform: string; resume?: boolean; answers?: ApplicationAnswer[] }
+  | { kind: "JOB_LINK"; url: string; applyNow?: boolean }
+  | { kind: "SHARED_JOB"; text: string; files?: string[]; draftEmail?: boolean }
+  | { kind: "INBOX_CHECK" };
+
+/** Work waiting for the agent; runs by itself, in order, once the agent is free. */
+export interface QueuedTask {
+  id: string;
+  userId: string;
+  task: AgentTask;
+  title: string;
+  requestedAt: string;
+  updatedAt: string;
+}
+
+/** How a start request ended: running now, or waiting its turn. */
+export interface Submission {
+  run: AgentRun | null;
+  queued: QueuedTask | null;
+  /** 1-based place in the queue when queued. */
+  position: number;
 }
 
 // ---- settings / status ---------------------------------------------------------------

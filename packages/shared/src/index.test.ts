@@ -97,13 +97,12 @@ describe("job filters", () => {
 
 describe("application state helpers", () => {
   it("only allows approval from review and applying after approval", () => {
-    expect(applicationActions("READY_FOR_REVIEW", false).canApprove).toBe(true);
-    expect(applicationActions("READY_FOR_REVIEW", false).canApply).toBe(false);
-    expect(applicationActions("APPROVED", false).canApply).toBe(true);
-    expect(applicationActions("APPROVED", true).canApply).toBe(false);
-    expect(applicationActions("APPLIED", false).canReject).toBe(false);
-    expect(applicationActions("WAITING_FOR_USER", false).canAnswer).toBe(true);
-    expect(applicationActions("MANUAL_ACTION_REQUIRED", false).canMarkApplied).toBe(true);
+    expect(applicationActions("READY_FOR_REVIEW").canApprove).toBe(true);
+    expect(applicationActions("READY_FOR_REVIEW").canApply).toBe(false);
+    expect(applicationActions("APPROVED").canApply).toBe(true);
+    expect(applicationActions("APPLIED").canReject).toBe(false);
+    expect(applicationActions("WAITING_FOR_USER").canAnswer).toBe(true);
+    expect(applicationActions("MANUAL_ACTION_REQUIRED").canMarkApplied).toBe(true);
   });
 
   it("collects pending actions", () => {

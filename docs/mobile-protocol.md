@@ -116,33 +116,48 @@ Every frame, both directions, is one JSON object:
 | `get_application` | `{id}` | `{ok:true, data: ApplicationDetail}` |
 | `approve_application` | `{id}` | `{ok:true, data: Application}` |
 | `reject_application` | `{id, reason?}` | `{ok:true, data: Application}` |
-| `apply_application` | `{id}` | `{ok:true, data: {runId}}` (fire-and-forget like the desktop's own apply button; follow with `changed` pushes) |
+| `apply_application` | `{id}` | `{ok:true, data: Started}` (fire-and-forget like the desktop's own apply button; follow with `changed` pushes) |
 | `answer_application_questions` | `{id, answers: [{question, answer}]}` | `{ok:true, data: Application}` |
 | `mark_manual_application_complete` | `{id, note?}` | `{ok:true, data: Application}` |
 | `set_application_status` | `{id, status: "INTERVIEW"\|"OFFER"\|"WITHDRAWN"\|"REJECTED", note?}` | `{ok:true, data: Application}` |
 | `request_file` | `{path, kind:"pdf"}` | `{ok:true, data: {name, base64}}` (desktop refuses anything over 4 MB or outside its data directory with `ok:false`) |
-| `get_agent_status` | `{}` | `{state, paused, runKind, progress}` (no free text) |
-| `start_job_hunt` | `{sources?: string[], discoverOnly?: bool}` | `{runId}`; `sources: ["LinkedIn Posts"]` = find hiring posts |
+| `get_agent_status` | `{}` | `{state, paused, runKind, progress, queued}` (no free text; `queued` = tasks waiting their turn) |
+| `start_job_hunt` | `{sources?: string[], discoverOnly?: bool, prepareOnly?: bool}` | `Started`; `sources: ["LinkedIn Posts"]` = find hiring posts; `prepareOnly` = applications for the best jobs already found, no search |
 | `stop_job_hunt` | `{}` | `{stopped}` |
-| `check_inbox` | `{}` | `{runId}` (Gmail replies check) |
+| `check_inbox` | `{}` | `Started` (Gmail replies check) |
 | `list_jobs` | `{}` | `JobListItem[]` (strings capped at 1,500 characters) |
 | `get_job` | `{id}` | `JobDetail` |
-| `generate_resume` | `{jobId}` | `{runId}` (prepare an application for review) |
+| `generate_resume` | `{jobId}` | `Started` (prepare an application for review) |
 | `reject_job` | `{id}` | `Job` |
 | `list_platform_profiles` | `{}` | `PlatformProfileView[]` |
-| `sync_platform_profile` | `{platform, resume?}` | `{runId}` |
-| `apply_from_link` | `{url, applyNow?}` | `{runId}`: open a pasted job link, prepare the application and (with `applyNow`, default true) approve and apply |
-| `add_shared_job` | `{text, attachments?: [{name, base64}], draftEmail?}` | `{runId}`: read a job the user found (images/PDFs ≤ 15 MB total), prepare the application and save a Gmail draft |
+| `sync_platform_profile` | `{platform, resume?}` | `Started` |
+| `apply_from_link` | `{url, applyNow?}` | `Started`: open a pasted job link, prepare the application and (with `applyNow`, default true) approve and apply |
+| `add_shared_job` | `{text, attachments?: [{name, base64}], draftEmail?}` | `Started`: read a job the user found (images/PDFs ≤ 15 MB total), prepare the application and save a Gmail draft |
 | `queue_profile_updates` | `{}` | `{queued}` ("Update all now": every site behind runs when the agent is free) |
-| `answer_platform_questions` | `{platform, answers: [{question, answer}]}` | `{runId}` |
+| `answer_platform_questions` | `{platform, answers: [{question, answer}]}` | `Started` |
+| `list_queue` | `{}` | `QueuedTask[]` (what waits for the agent, first to run first) |
+| `remove_queued_task` | `{id}` | `{removed}` |
+| `clear_queue` | `{}` | `{removed}` |
 | `list_answers` | `{}` | `AnswerRecord[]` |
 | `save_answer` | `{id?, question, answer}` | `AnswerRecord` |
+
+`Started` is what every request that starts agent work answers. The
+agent runs one task at a time, so a request made while it is busy is not
+refused: it waits in the desktop's queue and starts by itself, in order,
+as soon as the agent is free (idle, or stopped for the user's input).
+`{runId, queued: false}` means it is running now; `{queued: true,
+queuedId, position, title}` means it waits (`position` is 1-based). A queued
+task that can no longer run when its turn comes (its application was
+rejected meanwhile, ...) is dropped with a notification. `approve_application`
+and `answer_application_questions` queue the apply the same way and still
+answer with the `Application`.
 
 The web app sends the same requests over HTTP: `POST /v1/desktop/request`
 with `{type, payload}` and its access token. The server relays it to the
 desktop over the desktop's socket and returns `200 {data}`, or
 `{error: {code, message}}` with 503 (`DESKTOP_OFFLINE`), 504
-(`DESKTOP_TIMEOUT`), 409 (`AGENT_BUSY`, `INVALID_TRANSITION`), 404 or 400.
+(`DESKTOP_TIMEOUT`), 409 (`INVALID_TRANSITION`; `AGENT_BUSY` only from
+requests that cannot queue, such as pausing), 404 or 400.
 Either way every action runs in the desktop's own approval-gated code.
 
 Phones register for Firebase push with `PUT /v1/devices/me/push-token`

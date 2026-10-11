@@ -7,20 +7,20 @@ describe("approval workflow guards", () => {
 
   it("never offers an automatic apply action without prior approval", () => {
     for (const s of statuses) {
-      const a = applicationActions(s, false);
+      const a = applicationActions(s);
       if (a.canApply) expect(s).toBe("APPROVED");
     }
   });
 
-  it("disables agent-driven actions while the agent is busy", () => {
-    expect(applicationActions("APPROVED", true).canApply).toBe(false);
-    expect(applicationActions("WAITING_FOR_USER", true).canAnswer).toBe(false);
+  it("keeps agent-driven actions available while the agent is busy (they queue)", () => {
+    expect(applicationActions("APPROVED").canApply).toBe(true);
+    expect(applicationActions("WAITING_FOR_USER").canAnswer).toBe(true);
   });
 
   it("always keeps a manual path open for stuck applications", () => {
     for (const s of ["MANUAL_ACTION_REQUIRED", "WAITING_FOR_USER"] as ApplicationStatus[]) {
-      expect(applicationActions(s, true).canApplyManually).toBe(true);
-      expect(applicationActions(s, true).canMarkApplied).toBe(true);
+      expect(applicationActions(s).canApplyManually).toBe(true);
+      expect(applicationActions(s).canMarkApplied).toBe(true);
     }
   });
 

@@ -66,9 +66,20 @@ export interface QuestionAnswer {
   answer: string;
 }
 
+/** What a start request answers: the run, or its place in the desktop's queue. */
+export interface Submitted {
+  runId?: string;
+  queued: boolean;
+  queuedId?: string;
+  position?: number;
+  title?: string;
+}
+
 export interface AgentStatusSummary {
   state: AgentState;
   paused: boolean;
+  /** Tasks waiting for the agent on the desktop. */
+  queued?: number;
   runKind: RunKind | null;
   progress: number | null;
 }
@@ -237,7 +248,7 @@ export class ApiClient {
   }
 
   /** Runs (or retries) an approved application on the desktop. */
-  applyApplication(id: string): Promise<{ runId: string }> {
+  applyApplication(id: string): Promise<Submitted> {
     return this.desktop("apply_application", { id });
   }
 
@@ -249,7 +260,7 @@ export class ApiClient {
     return this.desktop("set_application_status", { id, status, note });
   }
 
-  startJobHunt(options: { sources?: string[]; discoverOnly?: boolean; prepareOnly?: boolean } = {}): Promise<{ runId: string }> {
+  startJobHunt(options: { sources?: string[]; discoverOnly?: boolean; prepareOnly?: boolean } = {}): Promise<Submitted> {
     return this.desktop("start_job_hunt", options);
   }
 
@@ -258,7 +269,7 @@ export class ApiClient {
   }
 
   /** Reads Gmail (inbox and spam) for employers' replies. */
-  checkInbox(): Promise<{ runId: string }> {
+  checkInbox(): Promise<Submitted> {
     return this.desktop("check_inbox");
   }
 

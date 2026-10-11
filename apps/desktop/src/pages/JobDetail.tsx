@@ -1,18 +1,17 @@
 import { Box, Button, Grid, GridItem, Heading, HStack, SimpleGrid, Spinner, Tabs, Text, VStack } from "@chakra-ui/react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { formatDateTime, isAgentRunning } from "@job-hunter/shared";
+import { formatDateTime } from "@job-hunter/shared";
 import { KeyValue, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { ArrowLeft, Bookmark, BookmarkCheck, Check, ExternalLink, FileText, RefreshCw, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { BulletList, Chips, ConfirmDialog, ErrorBanner, InfoBanner, Panel } from "../components/common";
 import { FileLinks, HtmlPreview } from "../components/DocumentPreview";
 import { MissingSkills } from "../components/MissingSkills";
-import { useAgentStatus, useAnalyzeJob, useApproveApplication, useGenerateResume, useJob, useOpenUrl, useRejectJob, useSetJobSaved } from "../lib/queries";
+import { useAnalyzeJob, useApproveApplication, useGenerateResume, useJob, useOpenUrl, useRejectJob, useSetJobSaved } from "../lib/queries";
 
 export function JobDetailPage() {
   const { jobId } = useParams({ from: "/jobs/$jobId" });
   const detail = useJob(jobId);
-  const agent = useAgentStatus();
   const analyze = useAnalyzeJob();
   const generate = useGenerateResume();
   const approve = useApproveApplication();
@@ -21,7 +20,6 @@ export function JobDetailPage() {
   const openUrl = useOpenUrl();
   const navigate = useNavigate();
   const [confirmApprove, setConfirmApprove] = useState(false);
-  const busy = agent.data ? isAgentRunning(agent.data.state) : false;
 
   if (detail.isLoading) return <Spinner />;
   if (detail.error || !detail.data) return <ErrorBanner error={detail.error ?? "Job not found"} onRetry={() => detail.refetch()} />;
@@ -48,7 +46,7 @@ export function JobDetailPage() {
             </Button>
           ) : null}
           {canApprove ? (
-            <Button size="sm" colorPalette="brand" onClick={() => setConfirmApprove(true)} disabled={busy}>
+            <Button size="sm" colorPalette="brand" onClick={() => setConfirmApprove(true)}>
               <Check size={14} /> Approve &amp; Apply
             </Button>
           ) : application ? (
@@ -56,7 +54,7 @@ export function JobDetailPage() {
               Open application
             </Button>
           ) : (
-            <Button size="sm" colorPalette="brand" onClick={() => generate.mutate(job.id)} loading={generate.isPending} disabled={busy || job.status === "REJECTED"}>
+            <Button size="sm" colorPalette="brand" onClick={() => generate.mutate(job.id)} loading={generate.isPending} disabled={job.status === "REJECTED"}>
               <Sparkles size={14} /> Prepare application
             </Button>
           )}
@@ -180,7 +178,7 @@ export function JobDetailPage() {
 
         <GridItem>
           <Panel title="Match analysis" mb={4} action={
-            <Button size="xs" variant="ghost" onClick={() => analyze.mutate(job.id)} loading={analyze.isPending} disabled={busy}>
+            <Button size="xs" variant="ghost" onClick={() => analyze.mutate(job.id)} loading={analyze.isPending}>
               <RefreshCw size={12} /> {analysis ? "Re-analyze" : "Analyze"}
             </Button>
           }>

@@ -5,6 +5,7 @@ import { Copy, Download, Pause, Play, Square, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ErrorBanner, PageHeader, Panel, Stat } from "../components/common";
 import { ActivityFeed } from "../components/ActivityFeed";
+import { QueuePanel } from "../components/QueuePanel";
 import { useActivity, useLogFeed } from "../lib/activity";
 import { useAgentStatus, useClearLogs, useExportLogs, useLogs, usePauseAgent, useResumeAgent, useRunEvents, useRuns, useStartJobHunt, useStopJobHunt } from "../lib/queries";
 
@@ -51,6 +52,9 @@ export function AgentPage() {
         <Stat label="Errors" value={s?.stats.errors ?? 0} tone={s?.stats.errors ? "red.fg" : "fg"} />
         <Stat label="Claude cost" value={`$${(s?.stats.claudeCostUsd ?? 0).toFixed(2)}`} />
       </SimpleGrid>
+      <Box mb={6}>
+        <QueuePanel />
+      </Box>
 
       <Tabs.Root defaultValue="activity" variant="line" size="sm">
         <Tabs.List mb={4}>

@@ -199,13 +199,15 @@ class _QuickActions extends StatelessWidget {
     final unavailable = agent.unavailableReason;
     final busy = agent.busy;
     final running = agent.running;
-    final canStart = unavailable == null && !busy && running == null;
+    // A busy agent queues new requests, so starting stays available.
+    final canStart = unavailable == null && running == null;
     final canStop = unavailable == null && busy && agent.status?.state != 'STOPPING' && running == null;
 
     Widget spinnerOr(String name, IconData icon) => running == name ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : Icon(icon);
 
     String? note = unavailable;
-    if (note == null && busy) note = 'The agent is busy (${agentStateLabel(agent.status!.state)}). New runs start when it finishes, or stop it first.';
+    final queued = agent.status?.queued ?? 0;
+    if (note == null && busy) note = 'The agent is busy (${agentStateLabel(agent.status!.state)})${queued > 0 ? ', $queued queued' : ''}. Anything you start now waits its turn and runs by itself.';
 
     return Card(
       child: Padding(

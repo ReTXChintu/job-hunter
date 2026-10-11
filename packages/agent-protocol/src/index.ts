@@ -2,43 +2,7 @@
  * Agent protocol: the names of the Tauri commands and events exchanged
  * between the React UI and the Rust agent runtime, with typed payloads.
  */
-import type {
-  AgentEvent,
-  AgentRun,
-  AgentStatus,
-  AnswerRecord,
-  Application,
-  ApplicationAnswer,
-  ApplicationDetail,
-  ApplicationListItem,
-  ApplicationStatus,
-  AppSettings,
-  CandidateProfile,
-  CoverLetter,
-  Dashboard,
-  Experience,
-  Job,
-  JobDetail,
-  JobHuntOptions,
-  JobListItem,
-  LogEntry,
-  LogLevel,
-  MasterResumeRef,
-  Notification,
-  PairingCode,
-  PlatformProfile,
-  PlatformProfileView,
-  Project,
-  ProjectPick,
-  PublishingPlan,
-  RemoteDevice,
-  RemoteStatus,
-  Resume,
-  ResumeDocument,
-  SetupStatus,
-  SkillGroups,
-  SyncStatus,
-} from "@job-hunter/types";
+import type { AgentEvent, AgentRun, AgentStatus, AnswerRecord, AppSettings, Application, ApplicationAnswer, ApplicationDetail, ApplicationListItem, ApplicationStatus, CandidateProfile, CoverLetter, Dashboard, Experience, Job, JobDetail, JobHuntOptions, JobListItem, LogEntry, LogLevel, MasterResumeRef, Notification, PairingCode, PlatformProfile, PlatformProfileView, Project, ProjectPick, PublishingPlan, QueuedTask, RemoteDevice, RemoteStatus, Resume, ResumeDocument, SetupStatus, SkillGroups, Submission, SyncStatus } from "@job-hunter/types";
 
 /** A key of the candidate's skill groups ("frontend", "backend", ...). */
 export type SkillGroup = keyof SkillGroups;
@@ -130,15 +94,15 @@ export interface Commands {
   get_publishing_plan: { args: Record<string, never>; result: PublishingPlan };
   suggest_project_picks: { args: Record<string, never>; result: ProjectPick[] };
   save_publishing_plan: { args: { featuredProjectIds: string[]; picks: ProjectPick[] }; result: PublishingPlan };
-  sync_platform_profile: { args: { platform: string; resume?: boolean }; result: AgentRun };
-  answer_platform_questions: { args: { platform: string; answers: ApplicationAnswer[] }; result: AgentRun };
+  sync_platform_profile: { args: { platform: string; resume?: boolean }; result: Submission };
+  answer_platform_questions: { args: { platform: string; answers: ApplicationAnswer[] }; result: Submission };
   set_platform_auto_sync: { args: { platform: string; enabled: boolean }; result: PlatformProfile };
   queue_profile_updates: { args: Record<string, never>; result: number };
-  apply_from_link: { args: { url: string; applyNow?: boolean }; result: AgentRun };
-  add_shared_job: { args: { text: string; files: string[]; draftEmail?: boolean }; result: AgentRun };
+  apply_from_link: { args: { url: string; applyNow?: boolean }; result: Submission };
+  add_shared_job: { args: { text: string; files: string[]; draftEmail?: boolean }; result: Submission };
 
   list_notifications: { args: { limit?: number }; result: Notification[] };
-  check_inbox_now: { args: Record<string, never>; result: AgentRun };
+  check_inbox_now: { args: Record<string, never>; result: Submission };
   restore_application_files: { args: { id: string }; result: null };
   mark_notifications_read: { args: { ids?: string[] }; result: null };
 
@@ -152,7 +116,7 @@ export interface Commands {
   get_application: { args: { id: string }; result: ApplicationDetail };
   approve_application: { args: { id: string; applyNow?: boolean }; result: Application };
   reject_application: { args: { id: string; reason?: string }; result: Application };
-  apply_application: { args: { id: string; simulate?: string }; result: AgentRun };
+  apply_application: { args: { id: string; simulate?: string }; result: Submission };
   answer_application_questions: { args: { id: string; answers: ApplicationAnswer[]; saveForReuse?: boolean }; result: Application };
   mark_manual_application_complete: { args: { id: string; note?: string }; result: Application };
   set_application_status: { args: { id: string; status: ApplicationStatus; note?: string }; result: Application };
@@ -168,14 +132,17 @@ export interface Commands {
   delete_answer: { args: { id: string }; result: null };
 
   get_agent_status: { args: Record<string, never>; result: AgentStatus };
-  start_job_hunt: { args: { options?: JobHuntOptions }; result: AgentRun };
+  start_job_hunt: { args: { options?: JobHuntOptions }; result: Submission };
   stop_job_hunt: { args: Record<string, never>; result: boolean };
   pause_agent: { args: Record<string, never>; result: null };
   resume_agent: { args: Record<string, never>; result: null };
-  discover_jobs: { args: { sources?: string[] }; result: AgentRun };
-  prepare_applications: { args: Record<string, never>; result: AgentRun };
-  analyze_job: { args: { jobId: string }; result: AgentRun };
-  generate_resume: { args: { jobId: string }; result: AgentRun };
+  discover_jobs: { args: { sources?: string[] }; result: Submission };
+  prepare_applications: { args: Record<string, never>; result: Submission };
+  list_queue: { args: Record<string, never>; result: QueuedTask[] };
+  remove_queued_task: { args: { id: string }; result: boolean };
+  clear_queue: { args: Record<string, never>; result: number };
+  analyze_job: { args: { jobId: string }; result: Submission };
+  generate_resume: { args: { jobId: string }; result: Submission };
   generate_cover_letter: { args: { jobId: string }; result: AgentRun };
   list_agent_runs: { args: { limit?: number }; result: AgentRun[] };
   get_run_events: { args: { runId: string; limit?: number }; result: AgentEvent[] };

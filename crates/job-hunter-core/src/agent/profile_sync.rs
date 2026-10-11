@@ -632,7 +632,7 @@ pub async fn answer_platform_questions(
     app: Arc<AppContext>,
     platform: &str,
     answers: Vec<ApplicationAnswer>,
-) -> CoreResult<AgentRun> {
+) -> CoreResult<Submission> {
     let platform = require_platform(platform)?;
     let mut given = Vec::new();
     for mut a in answers {
@@ -662,7 +662,16 @@ pub async fn answer_platform_questions(
         return Err(CoreError::Validation("Answer at least one question".into()));
     }
     // Continue the same session: the site's form is usually still open.
-    start_profile_sync(app, platform, given, true).await
+    // Queued if the agent is busy with something else.
+    super::queue::submit(
+        app,
+        AgentTask::ProfileSync {
+            platform: platform.to_string(),
+            resume: true,
+            answers: given,
+        },
+    )
+    .await
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ pub mod candidate;
 pub mod job;
 pub mod notification;
 pub mod platform;
+pub mod queue;
 pub mod resume;
 
 pub use agent::*;
@@ -18,6 +19,7 @@ pub use candidate::*;
 pub use job::*;
 pub use notification::*;
 pub use platform::*;
+pub use queue::*;
 pub use resume::*;
 
 /// Documents that can live in a store collection.
@@ -33,7 +35,12 @@ pub trait Entity:
 }
 
 /// Collections kept on this computer only (never sent to the backend).
-pub const LOCAL_COLLECTIONS: &[&str] = &["platform_profiles", "publishing_plans", "scan_cursors"];
+pub const LOCAL_COLLECTIONS: &[&str] = &[
+    "platform_profiles",
+    "publishing_plans",
+    "scan_cursors",
+    "agent_queue",
+];
 
 /// Names of every persisted collection (local store and MongoDB share them).
 pub const COLLECTIONS: &[&str] = &[

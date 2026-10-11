@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ProjectPick, ResumeDocument } from "@job-hunter/types";
+import type { AgentStatus, AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ProjectPick, ResumeDocument } from "@job-hunter/types";
 import type { SkillGroup } from "@job-hunter/agent-protocol";
 import { invoke } from "./tauri";
+import { announcing } from "./submission";
+import { toaster } from "../components/ui/toaster";
+import { isAgentRunning } from "@job-hunter/shared";
 
 interface AuthArgs {
   email: string;
@@ -34,6 +37,7 @@ export const keys = {
   platformProfiles: ["platformProfiles"] as const,
   notifications: ["notifications"] as const,
   publishingPlan: ["publishingPlan"] as const,
+  queue: ["queue"] as const,
 };
 
 /** Collections → query keys to invalidate when the backend reports a change. */
@@ -51,6 +55,7 @@ export const COLLECTION_KEYS: Record<string, readonly (readonly string[])[]> = {
   notifications: [keys.notifications],
   application_answers: [keys.answers],
   agent_runs: [keys.runs, keys.dashboard],
+  agent_queue: [keys.queue],
   agent_events: [["runEvents"]],
   settings: [keys.settings],
   users: [],
@@ -70,6 +75,7 @@ export const useApplication = (id: string) => useQuery({ queryKey: keys.applicat
 export const useResumes = () => useQuery({ queryKey: keys.resumes, queryFn: () => invoke("list_resumes") });
 export const useAnswers = () => useQuery({ queryKey: keys.answers, queryFn: () => invoke("list_answers") });
 export const useAgentStatus = () => useQuery({ queryKey: keys.agentStatus, queryFn: () => invoke("get_agent_status"), refetchInterval: 15_000 });
+export const useQueue = () => useQuery({ queryKey: keys.queue, queryFn: () => invoke("list_queue"), refetchInterval: 30_000 });
 export const useRuns = (limit = 20) => useQuery({ queryKey: [...keys.runs, limit], queryFn: () => invoke("list_agent_runs", { limit }) });
 export const useRunEvents = (runId: string | null) => useQuery({ queryKey: keys.runEvents(runId ?? ""), queryFn: () => invoke("get_run_events", { runId: runId!, limit: 500 }), enabled: !!runId });
 export const useLogs = (minLevel: LogLevel) => useQuery({ queryKey: keys.logs(minLevel), queryFn: () => invoke("get_logs", { minLevel, limit: 1000 }) });
@@ -181,14 +187,14 @@ export function useSyncPlatformProfile() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: (args: { platform: string; resume?: boolean }) => invoke("sync_platform_profile", args),
-    onSuccess: () => inv([keys.platformProfiles, keys.agentStatus, keys.runs]),
+    onSuccess: announcing(() => inv([keys.platformProfiles, keys.agentStatus, keys.runs])),
   });
 }
 
 /** Look for employers' replies in Gmail (inbox and spam) now. */
 export function useCheckInbox() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: () => invoke("check_inbox_now"), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+  return useMutation({ mutationFn: () => invoke("check_inbox_now"), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])) });
 }
 
 /** Re-create an application's files that were deleted after it was sent. */
@@ -208,14 +214,14 @@ export function useAnswerPlatformQuestions() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: (args: { platform: string; answers: ApplicationAnswer[] }) => invoke("answer_platform_questions", args),
-    onSuccess: () => inv([keys.platformProfiles, keys.answers, keys.agentStatus, keys.runs]),
+    onSuccess: announcing(() => inv([keys.platformProfiles, keys.answers, keys.agentStatus, keys.runs])),
   });
 }
 
 /** Apply from a pasted job link (applyNow = approve and apply when the resume is ready). */
 export function useApplyFromLink() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: { url: string; applyNow: boolean }) => invoke("apply_from_link", args), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+  return useMutation({ mutationFn: (args: { url: string; applyNow: boolean }) => invoke("apply_from_link", args), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])) });
 }
 
 /** A job the user found: text and/or screenshots/PDFs → resume, application, Gmail draft. */
@@ -223,7 +229,7 @@ export function useAddSharedJob() {
   const inv = useInvalidate();
   return useMutation({
     mutationFn: (args: { text: string; files: string[]; draftEmail: boolean }) => invoke("add_shared_job", args),
-    onSuccess: () => inv([keys.agentStatus, keys.runs]),
+    onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])),
   });
 }
 
@@ -265,7 +271,18 @@ export function useDeleteJob() {
 
 export function useApproveApplication() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: { id: string; applyNow?: boolean }) => invoke("approve_application", args), onSuccess: () => inv([keys.applications, keys.jobs, keys.dashboard, keys.agentStatus, ["application"], ["job"]]) });
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { id: string; applyNow?: boolean }) => invoke("approve_application", args),
+    onSuccess: (_application, args) => {
+      // The apply itself waits in the queue while the agent is busy.
+      const status = qc.getQueryData<AgentStatus>(keys.agentStatus);
+      if (args.applyNow !== false && status && isAgentRunning(status.state)) {
+        toaster.create({ type: "info", title: "Approved and queued", description: "The agent is busy; this application is sent as soon as it's free.", closable: true });
+      }
+      inv([keys.applications, keys.jobs, keys.dashboard, keys.agentStatus, keys.queue, ["application"], ["job"]]);
+    },
+  });
 }
 
 export function useRejectApplication() {
@@ -275,12 +292,12 @@ export function useRejectApplication() {
 
 export function useApplyApplication() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: { id: string; simulate?: string }) => invoke("apply_application", args), onSuccess: () => inv([keys.applications, keys.agentStatus, keys.dashboard, ["application"]]) });
+  return useMutation({ mutationFn: (args: { id: string; simulate?: string }) => invoke("apply_application", args), onSuccess: announcing(() => inv([keys.applications, keys.agentStatus, keys.dashboard, ["application"]])) });
 }
 
 export function useAnswerQuestions() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (args: { id: string; answers: ApplicationAnswer[]; saveForReuse?: boolean }) => invoke("answer_application_questions", args), onSuccess: () => inv([keys.applications, keys.answers, keys.agentStatus, ["application"]]) });
+  return useMutation({ mutationFn: (args: { id: string; answers: ApplicationAnswer[]; saveForReuse?: boolean }) => invoke("answer_application_questions", args), onSuccess: () => inv([keys.applications, keys.answers, keys.agentStatus, keys.queue, ["application"]]) });
 }
 
 export function useMarkManualComplete() {
@@ -320,7 +337,7 @@ export function useDeleteAnswer() {
 
 export function useStartJobHunt() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (options?: JobHuntOptions) => invoke("start_job_hunt", { options }), onSuccess: () => inv([keys.agentStatus, keys.runs, keys.dashboard]) });
+  return useMutation({ mutationFn: (options?: JobHuntOptions) => invoke("start_job_hunt", { options }), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs, keys.dashboard])) });
 }
 
 export function useStopJobHunt() {
@@ -340,22 +357,32 @@ export function useResumeAgent() {
 
 export function useDiscoverJobs() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (sources?: string[]) => invoke("discover_jobs", { sources }), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+  return useMutation({ mutationFn: (sources?: string[]) => invoke("discover_jobs", { sources }), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])) });
 }
 
 export function usePrepareApplications() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: () => invoke("prepare_applications"), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+  return useMutation({ mutationFn: () => invoke("prepare_applications"), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])) });
+}
+
+export function useRemoveQueuedTask() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (id: string) => invoke("remove_queued_task", { id }), onSuccess: () => inv([keys.queue, keys.agentStatus]) });
+}
+
+export function useClearQueue() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: () => invoke("clear_queue"), onSuccess: () => inv([keys.queue, keys.agentStatus]) });
 }
 
 export function useAnalyzeJob() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (jobId: string) => invoke("analyze_job", { jobId }), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+  return useMutation({ mutationFn: (jobId: string) => invoke("analyze_job", { jobId }), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])) });
 }
 
 export function useGenerateResume() {
   const inv = useInvalidate();
-  return useMutation({ mutationFn: (jobId: string) => invoke("generate_resume", { jobId }), onSuccess: () => inv([keys.agentStatus, keys.runs]) });
+  return useMutation({ mutationFn: (jobId: string) => invoke("generate_resume", { jobId }), onSuccess: announcing(() => inv([keys.agentStatus, keys.runs])) });
 }
 
 export function useClearLogs() {

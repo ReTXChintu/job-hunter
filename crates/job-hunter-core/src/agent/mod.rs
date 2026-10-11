@@ -7,6 +7,7 @@ pub mod inbox;
 pub mod job_link;
 pub mod orchestrator;
 pub mod profile_sync;
+pub mod queue;
 pub mod shared_job;
 pub mod state;
 pub mod steps;

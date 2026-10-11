@@ -7,12 +7,10 @@ import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
 import { JobLinkDialog } from "../components/JobLinkDialog";
 import { SharedJobDialog } from "../components/SharedJobDialog";
-import { useDiscoverJobs, useJobs, useAgentStatus, usePrepareApplications, useStartJobHunt } from "../lib/queries";
-import { isAgentRunning } from "@job-hunter/shared";
+import { useDiscoverJobs, useJobs, usePrepareApplications, useStartJobHunt } from "../lib/queries";
 
 export function JobsPage() {
   const jobs = useJobs();
-  const agent = useAgentStatus();
   const discover = useDiscoverJobs();
   const prepare = usePrepareApplications();
   const huntPosts = useStartJobHunt();
@@ -23,7 +21,6 @@ export function JobsPage() {
   const [query, setQuery] = useState("");
   const items = useMemo(() => sortJobs(filterJobs(jobs.data ?? [], filter, query)), [jobs.data, filter, query]);
   const counts = useMemo(() => Object.fromEntries(JOB_FILTERS.map((f) => [f.key, filterJobs(jobs.data ?? [], f.key).length])) as Record<JobFilter, number>, [jobs.data]);
-  const running = agent.data ? isAgentRunning(agent.data.state) : false;
 
   return (
     <Box>
@@ -32,17 +29,16 @@ export function JobsPage() {
         subtitle={`${jobs.data?.length ?? 0} jobs discovered`}
         actions={
           <HStack gap={2}>
-            <Button colorPalette="brand" onClick={() => setLinking(true)} disabled={running} title="Paste a job link and start applying">
+            <Button colorPalette="brand" onClick={() => setLinking(true)} title="Paste a job link and start applying">
               <Link2 size={16} /> Apply from a link
             </Button>
-            <Button variant="outline" onClick={() => setSharing(true)} disabled={running} title="Paste a job post or add screenshots/PDFs; get a resume and a Gmail draft">
+            <Button variant="outline" onClick={() => setSharing(true)} title="Paste a job post or add screenshots/PDFs; get a resume and a Gmail draft">
               <FilePlus size={16} /> Add a job I found
             </Button>
             <Button
               variant="outline"
               onClick={() => huntPosts.mutate({ sources: ["Telegram"] })}
               loading={huntPosts.isPending && huntPosts.variables?.sources?.[0] === "Telegram"}
-              disabled={running}
               title="Read your Telegram channels since the last scan and prepare the job posts for review"
             >
               <Send size={16} /> Scan Telegram
@@ -51,7 +47,6 @@ export function JobsPage() {
               variant="outline"
               onClick={() => huntPosts.mutate({ sources: ["LinkedIn Posts"] })}
               loading={huntPosts.isPending}
-              disabled={running}
               title="Search LinkedIn posts that ask for resumes by email, then analyze them and prepare applications for your review"
             >
               <Mail size={16} /> Find hiring posts
@@ -60,7 +55,7 @@ export function JobsPage() {
               variant="outline"
               onClick={() => prepare.mutate()}
               loading={prepare.isPending}
-              disabled={running || counts.RELEVANT === 0}
+              disabled={counts.RELEVANT === 0}
               title="Generate resumes and prepare applications for the best jobs already found (no new search); they wait for your approval"
             >
               <Wand2 size={16} /> Prepare applications
@@ -69,7 +64,6 @@ export function JobsPage() {
               variant="subtle"
               onClick={() => discover.mutate(undefined)}
               loading={discover.isPending}
-              disabled={running}
               title="Search your enabled sources and score the jobs only. No resumes or applications are prepared; use Start job hunt for that."
             >
               <Search size={16} /> Search only

@@ -15,7 +15,9 @@ Five tabs:
   actions that run on the desktop: **Start job hunt**, **Stop**, **Find
   hiring posts** (a job hunt limited to LinkedIn Posts) and **Check Gmail for
   replies**. They're disabled, with the reason shown, while the desktop is
-  offline or the agent is busy.
+  offline. While the agent is busy they stay available: the desktop queues
+  the request and runs it as soon as the agent is free, and the snackbar
+  says so.
 - **Applications** — every application, with filter chips and counts (All,
   Needs you, Pending approval, In progress, Applied, Interviews & offers,
   Rejected/withdrawn), search, and pull to refresh. The detail screen shows

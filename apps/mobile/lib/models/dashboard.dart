@@ -47,14 +47,17 @@ class AgentStatusLite {
   final bool paused;
   final String? runKind;
   final double? progress;
+  /// Tasks waiting for the agent on the desktop.
+  final int queued;
 
-  const AgentStatusLite({required this.state, required this.paused, this.runKind, this.progress});
+  const AgentStatusLite({required this.state, required this.paused, this.runKind, this.progress, this.queued = 0});
 
   factory AgentStatusLite.fromJson(Map<String, dynamic> json) => AgentStatusLite(
         state: str(json['state'], 'IDLE'),
         paused: boolOf(json['paused']),
         runKind: optStr(json['runKind']),
         progress: doubleOrNull(json['progress']),
+        queued: (json['queued'] as num?)?.toInt() ?? 0,
       );
 
   static const idle = AgentStatusLite(state: 'IDLE', paused: false);

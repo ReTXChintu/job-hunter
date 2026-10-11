@@ -22,6 +22,13 @@ export function AgentStatusBar() {
       <HStack gap={2} minW="200px">
         <Box w={2} h={2} borderRadius="full" bg={`${dot}.solid`} boxShadow={running && !s?.paused ? `0 0 0 3px var(--chakra-colors-${dot}-muted)` : undefined} />
         <Text fontWeight="semibold">{s ? (s.paused ? "Paused" : AGENT_STATE_LABELS[s.state]) : "Connecting"}</Text>
+        {s?.queued ? (
+          <Link to="/agent">
+            <Text color="fg.muted" title="Waiting for the agent; runs next">
+              · {s.queued} queued
+            </Text>
+          </Link>
+        ) : null}
         {s?.mock ? (
           <Text px={1.5} borderRadius="sm" bg="orange.muted" color="orange.fg" fontWeight="bold">
             MOCK

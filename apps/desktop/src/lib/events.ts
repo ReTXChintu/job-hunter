@@ -16,6 +16,7 @@ export function BackendEvents() {
     unlisteners.push(
       listen("agent:status", (status) => {
         qc.setQueryData(keys.agentStatus, status);
+        void qc.invalidateQueries({ queryKey: keys.queue });
         if (["COMPLETED", "FAILED", "WAITING_FOR_APPROVAL", "MANUAL_ACTION_REQUIRED", "WAITING_FOR_USER"].includes(status.state)) {
           void qc.invalidateQueries({ queryKey: keys.dashboard });
           void qc.invalidateQueries({ queryKey: keys.runs });

@@ -4,8 +4,9 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use job_hunter_core::agent::orchestrator::{self, JobHuntOptions};
+use job_hunter_core::agent::orchestrator;
 use job_hunter_core::agent::profile_sync::{self, PlatformProfileView};
+use job_hunter_core::agent::queue;
 use job_hunter_core::backend_url;
 use job_hunter_core::context::{
     ApplicationDetail, ApplicationListItem, Dashboard, JobDetail, JobListItem, SetupStatus,
@@ -232,8 +233,8 @@ pub async fn mark_skills_known(
 
 /// Look for employers' replies in Gmail (inbox and spam) now.
 #[tauri::command]
-pub async fn check_inbox_now(ctx: Ctx<'_>) -> R<AgentRun> {
-    job_hunter_core::agent::inbox::start_inbox_check(ctx.inner().clone())
+pub async fn check_inbox_now(ctx: Ctx<'_>) -> R<Submission> {
+    queue::submit(ctx.inner().clone(), AgentTask::InboxCheck)
         .await
         .map_err(Into::into)
 }
@@ -300,12 +301,14 @@ pub async fn sync_platform_profile(
     ctx: Ctx<'_>,
     platform: String,
     resume: Option<bool>,
-) -> R<AgentRun> {
-    profile_sync::start_profile_sync(
+) -> R<Submission> {
+    queue::submit(
         ctx.inner().clone(),
-        &platform,
-        vec![],
-        resume.unwrap_or(false),
+        AgentTask::ProfileSync {
+            platform,
+            resume: resume.unwrap_or(false),
+            answers: vec![],
+        },
     )
     .await
     .map_err(Into::into)
@@ -316,7 +319,7 @@ pub async fn answer_platform_questions(
     ctx: Ctx<'_>,
     platform: String,
     answers: Vec<ApplicationAnswer>,
-) -> R<AgentRun> {
+) -> R<Submission> {
     profile_sync::answer_platform_questions(ctx.inner().clone(), &platform, answers)
         .await
         .map_err(Into::into)
@@ -331,12 +334,12 @@ pub async fn add_shared_job(
     text: String,
     files: Vec<String>,
     draft_email: Option<bool>,
-) -> R<AgentRun> {
-    job_hunter_core::agent::shared_job::start_shared_job(
+) -> R<Submission> {
+    queue::submit(
         ctx.inner().clone(),
-        job_hunter_core::agent::shared_job::SharedJobInput {
+        AgentTask::SharedJob {
             text,
-            files: files.into_iter().map(PathBuf::from).collect(),
+            files,
             draft_email: draft_email.unwrap_or(true),
         },
     )
@@ -347,11 +350,13 @@ pub async fn add_shared_job(
 /// Apply from a pasted job link: read it, prepare the resume and, with
 /// `apply_now`, approve and apply as soon as it's ready.
 #[tauri::command]
-pub async fn apply_from_link(ctx: Ctx<'_>, url: String, apply_now: Option<bool>) -> R<AgentRun> {
-    job_hunter_core::agent::job_link::start_job_link(
+pub async fn apply_from_link(ctx: Ctx<'_>, url: String, apply_now: Option<bool>) -> R<Submission> {
+    queue::submit(
         ctx.inner().clone(),
-        &url,
-        apply_now.unwrap_or(true),
+        AgentTask::JobLink {
+            url,
+            apply_now: apply_now.unwrap_or(true),
+        },
     )
     .await
     .map_err(Into::into)
@@ -461,11 +466,22 @@ pub async fn reject_application(
 }
 
 #[tauri::command]
-pub async fn apply_application(ctx: Ctx<'_>, id: String, simulate: Option<String>) -> R<AgentRun> {
+pub async fn apply_application(
+    ctx: Ctx<'_>,
+    id: String,
+    simulate: Option<String>,
+) -> R<Submission> {
     // `simulate` is honoured only by the mock runner.
-    orchestrator::apply_application(ctx.inner().clone(), &id, false, simulate)
-        .await
-        .map_err(Into::into)
+    queue::submit(
+        ctx.inner().clone(),
+        AgentTask::Application {
+            application_id: id,
+            resume: false,
+            simulate,
+        },
+    )
+    .await
+    .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -591,10 +607,21 @@ pub async fn get_agent_status(ctx: Ctx<'_>) -> R<AgentStatus> {
 }
 
 #[tauri::command]
-pub async fn start_job_hunt(ctx: Ctx<'_>, options: Option<JobHuntOptions>) -> R<AgentRun> {
-    orchestrator::start_job_hunt(ctx.inner().clone(), options.unwrap_or_default())
-        .await
-        .map_err(Into::into)
+pub async fn start_job_hunt(
+    ctx: Ctx<'_>,
+    options: Option<orchestrator::JobHuntOptions>,
+) -> R<Submission> {
+    let options = options.unwrap_or_default();
+    queue::submit(
+        ctx.inner().clone(),
+        AgentTask::JobHunt {
+            discover_only: options.discover_only,
+            prepare_only: options.prepare_only,
+            sources: options.sources,
+        },
+    )
+    .await
+    .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -613,13 +640,13 @@ pub async fn resume_agent(ctx: Ctx<'_>) -> R<()> {
 }
 
 #[tauri::command]
-pub async fn discover_jobs(ctx: Ctx<'_>, sources: Option<Vec<String>>) -> R<AgentRun> {
-    orchestrator::start_job_hunt(
+pub async fn discover_jobs(ctx: Ctx<'_>, sources: Option<Vec<String>>) -> R<Submission> {
+    queue::submit(
         ctx.inner().clone(),
-        JobHuntOptions {
+        AgentTask::JobHunt {
             discover_only: true,
+            prepare_only: false,
             sources: sources.unwrap_or_default(),
-            ..Default::default()
         },
     )
     .await
@@ -628,28 +655,45 @@ pub async fn discover_jobs(ctx: Ctx<'_>, sources: Option<Vec<String>>) -> R<Agen
 
 /// Prepare applications for the best jobs already found, without searching.
 #[tauri::command]
-pub async fn prepare_applications(ctx: Ctx<'_>) -> R<AgentRun> {
-    orchestrator::start_job_hunt(
+pub async fn prepare_applications(ctx: Ctx<'_>) -> R<Submission> {
+    queue::submit(
         ctx.inner().clone(),
-        JobHuntOptions {
+        AgentTask::JobHunt {
+            discover_only: false,
             prepare_only: true,
-            ..Default::default()
+            sources: vec![],
         },
     )
     .await
     .map_err(Into::into)
 }
 
+/// Tasks waiting for the agent, first to run first.
 #[tauri::command]
-pub async fn analyze_job(ctx: Ctx<'_>, job_id: String) -> R<AgentRun> {
-    orchestrator::analyze_job(ctx.inner().clone(), job_id)
+pub async fn list_queue(ctx: Ctx<'_>) -> R<Vec<QueuedTask>> {
+    queue::list(&ctx).map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn remove_queued_task(ctx: Ctx<'_>, id: String) -> R<bool> {
+    queue::remove(&ctx, &id).await.map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn clear_queue(ctx: Ctx<'_>) -> R<usize> {
+    queue::clear(&ctx).await.map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn analyze_job(ctx: Ctx<'_>, job_id: String) -> R<Submission> {
+    queue::submit(ctx.inner().clone(), AgentTask::AnalyzeJob { job_id })
         .await
         .map_err(Into::into)
 }
 
 #[tauri::command]
-pub async fn generate_resume(ctx: Ctx<'_>, job_id: String) -> R<AgentRun> {
-    orchestrator::generate_resume(ctx.inner().clone(), job_id)
+pub async fn generate_resume(ctx: Ctx<'_>, job_id: String) -> R<Submission> {
+    queue::submit(ctx.inner().clone(), AgentTask::GenerateResume { job_id })
         .await
         .map_err(Into::into)
 }

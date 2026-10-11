@@ -164,7 +164,7 @@ function PlatformCard({ view, busy, updating, onUpdate, onResume }: { view: Plat
                 <Text fontSize="xs" color="fg.muted">
                   Saved to your answers, so applications can use them too.
                 </Text>
-                <Button size="sm" colorPalette="brand" onClick={submitAnswers} loading={answer.isPending} disabled={busy || missingRequired}>
+                <Button size="sm" colorPalette="brand" onClick={submitAnswers} loading={answer.isPending} disabled={missingRequired}>
                   <Send size={14} /> Save &amp; continue
                 </Button>
               </HStack>
@@ -214,15 +214,15 @@ function PlatformCard({ view, busy, updating, onUpdate, onResume }: { view: Plat
             ) : null}
             {canResume ? (
               <>
-                <Button size="sm" variant="outline" onClick={onUpdate} disabled={busy} title="Start a fresh update instead of continuing">
+                <Button size="sm" variant="outline" onClick={onUpdate} title="Start a fresh update instead of continuing">
                   Start over
                 </Button>
-                <Button size="sm" colorPalette="brand" onClick={onResume} loading={updating || running} disabled={busy}>
+                <Button size="sm" colorPalette="brand" onClick={onResume} loading={updating || running}>
                   <Play size={14} /> Resume
                 </Button>
               </>
             ) : (
-              <Button size="sm" colorPalette="brand" onClick={onUpdate} loading={updating || running} disabled={busy}>
+              <Button size="sm" colorPalette="brand" onClick={onUpdate} loading={updating || running}>
                 <RefreshCw size={14} /> {neverSynced ? "Update profile" : "Update again"}
               </Button>
             )}
