@@ -1,11 +1,12 @@
-import { Box, Button, HStack, Table, Tabs, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui/react";
 import { useNavigate } from "@tanstack/react-router";
-import { timeAgo } from "@job-hunter/shared";
+import { filterApplications, locationOptions, timeAgo } from "@job-hunter/shared";
 import type { ApplicationStatus } from "@job-hunter/types";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { Mail } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ErrorBanner, InfoBanner, PageHeader } from "../components/common";
+import { LocationFilter } from "../components/LocationFilter";
 import { useAgentStatus, useApplications, useCheckInbox, useRuns, useSettings } from "../lib/queries";
 
 type Bucket = "PENDING" | "ALL" | "APPLIED" | "REJECTED";
@@ -20,10 +21,13 @@ export function ApplicationsPage() {
   const apps = useApplications();
   const navigate = useNavigate();
   const [bucket, setBucket] = useState<Bucket>("PENDING");
+  const [query, setQuery] = useState("");
+  const [location, setLocation] = useState("");
   const items = useMemo(() => {
     const b = BUCKETS.find((x) => x.key === bucket)!;
-    return (apps.data ?? []).filter((i) => !b.statuses || b.statuses.includes(i.application.status));
-  }, [apps.data, bucket]);
+    return filterApplications(apps.data ?? [], b.statuses, query, location);
+  }, [apps.data, bucket, query, location]);
+  const places = useMemo(() => locationOptions((apps.data ?? []).map((i) => i.job)), [apps.data]);
   const awaiting = (apps.data ?? []).filter((i) => i.application.status === "READY_FOR_REVIEW").length;
   const sent = (apps.data ?? []).filter((i) => ["APPLIED", "INTERVIEW", "OFFER"].includes(i.application.status)).length;
   const checkInbox = useCheckInbox();
@@ -70,20 +74,27 @@ export function ApplicationsPage() {
           {hours ? `; next check within ${hours} hours` : " (automatic checks are off in Settings)"}.
         </Text>
       ) : null}
-      <Tabs.Root value={bucket} onValueChange={(e) => setBucket(e.value as Bucket)} variant="subtle" size="sm" mb={4}>
-        <Tabs.List>
-          {BUCKETS.map((b) => (
-            <Tabs.Trigger key={b.key} value={b.key}>
-              {b.label}
-              <Text as="span" ml={1.5} fontSize="xs" color="fg.muted">
-                {(apps.data ?? []).filter((i) => !b.statuses || b.statuses.includes(i.application.status)).length}
-              </Text>
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-      </Tabs.Root>
+      <HStack mb={4} gap={4} align="center" wrap="wrap">
+        <Tabs.Root value={bucket} onValueChange={(e) => setBucket(e.value as Bucket)} variant="subtle" size="sm" flex="1">
+          <Tabs.List>
+            {BUCKETS.map((b) => (
+              <Tabs.Trigger key={b.key} value={b.key}>
+                {b.label}
+                <Text as="span" ml={1.5} fontSize="xs" color="fg.muted">
+                  {filterApplications(apps.data ?? [], b.statuses, "", location).length}
+                </Text>
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </Tabs.Root>
+        <LocationFilter value={location} onChange={setLocation} options={places} />
+        <Input size="sm" maxW="240px" placeholder="Search title, company" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </HStack>
       {items.length === 0 ? (
-        <EmptyState title="Nothing here" description={bucket === "PENDING" ? "Applications prepared by the agent will show up here for your review." : "No applications in this bucket."} />
+        <EmptyState
+          title={location || query ? "No applications match" : "Nothing here"}
+          description={location || query ? "Try another place or search. This only looks through your own applications; it never searches the web." : bucket === "PENDING" ? "Applications prepared by the agent will show up here for your review." : "No applications in this bucket."}
+        />
       ) : (
         <Table.Root size="sm" interactive borderWidth="1px" borderColor="border.muted" borderRadius="md">
           <Table.Header>

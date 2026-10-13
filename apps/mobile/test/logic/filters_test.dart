@@ -15,6 +15,27 @@ JobListItem job(String id, {String status = 'ANALYZED', bool? relevant, String? 
     });
 
 void main() {
+  group('location filter', () {
+    Job place(String location, {String? remote}) => Job.fromJson({'id': location, 'title': 'Dev', 'company': 'Acme', 'location': location, 'remote': remote});
+
+    test('lists the places in the database with counts, most common first', () {
+      final options = locationOptions([place('Mumbai, Maharashtra, India'), place('Mumbai (Hybrid)', remote: 'HYBRID'), place('Bengaluru / Pune'), place('Remote - India', remote: 'REMOTE'), place('Pune', remote: 'Remote')]);
+      expect(options.take(3).map((o) => '${o.label}:${o.count}'), ['Mumbai:2', 'Pune:2', 'Remote:2']);
+      expect(options.map((o) => o.label), contains('Bengaluru'));
+      expect(options.map((o) => o.label), isNot(contains('India')));
+      expect(options.map((o) => o.label), isNot(contains('Hybrid')));
+    });
+
+    test('matches a typed place inside the location and remote jobs for "remote"', () {
+      expect(matchesLocation(place('Mumbai, Maharashtra'), 'mumbai'), isTrue);
+      expect(matchesLocation(place('Pune'), 'Mumbai'), isFalse);
+      expect(matchesLocation(place('Pune', remote: 'Remote'), 'remote'), isTrue);
+      expect(matchesLocation(place('Pune'), ''), isTrue);
+      final rows = filterJobs([job('a'), JobListItem(job: place('Mumbai')), JobListItem(job: place('Delhi'))], JobFilter.all, '', location: 'mumbai');
+      expect(rows.map((r) => r.job.id), ['Mumbai']);
+    });
+  });
+
   group('application buckets', () {
     test('every status maps to the right chip', () {
       expect(bucketOf('WAITING_FOR_USER'), ApplicationBucket.needsYou);

@@ -1,11 +1,12 @@
 import { Badge, Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui/react";
 import { useNavigate } from "@tanstack/react-router";
-import { filterJobs, JOB_FILTERS, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
+import { filterJobs, JOB_FILTERS, locationOptions, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { Bookmark, FilePlus, Link2, Mail, Search, Send, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
 import { JobLinkDialog } from "../components/JobLinkDialog";
+import { LocationFilter } from "../components/LocationFilter";
 import { SharedJobDialog } from "../components/SharedJobDialog";
 import { useDiscoverJobs, useJobs, usePrepareApplications, useStartJobHunt } from "../lib/queries";
 
@@ -19,8 +20,11 @@ export function JobsPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<JobFilter>("ALL");
   const [query, setQuery] = useState("");
-  const items = useMemo(() => sortJobs(filterJobs(jobs.data ?? [], filter, query)), [jobs.data, filter, query]);
-  const counts = useMemo(() => Object.fromEntries(JOB_FILTERS.map((f) => [f.key, filterJobs(jobs.data ?? [], f.key).length])) as Record<JobFilter, number>, [jobs.data]);
+  const [location, setLocation] = useState("");
+  const items = useMemo(() => sortJobs(filterJobs(jobs.data ?? [], filter, query, location)), [jobs.data, filter, query, location]);
+  // The tab counts follow the location, so "Applied · 3" means three in that place.
+  const counts = useMemo(() => Object.fromEntries(JOB_FILTERS.map((f) => [f.key, filterJobs(jobs.data ?? [], f.key, "", location).length])) as Record<JobFilter, number>, [jobs.data, location]);
+  const places = useMemo(() => locationOptions((jobs.data ?? []).map((i) => i.job)), [jobs.data]);
 
   return (
     <Box>
@@ -87,10 +91,11 @@ export function JobsPage() {
             ))}
           </Tabs.List>
         </Tabs.Root>
-        <Input size="sm" maxW="260px" placeholder="Search title, company, skill" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <LocationFilter value={location} onChange={setLocation} options={places} />
+        <Input size="sm" maxW="240px" placeholder="Search title, company, skill" value={query} onChange={(e) => setQuery(e.target.value)} />
       </HStack>
       {items.length === 0 ? (
-        <EmptyState title={jobs.data?.length ? "No jobs match this filter" : "No jobs yet"} description={jobs.data?.length ? "Try another filter or search." : "Start a job hunt from the dashboard, or use Search only to find and score jobs without preparing applications."} />
+        <EmptyState title={jobs.data?.length ? (location ? `No jobs in "${location}" here` : "No jobs match this filter") : "No jobs yet"} description={jobs.data?.length ? "Try another filter, place or search. This only looks through the jobs already found; it never searches the web." : "Start a job hunt from the dashboard, or use Search only to find and score jobs without preparing applications."} />
       ) : (
         <Table.Root size="sm" interactive borderWidth="1px" borderColor="border.muted" borderRadius="md">
           <Table.Header>

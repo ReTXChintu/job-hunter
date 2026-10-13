@@ -1,10 +1,12 @@
 import { Box, Button, Flex, Input, Text, VStack, Wrap } from "@chakra-ui/react";
+import { locationOptions, matchesLocation } from "@job-hunter/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { ApplicationRow } from "../components/ApplicationRow";
 import { ErrorBox, Loading } from "../components/State";
 import { href } from "../route";
+import { LocationFilter } from "../components/LocationFilter";
 import { useSession } from "../session";
 import { byUpdatedDesc, countByGroup, inGroup, STATUS_GROUPS, type StatusGroupKey } from "../statusGroups";
 
@@ -16,6 +18,7 @@ export function ApplicationsPage({ group }: { group?: string }) {
   const { api } = useSession();
   const applications = useQuery({ queryKey: ["applications"], queryFn: () => api.applications(), refetchInterval: 30_000 });
   const [query, setQuery] = useState("");
+  const [location, setLocation] = useState("");
   const active: StatusGroupKey = isGroupKey(group) ? group : "all";
 
   const counts = useMemo(() => countByGroup(applications.data ?? []), [applications.data]);
@@ -23,9 +26,11 @@ export function ApplicationsPage({ group }: { group?: string }) {
     const q = query.trim().toLowerCase();
     return (applications.data ?? [])
       .filter((item) => inGroup(item, active))
+      .filter((item) => matchesLocation(item.job, location))
       .filter((item) => !q || `${item.job.title} ${item.job.company} ${item.job.location}`.toLowerCase().includes(q))
       .sort(byUpdatedDesc);
-  }, [applications.data, active, query]);
+  }, [applications.data, active, query, location]);
+  const places = useMemo(() => locationOptions((applications.data ?? []).map((i) => i.job)), [applications.data]);
 
   return (
     <VStack align="stretch" gap={5}>
@@ -52,7 +57,10 @@ export function ApplicationsPage({ group }: { group?: string }) {
             </Button>
           ))}
         </Wrap>
-        <Input size="sm" maxW={{ md: "260px" }} placeholder="Search company, role, location" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <Flex gap={2} direction={{ base: "column", sm: "row" }}>
+          <LocationFilter value={location} onChange={setLocation} options={places} />
+          <Input size="sm" maxW={{ md: "240px" }} placeholder="Search company, role" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </Flex>
       </Flex>
 
       {applications.isPending ? (

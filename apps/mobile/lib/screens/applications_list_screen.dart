@@ -9,6 +9,7 @@ import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/job_tile.dart';
+import '../widgets/location_filter.dart';
 import '../widgets/presence_banner.dart';
 import 'application_detail_screen.dart';
 
@@ -24,6 +25,7 @@ class ApplicationsListScreen extends StatefulWidget {
 
 class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
   ApplicationBucket _bucket = ApplicationBucket.all;
+  String _location = '';
   final _search = TextEditingController();
   late final NavController _nav;
 
@@ -53,8 +55,9 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
   @override
   Widget build(BuildContext context) {
     final apps = context.watch<ApplicationsController>();
-    final counts = bucketCounts(apps.items);
-    final rows = filterApplications(apps.items, _bucket, _search.text);
+    // Counts follow the place, so "Applied (3)" means three there.
+    final counts = bucketCounts(apps.items.where((i) => matchesLocation(i.job, _location)));
+    final rows = filterApplications(apps.items, _bucket, _search.text, location: _location);
 
     Widget body;
     if (apps.items.isEmpty && apps.loading) {
@@ -71,7 +74,15 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
     } else if (rows.isEmpty) {
       body = PullableEmpty(
         onRefresh: apps.refresh,
-        child: EmptyState(icon: Icons.filter_alt_off_outlined, title: 'Nothing here', message: _search.text.trim().isNotEmpty ? 'No applications match "${_search.text.trim()}".' : _bucket.emptyMessage),
+        child: EmptyState(
+          icon: Icons.filter_alt_off_outlined,
+          title: 'Nothing here',
+          message: _location.isNotEmpty
+              ? 'No applications in "$_location" here. This only looks through your own applications, never the web.'
+              : _search.text.trim().isNotEmpty
+                  ? 'No applications match "${_search.text.trim()}".'
+                  : _bucket.emptyMessage,
+        ),
       );
     } else {
       body = RefreshIndicator(
@@ -98,6 +109,7 @@ class _ApplicationsListScreenState extends State<ApplicationsListScreen> {
             selected: _bucket,
             label: (b) => '${b.label} (${counts[b]})',
             onSelected: (b) => setState(() => _bucket = b),
+            leading: LocationChip(value: _location, options: locationOptions(apps.items.map((i) => i.job)), onChanged: (v) => setState(() => _location = v)),
           ),
           if (apps.loading && apps.items.isNotEmpty) const LinearProgressIndicator(minHeight: 2),
           Expanded(child: body),
@@ -139,13 +151,15 @@ class SearchField extends StatelessWidget {
   }
 }
 
-/// A horizontal row of filter chips with counts.
+/// A horizontal row of filter chips with counts, with an optional chip in
+/// front (the location picker).
 class FilterChips<T> extends StatelessWidget {
   final List<T> values;
   final T selected;
   final String Function(T) label;
   final ValueChanged<T> onSelected;
-  const FilterChips({super.key, required this.values, required this.selected, required this.label, required this.onSelected});
+  final Widget? leading;
+  const FilterChips({super.key, required this.values, required this.selected, required this.label, required this.onSelected, this.leading});
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +169,7 @@ class FilterChips<T> extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         children: [
+          if (leading != null) Padding(padding: const EdgeInsets.only(right: 8), child: leading),
           for (final v in values)
             Padding(
               padding: const EdgeInsets.only(right: 8),

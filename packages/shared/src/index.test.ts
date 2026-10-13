@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ApplicationListItem, CandidateProfile, JobListItem } from "@job-hunter/types";
-import { applicationActions, filterJobs, guessSkillGroup, isAgentRunning, normalizeQuestion, pendingApplications, profileIssues, sortJobs, splitList, statusTone } from "./index";
+import { applicationActions, filterJobs, guessSkillGroup, isAgentRunning, locationOptions, matchesLocation, normalizeQuestion, pendingApplications, profileIssues, sortJobs, splitList, statusTone } from "./index";
 
 function job(over: Partial<JobListItem["job"]>, analysis: Partial<NonNullable<JobListItem["analysis"]>> | null = null): JobListItem {
   const base: JobListItem["job"] = {
@@ -92,6 +92,36 @@ describe("job filters", () => {
 
   it("sorts by match score then recency", () => {
     expect(sortJobs(items).map((i) => i.job.id)).toEqual(["2", "3", "4", "5", "1"]);
+  });
+});
+
+describe("location filter", () => {
+  const jobs = [
+    { location: "Mumbai, Maharashtra, India", remote: null },
+    { location: "Mumbai (Hybrid)", remote: "HYBRID" },
+    { location: "Bengaluru / Pune", remote: null },
+    { location: "Remote - India", remote: "REMOTE" },
+    { location: "Pune", remote: "Remote" },
+  ];
+
+  it("lists the places in the database with counts, most common first", () => {
+    const options = locationOptions(jobs);
+    expect(options.slice(0, 3)).toEqual([
+      { label: "Mumbai", count: 2 },
+      { label: "Pune", count: 2 },
+      { label: "Remote", count: 2 },
+    ]);
+    expect(options.map((o) => o.label)).toContain("Bengaluru");
+    expect(options.map((o) => o.label)).not.toContain("India");
+    expect(options.map((o) => o.label)).not.toContain("Hybrid");
+  });
+
+  it("matches a typed place inside the job's location, and remote jobs for 'remote'", () => {
+    expect(jobs.filter((j) => matchesLocation(j, "mumbai")).length).toBe(2);
+    expect(jobs.filter((j) => matchesLocation(j, "Pune")).length).toBe(2);
+    expect(jobs.filter((j) => matchesLocation(j, "remote")).length).toBe(2);
+    expect(jobs.filter((j) => matchesLocation(j, "")).length).toBe(5);
+    expect(jobs.filter((j) => matchesLocation(j, "Delhi")).length).toBe(0);
   });
 });
 

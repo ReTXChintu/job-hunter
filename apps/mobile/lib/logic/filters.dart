@@ -64,10 +64,11 @@ bool _matches(String query, Iterable<String> fields) {
   return fields.any((f) => f.toLowerCase().contains(q));
 }
 
-/// The rows for one chip and search text, most recently updated first.
-List<ApplicationListItem> filterApplications(Iterable<ApplicationListItem> items, ApplicationBucket bucket, String query) {
+/// The rows for one chip, search text and place, most recently updated first.
+List<ApplicationListItem> filterApplications(Iterable<ApplicationListItem> items, ApplicationBucket bucket, String query, {String location = ''}) {
   final list = items
       .where((i) => inBucket(i.application.status, bucket))
+      .where((i) => matchesLocation(i.job, location))
       .where((i) => _matches(query, [i.job.title, i.job.company, i.job.location, i.job.source]))
       .toList();
   list.sort((a, b) => b.application.updatedAt.compareTo(a.application.updatedAt));
@@ -132,9 +133,57 @@ bool jobMatchesFilter(JobListItem item, JobFilter filter) => switch (filter) {
 Map<JobFilter, int> jobFilterCounts(Iterable<JobListItem> items) => {for (final f in JobFilter.values) f: items.where((i) => jobMatchesFilter(i, f)).length};
 
 /// Newest discovered first.
-List<JobListItem> filterJobs(Iterable<JobListItem> items, JobFilter filter, String query) {
-  final list = items.where((i) => jobMatchesFilter(i, filter)).where((i) => _matches(query, [i.job.title, i.job.company, i.job.location, i.job.source])).toList();
+List<JobListItem> filterJobs(Iterable<JobListItem> items, JobFilter filter, String query, {String location = ''}) {
+  final list = items.where((i) => jobMatchesFilter(i, filter)).where((i) => matchesLocation(i.job, location)).where((i) => _matches(query, [i.job.title, i.job.company, i.job.location, i.job.source])).toList();
   DateTime when(JobListItem i) => i.job.discoveredAt ?? i.job.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
   list.sort((a, b) => when(b).compareTo(when(a)));
   return list;
+}
+
+// ---- location filter: searches what's already on the phone, never the web ----
+
+class LocationOption {
+  final String label;
+  final int count;
+  const LocationOption(this.label, this.count);
+}
+
+const _locationNoise = {'', 'india', 'in', 'hybrid', 'onsite', 'on-site', 'on site', 'wfh', 'work from home', 'full time', 'full-time', 'part time', 'part-time', 'contract', 'permanent', 'anywhere'};
+final _remoteWords = RegExp(r'remote|work from home|wfh', caseSensitive: false);
+final _locationSplit = RegExp(r'[,/|•·()\[\]\-–—]|\band\b|\bor\b', caseSensitive: false);
+
+bool _isRemote(Job job) => _remoteWords.hasMatch(job.location) || RegExp('remote', caseSensitive: false).hasMatch(job.remote ?? '');
+
+/// The places in the jobs' locations with how many jobs each ("Mumbai,
+/// Maharashtra" and "Mumbai (Hybrid)" both count for Mumbai), most common
+/// first. "Remote" is added for remote jobs.
+List<LocationOption> locationOptions(Iterable<Job> jobs) {
+  final counts = <String, (String, int)>{};
+  void bump(String label) {
+    final key = label.toLowerCase();
+    final existing = counts[key];
+    counts[key] = (existing?.$1 ?? label, (existing?.$2 ?? 0) + 1);
+  }
+
+  for (final job in jobs) {
+    final seen = <String>{};
+    for (final raw in job.location.split(_locationSplit)) {
+      final part = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (part.length < 2 || int.tryParse(part) != null || _locationNoise.contains(part.toLowerCase()) || _remoteWords.hasMatch(part)) continue;
+      if (seen.add(part.toLowerCase())) bump(part);
+    }
+    if (_isRemote(job)) bump('Remote');
+  }
+  final list = counts.values.map((e) => LocationOption(e.$1, e.$2)).toList();
+  list.sort((a, b) => b.count != a.count ? b.count.compareTo(a.count) : a.label.compareTo(b.label));
+  return list;
+}
+
+/// Whether a job is in the wanted place ("mumbai" matches "Mumbai,
+/// Maharashtra"; "remote" matches remote jobs; empty matches everything).
+bool matchesLocation(Job job, String wanted) {
+  final w = wanted.trim().toLowerCase();
+  if (w.isEmpty) return true;
+  if (w == 'remote') return _isRemote(job);
+  return job.location.toLowerCase().contains(w);
 }

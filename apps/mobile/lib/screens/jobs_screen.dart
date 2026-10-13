@@ -11,6 +11,7 @@ import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/job_tile.dart';
+import '../widgets/location_filter.dart';
 import '../widgets/presence_banner.dart';
 import 'applications_list_screen.dart' show FilterChips, PullableEmpty, SearchField;
 import 'job_detail_screen.dart';
@@ -25,6 +26,7 @@ class JobsScreen extends StatefulWidget {
 
 class _JobsScreenState extends State<JobsScreen> {
   JobFilter _filter = JobFilter.all;
+  String _location = '';
   final _search = TextEditingController();
   late final NavController _nav;
 
@@ -53,8 +55,8 @@ class _JobsScreenState extends State<JobsScreen> {
   @override
   Widget build(BuildContext context) {
     final jobs = context.watch<JobsController>();
-    final counts = jobFilterCounts(jobs.items);
-    final rows = filterJobs(jobs.items, _filter, _search.text);
+    final counts = jobFilterCounts(jobs.items.where((i) => matchesLocation(i.job, _location)));
+    final rows = filterJobs(jobs.items, _filter, _search.text, location: _location);
 
     Widget body;
     if (jobs.items.isEmpty && (jobs.loading || (jobs.source == DataSource.none && jobs.error == null))) {
@@ -71,7 +73,15 @@ class _JobsScreenState extends State<JobsScreen> {
     } else if (rows.isEmpty) {
       body = PullableEmpty(
         onRefresh: jobs.refresh,
-        child: EmptyState(icon: Icons.filter_alt_off_outlined, title: 'Nothing here', message: _search.text.trim().isNotEmpty ? 'No jobs match "${_search.text.trim()}".' : 'No jobs in "${_filter.label}".'),
+        child: EmptyState(
+          icon: Icons.filter_alt_off_outlined,
+          title: 'Nothing here',
+          message: _location.isNotEmpty
+              ? 'No jobs in "$_location" here. This only looks through the jobs already found, never the web.'
+              : _search.text.trim().isNotEmpty
+                  ? 'No jobs match "${_search.text.trim()}".'
+                  : 'No jobs in "${_filter.label}".',
+        ),
       );
     } else {
       body = RefreshIndicator(
@@ -93,7 +103,13 @@ class _JobsScreenState extends State<JobsScreen> {
           DataSourceBanner(jobs.source),
           if (jobs.error != null && jobs.items.isNotEmpty) InlineNotice(icon: Icons.error_outline, text: jobs.error!, color: Theme.of(context).colorScheme.error),
           SearchField(controller: _search, hint: 'Search title, company or site', onChanged: () => setState(() {})),
-          FilterChips<JobFilter>(values: JobFilter.values, selected: _filter, label: (f) => '${f.label} (${counts[f]})', onSelected: (f) => setState(() => _filter = f)),
+          FilterChips<JobFilter>(
+            values: JobFilter.values,
+            selected: _filter,
+            label: (f) => '${f.label} (${counts[f]})',
+            onSelected: (f) => setState(() => _filter = f),
+            leading: LocationChip(value: _location, options: locationOptions(jobs.items.map((i) => i.job)), onChanged: (v) => setState(() => _location = v)),
+          ),
           if (jobs.loading && jobs.items.isNotEmpty) const LinearProgressIndicator(minHeight: 2),
           Expanded(child: body),
         ],

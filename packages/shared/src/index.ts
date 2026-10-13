@@ -49,14 +49,78 @@ export function matchesJobFilter(item: JobListItem, filter: JobFilter): boolean 
   }
 }
 
-export function filterJobs(items: JobListItem[], filter: JobFilter, query = ""): JobListItem[] {
+export function filterJobs(items: JobListItem[], filter: JobFilter, query = "", location = ""): JobListItem[] {
   const q = query.trim().toLowerCase();
   return items.filter((item) => {
     if (!matchesJobFilter(item, filter)) return false;
+    if (!matchesLocation(item.job, location)) return false;
     if (!q) return true;
     const hay = `${item.job.title} ${item.job.company} ${item.job.location} ${item.job.source} ${item.job.skills.join(" ")}`.toLowerCase();
     return hay.includes(q);
   });
+}
+
+/** Applications in the given statuses (any, when undefined) that match the search and location. */
+export function filterApplications(items: ApplicationListItem[], statuses: readonly ApplicationStatus[] | undefined, query = "", location = ""): ApplicationListItem[] {
+  const q = query.trim().toLowerCase();
+  return items.filter((item) => {
+    if (statuses && !statuses.includes(item.application.status)) return false;
+    if (!matchesLocation(item.job, location)) return false;
+    if (!q) return true;
+    return `${item.job.title} ${item.job.company} ${item.job.location} ${item.job.source}`.toLowerCase().includes(q);
+  });
+}
+
+// ---- location filter: searches what's already in the database, never the web ----
+
+export interface LocationOption {
+  label: string;
+  count: number;
+}
+
+const LOCATION_NOISE = new Set(["", "india", "in", "hybrid", "onsite", "on-site", "on site", "wfh", "work from home", "full time", "full-time", "part time", "part-time", "contract", "permanent", "anywhere"]);
+
+/** Whether a job's location mentions remote work. */
+function isRemote(job: { location: string; remote?: string | null }): boolean {
+  return /remote|work from home|wfh/i.test(job.location) || /remote/i.test(job.remote ?? "");
+}
+
+/**
+ * The places that appear in the jobs' locations, with how many jobs each
+ * ("Mumbai, Maharashtra" and "Mumbai (Hybrid)" both count for Mumbai), most
+ * common first. "Remote" is added for remote jobs.
+ */
+export function locationOptions(jobs: Iterable<{ location: string; remote?: string | null }>): LocationOption[] {
+  const counts = new Map<string, LocationOption>();
+  const bump = (label: string) => {
+    const key = label.toLowerCase();
+    const existing = counts.get(key);
+    if (existing) existing.count += 1;
+    else counts.set(key, { label, count: 1 });
+  };
+  for (const job of jobs) {
+    const seen = new Set<string>();
+    const parts = job.location
+      .split(/[,/|•·()\[\]\-–—]|\band\b|\bor\b/i)
+      .map((p) => p.replace(/\s+/g, " ").trim())
+      .filter((p) => p.length >= 2 && !/^\d+$/.test(p) && !LOCATION_NOISE.has(p.toLowerCase()) && !/remote|work from home|wfh/i.test(p));
+    for (const part of parts) {
+      const key = part.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      bump(part);
+    }
+    if (isRemote(job)) bump("Remote");
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/** Whether a job is in the wanted place ("mumbai" matches "Mumbai, Maharashtra"; "remote" matches remote jobs). */
+export function matchesLocation(job: { location: string; remote?: string | null }, wanted: string): boolean {
+  const w = wanted.trim().toLowerCase();
+  if (!w) return true;
+  if (w === "remote") return isRemote(job);
+  return job.location.toLowerCase().includes(w);
 }
 
 export function sortJobs(items: JobListItem[]): JobListItem[] {
