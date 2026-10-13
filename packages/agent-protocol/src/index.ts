@@ -2,7 +2,7 @@
  * Agent protocol: the names of the Tauri commands and events exchanged
  * between the React UI and the Rust agent runtime, with typed payloads.
  */
-import type { AgentEvent, AgentRun, AgentStatus, AnswerRecord, AppSettings, Application, ApplicationAnswer, ApplicationDetail, ApplicationListItem, ApplicationStatus, CandidateProfile, CoverLetter, Dashboard, Experience, Job, JobDetail, JobHuntOptions, JobListItem, LogEntry, LogLevel, MasterResumeRef, Notification, PairingCode, PlatformProfile, PlatformProfileView, Project, ProjectPick, PublishingPlan, QueuedTask, RemoteDevice, RemoteStatus, Resume, ResumeDocument, SetupStatus, SkillGroups, Submission, SyncStatus } from "@job-hunter/types";
+import type { AgentEvent, AgentRun, AgentStatus, AnswerRecord, AppSettings, Application, ApplicationAnswer, ApplicationDetail, ApplicationListItem, ApplicationStatus, CandidateProfile, CoverLetter, Dashboard, Experience, InterviewInput, Job, JobDetail, JobHuntOptions, JobListItem, LogEntry, LogLevel, MasterResumeRef, Notification, PairingCode, PlatformProfile, PlatformProfileView, Project, ProjectPick, PublishingPlan, QueuedTask, RemoteDevice, RemoteStatus, Resume, ResumeDocument, SetupStatus, SkillGroups, Submission, SyncStatus } from "@job-hunter/types";
 
 /** A key of the candidate's skill groups ("frontend", "backend", ...). */
 export type SkillGroup = keyof SkillGroups;
@@ -120,6 +120,7 @@ export interface Commands {
   answer_application_questions: { args: { id: string; answers: ApplicationAnswer[]; saveForReuse?: boolean }; result: Application };
   mark_manual_application_complete: { args: { id: string; note?: string }; result: Application };
   set_application_status: { args: { id: string; status: ApplicationStatus; note?: string }; result: Application };
+  record_interview: { args: { id: string; interview: InterviewInput }; result: Application };
   add_application_note: { args: { id: string; note: string }; result: Application };
 
   list_resumes: { args: Record<string, never>; result: Resume[] };

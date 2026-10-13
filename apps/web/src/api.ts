@@ -12,18 +12,7 @@
  * apps. The short-lived access token is refreshed transparently with the
  * refresh token; if that fails too, the session ends.
  */
-import type {
-  AgentState,
-  AnswerRecord,
-  Application,
-  ApplicationListItem,
-  ApplicationStatus,
-  Job,
-  JobAnalysis,
-  Notification,
-  PlatformProfileView,
-  RunKind,
-} from "@job-hunter/types";
+import type { AgentState, AnswerRecord, Application, ApplicationListItem, ApplicationStatus, InterviewInput, Job, JobAnalysis, Notification, PlatformProfileView, RunKind } from "@job-hunter/types";
 
 export interface Session {
   email: string;
@@ -254,6 +243,11 @@ export class ApiClient {
 
   markApplicationApplied(id: string, note = ""): Promise<Application> {
     return this.desktop("mark_manual_application_complete", { id, note });
+  }
+
+  /** The user got an interview call for a sent application. */
+  recordInterview(id: string, interview: InterviewInput): Promise<Application> {
+    return this.desktop("record_interview", { id, ...interview });
   }
 
   setApplicationStatus(id: string, status: ApplicationStatus, note = ""): Promise<Application> {

@@ -1,5 +1,5 @@
 import { Alert, Badge, Box, Button, Flex, Link, SimpleGrid, Text, VStack, Wrap } from "@chakra-ui/react";
-import { formatDateTime, STATUS_LABELS, timeAgo } from "@job-hunter/shared";
+import { formatDateTime, interviewLine, STATUS_LABELS, timeAgo } from "@job-hunter/shared";
 import { KeyValue, MatchScore, StatusBadge } from "@job-hunter/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink } from "lucide-react";
@@ -87,6 +87,30 @@ export function ApplicationDetailPage({ id }: { id: string }) {
       <SimpleGrid columns={{ base: 1, lg: 3 }} gap={4} alignItems="start">
         <Box gridColumn={{ lg: "span 2" }}>
           <VStack align="stretch" gap={4}>
+            {app.interviews.length > 0 ? (
+              <Panel title={`Interviews (${app.interviews.length})`}>
+                <VStack align="stretch" gap={2}>
+                  {[...app.interviews].reverse().map((i, idx) => (
+                    <Flex key={i.id} gap={3} p={3} borderWidth="1px" borderColor="border.muted" borderRadius="md" align="start">
+                      <Badge colorPalette="green" variant="subtle" flexShrink={0}>
+                        Round {app.interviews.length - idx}
+                      </Badge>
+                      <Box minW={0}>
+                        <Text fontSize="sm" fontWeight="semibold">
+                          {i.scheduledAt ? formatDateTime(i.scheduledAt) : "Date to be confirmed"}
+                        </Text>
+                        {interviewLine(i) ? <Text fontSize="sm">{interviewLine(i)}</Text> : null}
+                        {i.notes ? (
+                          <Text fontSize="sm" color="fg.muted" whiteSpace="pre-wrap">
+                            {i.notes}
+                          </Text>
+                        ) : null}
+                      </Box>
+                    </Flex>
+                  ))}
+                </VStack>
+              </Panel>
+            ) : null}
             {app.replies.length > 0 ? <Replies replies={app.replies} company={job.company} /> : null}
 
             <Panel title="Match analysis">

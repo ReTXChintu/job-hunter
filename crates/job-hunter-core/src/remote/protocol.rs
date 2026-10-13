@@ -94,6 +94,14 @@ pub struct SetStatusPayload {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordInterviewPayload {
+    pub id: String,
+    #[serde(flatten)]
+    pub interview: crate::domain::InterviewInput,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct RequestFilePayload {
     pub path: String,
     #[serde(default)]

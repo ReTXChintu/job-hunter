@@ -11,7 +11,7 @@ use crate::context::AppContext;
 use crate::dedup;
 use crate::domain::*;
 use crate::error::{CoreError, CoreResult};
-use crate::util::now;
+use crate::util::{new_id, now};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1019,6 +1019,68 @@ pub async fn mark_manual_complete(
 }
 
 /// Post-application tracking (interview, offer, withdrawn, rejected).
+/// The user got an interview call for a sent application: record it (date,
+/// mode, round, notes) and move the application to the interview stage.
+pub async fn record_interview(
+    app: Arc<AppContext>,
+    application_id: &str,
+    input: InterviewInput,
+) -> CoreResult<Application> {
+    let mut application: Application = app.store.require(application_id)?;
+    if !matches!(
+        application.status,
+        ApplicationStatus::Applied | ApplicationStatus::Interview | ApplicationStatus::Offer
+    ) {
+        return Err(CoreError::Validation(
+            "Interviews are recorded on applications that were sent. Mark it as applied first."
+                .into(),
+        ));
+    }
+    let mode = input.mode.trim().to_uppercase().replace([' ', '-'], "_");
+    if !mode.is_empty() && !INTERVIEW_MODES.contains(&mode.as_str()) {
+        return Err(CoreError::Validation(format!(
+            "Unknown interview mode {mode}; use one of {}",
+            INTERVIEW_MODES.join(", ")
+        )));
+    }
+    let ts = now();
+    let interview = Interview {
+        id: new_id(),
+        scheduled_at: input.scheduled_at,
+        mode,
+        round: input.round.trim().to_string(),
+        contact: input.contact.trim().to_string(),
+        notes: input.notes.trim().to_string(),
+        recorded_at: ts,
+    };
+    if application.status == ApplicationStatus::Applied {
+        application.transition(ApplicationStatus::Interview, "interview call received")?;
+    }
+    application.interviews.push(interview.clone());
+    application.updated_at = ts;
+    app.store.put(&application)?;
+    if let Ok(mut job) = app.store.require::<Job>(&application.job_id) {
+        if matches!(job.status, JobStatus::Applied | JobStatus::Interview) {
+            job.status = JobStatus::Interview;
+            job.touch();
+            app.store.put(&job)?;
+        }
+    }
+    app.emit_event(
+        AgentEvent::new(
+            application.run_id.as_deref().unwrap_or("manual"),
+            EventLevel::Success,
+            "APPLICATION_UPDATED",
+            match interview.scheduled_at {
+                Some(at) => format!("Interview recorded for {}", at.format("%Y-%m-%d %H:%M UTC")),
+                None => "Interview recorded".to_string(),
+            },
+        )
+        .with_data(json!({ "applicationId": application.id, "status": "INTERVIEW", "interviewId": interview.id })),
+    );
+    Ok(application)
+}
+
 pub async fn set_application_status(
     app: Arc<AppContext>,
     application_id: &str,

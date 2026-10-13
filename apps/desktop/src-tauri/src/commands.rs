@@ -512,6 +512,19 @@ pub async fn mark_manual_application_complete(
         .map_err(Into::into)
 }
 
+/// The user got an interview call: record it and move the application to
+/// the interview stage.
+#[tauri::command]
+pub async fn record_interview(
+    ctx: Ctx<'_>,
+    id: String,
+    interview: InterviewInput,
+) -> R<Application> {
+    orchestrator::record_interview(ctx.inner().clone(), &id, interview)
+        .await
+        .map_err(Into::into)
+}
+
 #[tauri::command]
 pub async fn set_application_status(
     ctx: Ctx<'_>,

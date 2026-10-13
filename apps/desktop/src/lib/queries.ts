@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AgentStatus, AnswerRecord, AppSettings, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ProjectPick, ResumeDocument } from "@job-hunter/types";
+import type { AgentStatus, AnswerRecord, AppSettings, InterviewInput, ApplicationAnswer, ApplicationStatus, CandidateProfile, Experience, JobHuntOptions, LogLevel, Project, ProjectPick, ResumeDocument } from "@job-hunter/types";
 import type { SkillGroup } from "@job-hunter/agent-protocol";
 import { invoke } from "./tauri";
 import { announcing } from "./submission";
@@ -298,6 +298,12 @@ export function useApplyApplication() {
 export function useAnswerQuestions() {
   const inv = useInvalidate();
   return useMutation({ mutationFn: (args: { id: string; answers: ApplicationAnswer[]; saveForReuse?: boolean }) => invoke("answer_application_questions", args), onSuccess: () => inv([keys.applications, keys.answers, keys.agentStatus, keys.queue, ["application"]]) });
+}
+
+/** The user got an interview call for a sent application. */
+export function useRecordInterview() {
+  const inv = useInvalidate();
+  return useMutation({ mutationFn: (args: { id: string; interview: InterviewInput }) => invoke("record_interview", args), onSuccess: () => inv([keys.applications, keys.jobs, keys.dashboard, ["application"], ["job"]]) });
 }
 
 export function useMarkManualComplete() {

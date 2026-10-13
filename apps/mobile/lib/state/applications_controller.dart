@@ -149,6 +149,10 @@ class ApplicationsController extends ChangeNotifier {
 
   Future<RelayResponse> markManualComplete(String applicationId, {String note = ''}) => _actThenRefresh('mark_manual_application_complete', {'id': applicationId, 'note': note});
 
+  /// The user got an interview call: `interview` is the `record_interview`
+  /// payload without the id (scheduledAt, mode, round, contact, notes).
+  Future<RelayResponse> recordInterview(String applicationId, Map<String, dynamic> interview) => _actThenRefresh('record_interview', {'id': applicationId, ...interview});
+
   Future<RelayResponse> setStatus(String applicationId, String status, {String note = ''}) => _actThenRefresh('set_application_status', {'id': applicationId, 'status': status, 'note': note});
 
   Future<RelayResponse> _actThenRefresh(String type, Map<String, dynamic> payload) async {

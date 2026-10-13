@@ -13,6 +13,7 @@ import '../theme/theme.dart';
 import '../util/format.dart';
 import '../widgets/common.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/interview_sheet.dart';
 import '../widgets/job_tile.dart';
 import '../widgets/question_form.dart';
 import '../widgets/status_badge.dart';
@@ -109,6 +110,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
                   ..._actionArea(app, job, disabledReason),
                   if (app.failureReason != null && app.status != 'MANUAL_ACTION_REQUIRED')
                     Callout(icon: Icons.error_outline, color: theme.colorScheme.error, title: 'What went wrong', message: app.failureReason),
+                  if (app.interviews.isNotEmpty) _Interviews(app.interviews),
                   if (app.replies.isNotEmpty) _Replies(app.replies),
                   if (analysis != null) _Analysis(analysis),
                   if (job.description.isNotEmpty) Section(title: 'Job description', child: ExpandableText(job.description)),
@@ -265,11 +267,25 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
         return [Callout(icon: Icons.autorenew, color: Theme.of(context).colorScheme.primary, title: 'Applying now', message: 'Your desktop agent is filling in this application.')];
       case 'APPLIED':
       case 'INTERVIEW':
-        final options = [if (app.status == 'APPLIED') 'INTERVIEW', 'OFFER', 'REJECTED', 'WITHDRAWN'];
+        final options = ['OFFER', 'REJECTED', 'WITHDRAWN'];
         return [
           Section(
             title: 'Track this application',
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              FilledButton.icon(
+                onPressed: enabled
+                    ? () async {
+                        final interview = await showInterviewSheet(context, company: job.company, another: app.status == 'INTERVIEW');
+                        if (interview == null || !mounted) return;
+                        await _act(() => apps.recordInterview(app.id, interview), 'Interview recorded. Good luck!');
+                      }
+                    : null,
+                icon: const Icon(Icons.event_available),
+                label: Text(app.status == 'INTERVIEW' ? 'Add another interview' : 'Got an interview call'),
+              ),
+              const SizedBox(height: 10),
+              Text('Or mark as', style: Theme.of(context).textTheme.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 6),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final s in options)
                   OutlinedButton(
@@ -343,6 +359,40 @@ class _Header extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _Interviews extends StatelessWidget {
+  final List<Interview> interviews;
+  const _Interviews(this.interviews);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rounds = interviews.reversed.toList();
+    return Section(
+      title: 'Interviews (${interviews.length})',
+      child: Column(children: [
+        for (final (i, it) in rounds.indexed)
+          Padding(
+            padding: EdgeInsets.only(bottom: i == rounds.length - 1 ? 0 : 10),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              IconBubble(switch (it.mode) { 'PHONE' => Icons.phone_outlined, 'VIDEO' => Icons.videocam_outlined, 'ON_SITE' => Icons.business_outlined, _ => Icons.event_available_outlined }, color: Colors.green, size: 34),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text(it.scheduledAt != null ? formatDateTime(context, it.scheduledAt) : 'Date to be confirmed', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700))),
+                    Tag('Round ${rounds.length - i}', color: Colors.green),
+                  ]),
+                  if (it.line.isNotEmpty) Text(it.line, style: theme.textTheme.bodySmall),
+                  if (it.notes.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(it.notes, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                ]),
+              ),
+            ]),
+          ),
+      ]),
     );
   }
 }

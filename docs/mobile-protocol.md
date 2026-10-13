@@ -120,6 +120,7 @@ Every frame, both directions, is one JSON object:
 | `answer_application_questions` | `{id, answers: [{question, answer}]}` | `{ok:true, data: Application}` |
 | `mark_manual_application_complete` | `{id, note?}` | `{ok:true, data: Application}` |
 | `set_application_status` | `{id, status: "INTERVIEW"\|"OFFER"\|"WITHDRAWN"\|"REJECTED", note?}` | `{ok:true, data: Application}` |
+| `record_interview` | `{id, scheduledAt?: iso, mode?: "PHONE"\|"VIDEO"\|"ON_SITE"\|"OTHER", round?, contact?, notes?}` | `{ok:true, data: Application}`: the user got an interview call for a sent application; it is added to `application.interviews` and the status becomes `INTERVIEW` |
 | `request_file` | `{path, kind:"pdf"}` | `{ok:true, data: {name, base64}}` (desktop refuses anything over 4 MB or outside its data directory with `ok:false`) |
 | `get_agent_status` | `{}` | `{state, paused, runKind, progress, queued}` (no free text; `queued` = tasks waiting their turn) |
 | `start_job_hunt` | `{sources?: string[], discoverOnly?: bool, prepareOnly?: bool}` | `Started`; `sources: ["LinkedIn Posts"]` = find hiring posts; `prepareOnly` = applications for the best jobs already found, no search |

@@ -1,6 +1,6 @@
-import { Box, Button, Grid, GridItem, Heading, HStack, SimpleGrid, Spinner, Table, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, Grid, GridItem, Heading, HStack, SimpleGrid, Spinner, Table, Text, VStack } from "@chakra-ui/react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { AGENT_STATE_LABELS, greeting, isAgentRunning, timeAgo } from "@job-hunter/shared";
+import { AGENT_STATE_LABELS, formatDateTime, greeting, interviewLine, isAgentRunning, timeAgo } from "@job-hunter/shared";
 import { MatchScore, StatusBadge } from "@job-hunter/ui";
 import { Pause, Play, Square } from "lucide-react";
 import { ErrorBanner, InfoBanner, PageHeader, Panel, Stat } from "../components/common";
@@ -87,6 +87,29 @@ export function DashboardPage() {
               <Stat label="Rejected" value={d.total.rejected} tone="red.fg" />
               <Stat label="All jobs" value={d.total.jobsDiscovered} />
             </SimpleGrid>
+
+            {d.upcomingInterviews.length > 0 ? (
+              <Panel title={`${d.upcomingInterviews.length} upcoming interview${d.upcomingInterviews.length === 1 ? "" : "s"}`} mb={6} action={<Link to="/applications">All applications</Link>}>
+                <VStack align="stretch" gap={2}>
+                  {d.upcomingInterviews.map((u) => (
+                    <HStack key={u.interview.id} justify="space-between" p={3} borderWidth="1px" borderColor="green.muted" bg="green.subtle" borderRadius="md" cursor="pointer" _hover={{ bg: "green.muted" }} onClick={() => navigate({ to: "/applications/$applicationId", params: { applicationId: u.applicationId } })}>
+                      <Box minW={0}>
+                        <Text fontWeight="semibold" truncate>
+                          {formatDateTime(u.interview.scheduledAt)} · {u.company}
+                        </Text>
+                        <Text fontSize="sm" color="fg.muted" truncate>
+                          {u.jobTitle}
+                          {interviewLine(u.interview) ? ` · ${interviewLine(u.interview)}` : ""}
+                        </Text>
+                      </Box>
+                      <Badge colorPalette="green" variant="subtle" flexShrink={0}>
+                        {timeAgo(u.interview.scheduledAt).startsWith("in ") ? timeAgo(u.interview.scheduledAt) : "Interview"}
+                      </Badge>
+                    </HStack>
+                  ))}
+                </VStack>
+              </Panel>
+            ) : null}
 
             {d.pendingActions.length > 0 ? (
               <Panel title={`${d.pendingActions.length} pending action${d.pendingActions.length === 1 ? "" : "s"}`} mb={6} action={<Link to="/applications">View all</Link>}>

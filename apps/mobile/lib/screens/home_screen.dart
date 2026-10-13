@@ -12,6 +12,7 @@ import '../state/nav_controller.dart';
 import '../state/queue_controller.dart';
 import '../theme/theme.dart';
 import '../widgets/common.dart';
+import '../util/format.dart';
 import '../widgets/presence_banner.dart';
 import 'application_detail_screen.dart';
 import 'queue_screen.dart';
@@ -45,6 +46,7 @@ class HomeScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
               sliver: SliverList.list(children: const [
                 _QueueCard(),
+                _UpcomingInterviews(),
                 _WaitingOnYou(),
                 _Counts(),
                 _Actions(),
@@ -220,6 +222,57 @@ class _QueueCard extends StatelessWidget {
                     ),
                 ]),
         ),
+      ],
+    );
+  }
+}
+
+/// Dated interviews from a few hours ago on, soonest first.
+List<(ApplicationListItem, Interview)> upcomingInterviews(Iterable<ApplicationListItem> items, {DateTime? now}) {
+  final cutoff = (now ?? DateTime.now()).subtract(const Duration(hours: 3));
+  final list = [
+    for (final item in items)
+      if (item.application.status == 'INTERVIEW' || item.application.status == 'OFFER')
+        for (final i in item.application.interviews)
+          if (i.scheduledAt != null && !i.scheduledAt!.isBefore(cutoff)) (item, i),
+  ];
+  list.sort((a, b) => a.$2.scheduledAt!.compareTo(b.$2.scheduledAt!));
+  return list;
+}
+
+class _UpcomingInterviews extends StatelessWidget {
+  const _UpcomingInterviews();
+
+  @override
+  Widget build(BuildContext context) {
+    final apps = context.watch<ApplicationsController>();
+    final upcoming = upcomingInterviews(apps.items);
+    if (upcoming.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader('Upcoming interviews', subtitle: '${upcoming.length} scheduled'),
+        for (final (item, interview) in upcoming.take(3))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AppCard(
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ApplicationDetailScreen(applicationId: item.application.id))),
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(children: [
+                IconBubble(switch (interview.mode) { 'PHONE' => Icons.phone_outlined, 'VIDEO' => Icons.videocam_outlined, 'ON_SITE' => Icons.business_outlined, _ => Icons.event_available_outlined }, color: Colors.green, size: 38),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(formatDateTime(context, interview.scheduledAt), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: Colors.green.shade700)),
+                    Text('${item.job.company} · ${item.job.title}', maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                    if (interview.line.isNotEmpty) Text(interview.line, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  ]),
+                ),
+                Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              ]),
+            ),
+          ),
       ],
     );
   }

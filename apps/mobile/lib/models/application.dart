@@ -94,6 +94,42 @@ const replyKindLabels = <String, String>{
 
 String replyKindLabel(String kind) => replyKindLabels[kind.toUpperCase()] ?? kind;
 
+/// An interview the user was called for, recorded by hand (Rust
+/// `Interview`).
+class Interview {
+  final String id;
+  final DateTime? scheduledAt;
+
+  /// PHONE | VIDEO | ON_SITE | OTHER, or empty when not known.
+  final String mode;
+  final String round;
+  final String contact;
+  final String notes;
+  final DateTime? recordedAt;
+
+  const Interview({required this.id, this.scheduledAt, this.mode = '', this.round = '', this.contact = '', this.notes = '', this.recordedAt});
+
+  factory Interview.fromJson(Map<String, dynamic> json) => Interview(
+        id: str(json['id']),
+        scheduledAt: dateOf(json['scheduledAt']),
+        mode: str(json['mode']).toUpperCase(),
+        round: str(json['round']),
+        contact: str(json['contact']),
+        notes: str(json['notes']),
+        recordedAt: dateOf(json['recordedAt']),
+      );
+
+  /// "Video call · HR screening · with Priya", from whatever parts it has.
+  String get line => [interviewModeLabels[mode] ?? '', round, if (contact.isNotEmpty) 'with $contact'].where((s) => s.isNotEmpty).join(' · ');
+}
+
+const interviewModeLabels = <String, String>{
+  'PHONE': 'Phone call',
+  'VIDEO': 'Video call',
+  'ON_SITE': 'On site',
+  'OTHER': 'Other',
+};
+
 class ResumeValidation {
   final String status;
   final int keywordCoverage;
@@ -161,6 +197,8 @@ class Application {
   final List<StatusChange> statusHistory;
   final List<String> potentialIssues;
   final List<EmailReply> replies;
+  /// Interviews the user recorded, oldest first.
+  final List<Interview> interviews;
   final DateTime? approvedAt;
   final DateTime? appliedAt;
   final String? failureReason;
@@ -181,6 +219,7 @@ class Application {
     required this.statusHistory,
     required this.potentialIssues,
     this.replies = const [],
+    this.interviews = const [],
     this.approvedAt,
     this.appliedAt,
     this.failureReason,
@@ -202,6 +241,7 @@ class Application {
         statusHistory: mapList(json['statusHistory']).map(StatusChange.fromJson).toList(),
         potentialIssues: strList(json['potentialIssues']),
         replies: mapList(json['replies']).map(EmailReply.fromJson).toList(),
+        interviews: mapList(json['interviews']).map(Interview.fromJson).toList(),
         approvedAt: dateOf(json['approvedAt']),
         appliedAt: dateOf(json['appliedAt']),
         failureReason: optStr(json['failureReason']),

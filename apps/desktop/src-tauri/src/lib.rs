@@ -229,6 +229,7 @@ pub fn run() {
             commands::answer_application_questions,
             commands::mark_manual_application_complete,
             commands::set_application_status,
+            commands::record_interview,
             commands::add_application_note,
             commands::list_resumes,
             commands::update_resume_content,

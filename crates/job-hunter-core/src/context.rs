@@ -104,9 +104,52 @@ pub struct Dashboard {
     pub latest_jobs: Vec<JobListItem>,
     pub recent_applications: Vec<ApplicationListItem>,
     pub pending_actions: Vec<ApplicationListItem>,
+    /// Interviews with a date from now on, soonest first.
+    #[serde(default)]
+    pub upcoming_interviews: Vec<InterviewItem>,
     pub last_run: Option<AgentRun>,
     pub agent: AgentStatus,
     pub sync: SyncStatus,
+}
+
+/// One dated interview with the application it belongs to.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterviewItem {
+    pub application_id: String,
+    pub job_title: String,
+    pub company: String,
+    pub interview: Interview,
+}
+
+/// Dated interviews from a few hours ago on, soonest first.
+pub fn upcoming_interviews(applications: &[ApplicationListItem]) -> Vec<InterviewItem> {
+    let cutoff = now() - chrono::Duration::hours(3);
+    let mut items: Vec<InterviewItem> = applications
+        .iter()
+        .filter(|a| {
+            matches!(
+                a.application.status,
+                ApplicationStatus::Interview | ApplicationStatus::Offer
+            )
+        })
+        .flat_map(|a| {
+            a.application
+                .interviews
+                .iter()
+                .filter(|i| i.scheduled_at.is_some_and(|at| at >= cutoff))
+                .map(|i| InterviewItem {
+                    application_id: a.application.id.clone(),
+                    job_title: a.job.title.clone(),
+                    company: a.job.company.clone(),
+                    interview: i.clone(),
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    items.sort_by_key(|i| i.interview.scheduled_at);
+    items.truncate(8);
+    items
 }
 
 impl AppContext {
@@ -1133,12 +1176,14 @@ impl AppContext {
             })
             .cloned()
             .collect();
+        let upcoming = upcoming_interviews(&applications);
         Ok(Dashboard {
             today,
             total,
             latest_jobs: jobs.into_iter().take(8).collect(),
             recent_applications: applications.into_iter().take(8).collect(),
             pending_actions,
+            upcoming_interviews: upcoming,
             last_run: self.list_runs(1)?.into_iter().next(),
             agent: self.agent.status().await,
             sync: self.sync.status().await,

@@ -1,7 +1,7 @@
-import { Alert, Button, Field, Flex, Input, Text, VStack } from "@chakra-ui/react";
-import { STATUS_LABELS } from "@job-hunter/shared";
-import type { ApplicationListItem, ApplicationStatus } from "@job-hunter/types";
-import { Check, RefreshCw, X } from "lucide-react";
+import { Alert, Button, Field, Flex, Input, NativeSelect, Text, Textarea, VStack } from "@chakra-ui/react";
+import { INTERVIEW_MODE_LABELS, STATUS_LABELS } from "@job-hunter/shared";
+import type { ApplicationListItem, ApplicationStatus, InterviewInput, InterviewMode } from "@job-hunter/types";
+import { CalendarPlus, Check, RefreshCw, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { useDesktopAction } from "../desktopActions";
@@ -11,7 +11,9 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { QuestionForm } from "./QuestionForm";
 import { ErrorBox, Panel } from "./State";
 
-type Dialog = { kind: "approve" } | { kind: "reject" } | { kind: "applied" } | { kind: "status"; status: ApplicationStatus } | null;
+type Dialog = { kind: "approve" } | { kind: "reject" } | { kind: "applied" } | { kind: "status"; status: ApplicationStatus } | { kind: "interview" } | null;
+
+const EMPTY_INTERVIEW: { when: string; mode: InterviewMode | ""; round: string; contact: string; notes: string } = { when: "", mode: "", round: "", contact: "", notes: "" };
 
 const STATUS_HINTS: Partial<Record<ApplicationStatus, string>> = {
   INTERVIEW: "You've been invited to interview.",
@@ -32,6 +34,7 @@ export function ApplicationActions({ item }: { item: ApplicationListItem }) {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
+  const [interview, setInterview] = useState(EMPTY_INTERVIEW);
 
   const byEmail = !!job.applyEmail;
   const tracking = trackingStatuses(app.status);
@@ -41,6 +44,7 @@ export function ApplicationActions({ item }: { item: ApplicationListItem }) {
     action.reset();
     setReason("");
     setNote("");
+    setInterview(EMPTY_INTERVIEW);
     setDialog(next);
   };
   const close = () => {
@@ -78,6 +82,17 @@ export function ApplicationActions({ item }: { item: ApplicationListItem }) {
           closeOnSuccess,
         );
         break;
+      case "interview": {
+        const input: InterviewInput = {
+          scheduledAt: interview.when ? new Date(interview.when).toISOString() : null,
+          mode: interview.mode,
+          round: interview.round.trim(),
+          contact: interview.contact.trim(),
+          notes: interview.notes.trim(),
+        };
+        action.run({ key: "interview", run: () => api.recordInterview(app.id, input), success: "Interview recorded. Good luck!" }, closeOnSuccess);
+        break;
+      }
     }
   };
 
@@ -174,7 +189,12 @@ export function ApplicationActions({ item }: { item: ApplicationListItem }) {
               Heard back from {job.company}? Record where the application stands.
             </Text>
             <Flex gap={2} wrap="wrap">
-              {tracking.map((status) => (
+              {app.status !== "OFFER" ? (
+                <Button size="sm" colorPalette="green" onClick={() => open({ kind: "interview" })} disabled={action.busy}>
+                  <CalendarPlus size={14} /> {app.status === "INTERVIEW" ? "Add another interview" : "Got an interview call"}
+                </Button>
+              ) : null}
+              {tracking.filter((status) => status !== "INTERVIEW").map((status) => (
                 <Button
                   key={status}
                   size="sm"
@@ -246,6 +266,49 @@ export function ApplicationActions({ item }: { item: ApplicationListItem }) {
         onConfirm={confirm}
       >
         {noteField}
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={dialog?.kind === "interview"}
+        onClose={close}
+        title={app.status === "INTERVIEW" ? "Add another interview" : "Got an interview call?"}
+        description={`Record the interview ${job.company} invited you to. Everything is optional; add what you know.`}
+        confirmLabel="Record interview"
+        loading={action.running("interview")}
+        error={action.error}
+        onConfirm={confirm}
+      >
+        <VStack align="stretch" gap={3} mt={4}>
+          <Field.Root>
+            <Field.Label>When</Field.Label>
+            <Input type="datetime-local" value={interview.when} onChange={(e) => setInterview({ ...interview, when: e.target.value })} disabled={action.busy} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>How</Field.Label>
+            <NativeSelect.Root size="sm" disabled={action.busy}>
+              <NativeSelect.Field value={interview.mode} onChange={(e) => setInterview({ ...interview, mode: e.target.value as InterviewMode | "" })}>
+                <option value="">Not sure yet</option>
+                {Object.entries(INTERVIEW_MODE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Round</Field.Label>
+            <Input value={interview.round} onChange={(e) => setInterview({ ...interview, round: e.target.value })} placeholder="e.g. HR screening, Technical round 1" disabled={action.busy} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Who called</Field.Label>
+            <Input value={interview.contact} onChange={(e) => setInterview({ ...interview, contact: e.target.value })} placeholder="Name or team" disabled={action.busy} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Notes</Field.Label>
+            <Textarea value={interview.notes} onChange={(e) => setInterview({ ...interview, notes: e.target.value })} placeholder="What they said, what to prepare" rows={3} disabled={action.busy} />
+          </Field.Root>
+        </VStack>
       </ConfirmDialog>
       <ConfirmDialog
         open={dialog?.kind === "status"}

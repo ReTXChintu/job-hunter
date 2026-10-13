@@ -1,12 +1,13 @@
 import { Badge, Box, Button, Checkbox, Grid, GridItem, Heading, HStack, Input, SimpleGrid, Spinner, Tabs, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { applicationActions, formatDateTime, isAgentRunning } from "@job-hunter/shared";
+import { applicationActions, formatDateTime, interviewLine, isAgentRunning } from "@job-hunter/shared";
 import type { ApplicationAnswer, ApplicationStatus, ResumeDocument } from "@job-hunter/types";
 import { KeyValue, MatchScore, StatusBadge } from "@job-hunter/ui";
-import { ArrowLeft, Check, ExternalLink, Pencil, Play, RefreshCw, Send, X } from "lucide-react";
+import { ArrowLeft, CalendarPlus, Check, ExternalLink, Pencil, Play, RefreshCw, Send, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { BulletList, Chips, ConfirmDialog, ErrorBanner, InfoBanner } from "../components/common";
 import { FileLinks, HtmlPreview } from "../components/DocumentPreview";
+import { InterviewDialog } from "../components/InterviewDialog";
 import { MissingSkills } from "../components/MissingSkills";
 import { QuestionField } from "../components/QuestionField";
 import { ResumeEditor } from "../components/ResumeEditor";
@@ -43,6 +44,7 @@ export function ApplicationReviewPage() {
   const activity = useActivity();
 
   const [confirm, setConfirm] = useState<"approve" | "reject" | "applied" | null>(null);
+  const [interviewOpen, setInterviewOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [editingResume, setEditingResume] = useState(false);
   const [editingCover, setEditingCover] = useState(false);
@@ -182,21 +184,26 @@ export function ApplicationReviewPage() {
           </Box>
         ) : null}
 
-        {application.status === "APPLIED" ? (
+        {["APPLIED", "INTERVIEW", "OFFER"].includes(application.status) ? (
           <Box px={6} py={4} borderBottomWidth="1px" borderColor="border.muted" bg="green.subtle">
             <Text fontSize="sm">
               <Text as="span" fontWeight="semibold">
-                Applied {formatDateTime(application.appliedAt)}
+                {application.status === "APPLIED" ? `Applied ${formatDateTime(application.appliedAt)}` : application.status === "INTERVIEW" ? `Interview stage · ${application.interviews.length} interview${application.interviews.length === 1 ? "" : "s"} recorded` : "Offer received"}
               </Text>
-              {application.manualCompleted ? " (completed manually)" : ""}
-              {application.evidence ? ` · Evidence: ${application.evidence}` : ""}
+              {application.status === "APPLIED" && application.manualCompleted ? " (completed manually)" : ""}
+              {application.status === "APPLIED" && application.evidence ? ` · Evidence: ${application.evidence}` : ""}
             </Text>
-            <HStack mt={2} gap={2}>
+            <HStack mt={3} gap={2} wrap="wrap">
+              {application.status !== "OFFER" ? (
+                <Button size="sm" colorPalette="green" onClick={() => setInterviewOpen(true)} title="Record a call or email inviting you to interview">
+                  <CalendarPlus size={14} /> {application.status === "INTERVIEW" ? "Add another interview" : "Got an interview call"}
+                </Button>
+              ) : null}
               <Text fontSize="sm" color="fg.muted">
-                Track:
+                Or mark as:
               </Text>
-              {(["INTERVIEW", "OFFER", "REJECTED", "WITHDRAWN"] as ApplicationStatus[]).map((s) => (
-                <Button key={s} size="xs" variant="outline" onClick={() => setStatus.mutate({ id: application.id, status: s })} loading={setStatus.isPending}>
+              {(["OFFER", "REJECTED", "WITHDRAWN"] as ApplicationStatus[]).filter((s) => s !== application.status).map((s) => (
+                <Button key={s} size="xs" variant="outline" colorPalette={s === "OFFER" ? "green" : "red"} onClick={() => setStatus.mutate({ id: application.id, status: s })} loading={setStatus.isPending}>
                   {s.charAt(0) + s.slice(1).toLowerCase()}
                 </Button>
               ))}
@@ -204,20 +211,37 @@ export function ApplicationReviewPage() {
           </Box>
         ) : null}
 
-        {(application.status === "INTERVIEW" || application.status === "OFFER") ? (
-          <Box px={6} py={4} borderBottomWidth="1px" borderColor="border.muted" bg="green.subtle">
-            <HStack gap={2}>
-              <Text fontSize="sm" fontWeight="semibold">
-                {application.status === "INTERVIEW" ? "Interview stage" : "Offer received"}
-              </Text>
-              {(["OFFER", "REJECTED", "WITHDRAWN"] as ApplicationStatus[]).filter((s) => s !== application.status).map((s) => (
-                <Button key={s} size="xs" variant="outline" onClick={() => setStatus.mutate({ id: application.id, status: s })}>
-                  {s.charAt(0) + s.slice(1).toLowerCase()}
-                </Button>
+        {application.interviews.length ? (
+          <Box px={6} py={5} borderBottomWidth="1px" borderColor="border.muted">
+            <Heading size="xs" mb={3} color="fg.muted" textTransform="uppercase" letterSpacing="wide">
+              Interviews
+            </Heading>
+            <VStack align="stretch" gap={2}>
+              {[...application.interviews].reverse().map((i, idx) => (
+                <HStack key={i.id} align="start" p={3} borderWidth="1px" borderColor="border.muted" borderRadius="md" gap={3}>
+                  <Badge colorPalette="green" variant="subtle" flexShrink={0}>
+                    Round {application.interviews.length - idx}
+                  </Badge>
+                  <Box minW={0}>
+                    <Text fontSize="sm" fontWeight="semibold">
+                      {i.scheduledAt ? formatDateTime(i.scheduledAt) : "Date to be confirmed"}
+                    </Text>
+                    {interviewLine(i) ? <Text fontSize="sm">{interviewLine(i)}</Text> : null}
+                    {i.notes ? (
+                      <Text fontSize="sm" color="fg.muted" whiteSpace="pre-wrap">
+                        {i.notes}
+                      </Text>
+                    ) : null}
+                    <Text fontSize="xs" color="fg.subtle">
+                      Recorded {formatDateTime(i.recordedAt)}
+                    </Text>
+                  </Box>
+                </HStack>
               ))}
-            </HStack>
+            </VStack>
           </Box>
         ) : null}
+        <InterviewDialog open={interviewOpen} onOpenChange={setInterviewOpen} applicationId={application.id} company={job.company} />
 
         {application.replies.length ? (
           <Box px={6} py={5} borderBottomWidth="1px" borderColor="border.muted">

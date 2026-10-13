@@ -123,6 +123,44 @@ pub struct PendingQuestion {
     pub context: String,
 }
 
+/// How an interview takes place, as the user records it.
+pub const INTERVIEW_MODES: &[&str] = &["PHONE", "VIDEO", "ON_SITE", "OTHER"];
+
+/// An interview the user was called for, recorded by hand (the phone,
+/// web or desktop "Got an interview call" action).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Interview {
+    #[serde(default = "new_id")]
+    pub id: String,
+    /// When it takes place, if known.
+    #[serde(default)]
+    pub scheduled_at: Option<DateTime<Utc>>,
+    /// One of [`INTERVIEW_MODES`], or empty when not known.
+    #[serde(default)]
+    pub mode: String,
+    /// "HR screening", "Technical round 2", ...
+    #[serde(default)]
+    pub round: String,
+    /// Who called or who interviews, free text.
+    #[serde(default)]
+    pub contact: String,
+    #[serde(default)]
+    pub notes: String,
+    pub recorded_at: DateTime<Utc>,
+}
+
+/// What the user fills in to record an interview.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct InterviewInput {
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub mode: String,
+    pub round: String,
+    pub contact: String,
+    pub notes: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusChange {
@@ -180,6 +218,9 @@ pub struct Application {
     /// to review and send (jobs they shared).
     #[serde(default)]
     pub email_drafted_at: Option<DateTime<Utc>>,
+    /// Interviews the user recorded for this application, oldest first.
+    #[serde(default)]
+    pub interviews: Vec<Interview>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -249,6 +290,7 @@ impl Application {
             manual_completed: false,
             replies: vec![],
             email_drafted_at: None,
+            interviews: vec![],
             created_at: ts,
             updated_at: ts,
         }

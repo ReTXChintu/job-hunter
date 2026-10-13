@@ -190,6 +190,18 @@ export function joinList(items: string[]): string {
 
 // ---- formatting ---------------------------------------------------------------------------
 
+export const INTERVIEW_MODE_LABELS: Record<string, string> = {
+  PHONE: "Phone call",
+  VIDEO: "Video call",
+  ON_SITE: "On site",
+  OTHER: "Other",
+};
+
+/** "Video call · HR screening", from whatever parts an interview has. */
+export function interviewLine(interview: { mode: string; round: string; contact: string }): string {
+  return [INTERVIEW_MODE_LABELS[interview.mode] ?? "", interview.round, interview.contact ? `with ${interview.contact}` : ""].filter(Boolean).join(" · ");
+}
+
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);

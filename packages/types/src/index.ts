@@ -388,8 +388,43 @@ export interface Application {
   replies: EmailReply[];
   /** Saved as a Gmail draft for the user to review and send (shared jobs). */
   emailDraftedAt: string | null;
+  /** Interviews the user recorded for this application, oldest first. */
+  interviews: Interview[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type InterviewMode = "PHONE" | "VIDEO" | "ON_SITE" | "OTHER";
+
+/** An interview the user was called for, recorded by hand. */
+export interface Interview {
+  id: string;
+  /** When it takes place, if known. */
+  scheduledAt: string | null;
+  mode: InterviewMode | "";
+  /** "HR screening", "Technical round 2", ... */
+  round: string;
+  /** Who called or who interviews. */
+  contact: string;
+  notes: string;
+  recordedAt: string;
+}
+
+/** What the user fills in to record an interview. */
+export interface InterviewInput {
+  scheduledAt?: string | null;
+  mode?: InterviewMode | "";
+  round?: string;
+  contact?: string;
+  notes?: string;
+}
+
+/** A dated interview with the application it belongs to (dashboard). */
+export interface InterviewItem {
+  applicationId: string;
+  jobTitle: string;
+  company: string;
+  interview: Interview;
 }
 
 export type ReplyKind = "INTERVIEW" | "ASSESSMENT" | "QUESTION" | "OFFER" | "REJECTION" | "ACKNOWLEDGEMENT" | "OTHER";
@@ -718,6 +753,8 @@ export interface Dashboard {
   latestJobs: JobListItem[];
   recentApplications: ApplicationListItem[];
   pendingActions: ApplicationListItem[];
+  /** Interviews with a date from now on, soonest first. */
+  upcomingInterviews: InterviewItem[];
   lastRun: AgentRun | null;
   agent: AgentStatus;
   sync: SyncStatus;
