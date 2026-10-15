@@ -54,7 +54,7 @@ void main() {
     expect(find.text('1. Apply: Developer at Acme'), findsNothing); // titles are plain; the place is drawn as a badge
     expect(find.text('Apply: Developer at Acme'), findsOneWidget);
     expect(find.text('Search only: Naukri'), findsOneWidget);
-    for (final action in ['Start job hunt', 'Prepare applications', 'Search only', 'Find hiring posts', 'Scan Telegram', 'Check Gmail', 'Apply from a link', 'Add a job I found']) {
+    for (final action in ['Start job hunt', 'Prepare applications', 'Search only', 'Find hiring posts', 'Company careers', 'Scan Telegram', 'Check Gmail', 'Apply from a link', 'Add a job I found']) {
       expect(find.text(action), findsOneWidget, reason: action);
     }
   });

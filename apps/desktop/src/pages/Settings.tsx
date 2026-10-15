@@ -4,6 +4,7 @@ import type { AppSettings } from "@job-hunter/types";
 import { LogIn, LogOut, Save, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ErrorBanner, InfoBanner, LinesInput, PageHeader, Panel } from "../components/common";
+import { CompaniesEditor } from "../components/CompaniesEditor";
 import { MobileAppSettings } from "../components/MobileAppSettings";
 import { LogViewer } from "./Agent";
 import { useBackendLogin, useBackendLogout, useBackendRegister, useSaveSettings, useSettings, useSetupStatus, useServerInfo, useSyncStatus, useTestBackend } from "../lib/queries";
@@ -80,11 +81,18 @@ export function SettingsPage() {
                 Read in Telegram Web: sign in once at web.telegram.org in Chrome. Each scan reads only the messages posted since the last one and keeps the job posts, with their apply links or email addresses.
               </Field.HelperText>
             </Field.Root>
+            <Field.Root mt={6}>
+              <Field.Label>Company careers sites</Field.Label>
+              <CompaniesEditor value={draft.targetCompanies} onChange={(v) => update((s) => { s.targetCompanies = v; })} />
+              <Field.HelperText>
+                Searched by the &quot;Company careers&quot; source, straight on each company&apos;s own site (no job boards). If a link moved, Claude finds the official careers site from the company&apos;s homepage.
+              </Field.HelperText>
+            </Field.Root>
             <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} mt={6}>
               <Field.Root>
                 <Field.Label>Max jobs per source</Field.Label>
                 <Input type="number" min={1} max={100} value={draft.maxJobsPerSource} onChange={(e) => update((s) => { s.maxJobsPerSource = num(e.target.value, 10); })} />
-                <Field.HelperText>Postings collected from each site per hunt. More takes longer and costs more Claude usage.</Field.HelperText>
+                <Field.HelperText>Postings collected from each site per hunt (for Company careers, from each company). More takes longer and costs more Claude usage.</Field.HelperText>
               </Field.Root>
               <Field.Root>
                 <Field.Label>Only jobs posted in the last (days)</Field.Label>

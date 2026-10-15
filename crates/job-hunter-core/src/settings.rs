@@ -50,6 +50,98 @@ pub struct AppSettings {
     /// `t.me/...` link), read in Telegram Web by the "Telegram" source.
     #[serde(default)]
     pub telegram_channels: Vec<String>,
+    /// Companies whose own careers sites the "Company careers" source
+    /// searches, one Claude run each.
+    #[serde(default = "default_target_companies")]
+    pub target_companies: Vec<TargetCompany>,
+}
+
+/// A company whose careers site is searched directly.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetCompany {
+    pub name: String,
+    /// The careers site's job search page. If it moved, Claude finds the
+    /// official one from the company's homepage.
+    pub careers_url: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+/// The name the "Company careers" source goes by.
+pub const COMPANY_CAREERS: &str = "Company careers";
+
+/// Well-known employers, the first few on. Each enabled one is a separate
+/// Claude run per hunt, so the rest start off.
+pub const DEFAULT_COMPANIES: &[(&str, &str, bool)] = &[
+    (
+        "Google",
+        "https://www.google.com/about/careers/applications/jobs/results/",
+        true,
+    ),
+    (
+        "Microsoft",
+        "https://jobs.careers.microsoft.com/global/en/search",
+        true,
+    ),
+    ("Apple", "https://jobs.apple.com/en-in/search", true),
+    ("Amazon", "https://www.amazon.jobs/en/search", true),
+    ("Meta", "https://www.metacareers.com/jobs", true),
+    (
+        "Accenture",
+        "https://www.accenture.com/in-en/careers/jobsearch",
+        true,
+    ),
+    (
+        "Deloitte",
+        "https://www.deloitte.com/global/en/careers.html",
+        true,
+    ),
+    ("IBM", "https://www.ibm.com/careers/search", false),
+    (
+        "Adobe",
+        "https://careers.adobe.com/us/en/search-results",
+        false,
+    ),
+    (
+        "Salesforce",
+        "https://careers.salesforce.com/en/jobs/",
+        false,
+    ),
+    ("Oracle", "https://careers.oracle.com/jobs/", false),
+    (
+        "Atlassian",
+        "https://www.atlassian.com/company/careers/all-jobs",
+        false,
+    ),
+    ("Infosys", "https://career.infosys.com/joblist", false),
+    ("TCS", "https://ibegin.tcs.com/iBegin/jobs/search", false),
+    (
+        "Wipro",
+        "https://careers.wipro.com/careers-home/jobs",
+        false,
+    ),
+    (
+        "Capgemini",
+        "https://www.capgemini.com/in-en/careers/join-capgemini/job-search/",
+        false,
+    ),
+    (
+        "Flipkart",
+        "https://www.flipkartcareers.com/#!/joblist",
+        false,
+    ),
+];
+
+fn default_target_companies() -> Vec<TargetCompany> {
+    DEFAULT_COMPANIES
+        .iter()
+        .map(|(name, url, enabled)| TargetCompany {
+            name: name.to_string(),
+            careers_url: url.to_string(),
+            enabled: *enabled,
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -206,6 +298,8 @@ pub const KNOWN_SOURCES: &[(&str, bool)] = &[
     ("Y Combinator", true),
     // Does nothing until channels are added in Settings.
     ("Telegram", true),
+    // The careers sites in `target_companies`.
+    (COMPANY_CAREERS, true),
 ];
 
 fn default_sources() -> Vec<JobSourceConfig> {
@@ -237,6 +331,7 @@ impl Default for AppSettings {
             inbox_check_hours: default_inbox_check_hours(),
             profile_sync: ProfileSyncSettings::default(),
             telegram_channels: vec![],
+            target_companies: default_target_companies(),
         }
     }
 }

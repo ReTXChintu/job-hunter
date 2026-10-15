@@ -85,11 +85,29 @@ impl MockClaudeRunner {
                     .collect()
             })
             .unwrap_or_default();
-        let jobs: Vec<Value> = FIXTURE_JOBS
-            .get(source)
-            .and_then(|j| j.as_array())
-            .cloned()
-            .unwrap_or_default()
+        // Company careers: one posting on that company's own site.
+        let company = ctx.get("company").and_then(|c| c.as_str());
+        let fixtures: Vec<Value> = match company {
+            Some(name) => {
+                let mut job = FIXTURE_JOBS["LinkedIn"][0].clone();
+                let base = ctx
+                    .get("careersUrl")
+                    .and_then(|u| u.as_str())
+                    .unwrap_or("https://careers.example.com")
+                    .trim_end_matches('/');
+                let slug = crate::util::slugify(name);
+                job["company"] = json!(name);
+                job["url"] = json!(format!("{base}/jobs/mock-{slug}-1"));
+                job["sourceJobId"] = json!(format!("{slug}-1"));
+                vec![job]
+            }
+            None => FIXTURE_JOBS
+                .get(source)
+                .and_then(|j| j.as_array())
+                .cloned()
+                .unwrap_or_default(),
+        };
+        let jobs: Vec<Value> = fixtures
             .into_iter()
             .filter(|j| {
                 !seen

@@ -4,7 +4,8 @@ Find recent job postings on one job source using Claude in Chrome.
 
 ## Inputs
 
-- `source`: one of LinkedIn, LinkedIn Posts, Telegram, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Hiring Cafe, Welcome to the Jungle, Himalayas, Y Combinator, Greenhouse, Lever, Workday, or a company careers URL.
+- `source`: one of LinkedIn, LinkedIn Posts, Telegram, Company careers, Naukri, Indeed, Wellfound, Cutshort, Instahyre, Hirist, Foundit, Hiring Cafe, Welcome to the Jungle, Himalayas, Y Combinator, Greenhouse, Lever, Workday, or a company careers URL.
+- `company` and `careersUrl`: for Company careers, whose site to search.
 - `queries`: search phrases derived from the candidate's target roles.
 - `locations`, `remotePreference`, `recencyDays`, `maxJobs`.
 - Optional `seenUrls`: postings already known; skip them.
@@ -36,6 +37,31 @@ Find recent job postings on one job source using Claude in Chrome.
 - **Himalayas** (remote jobs): `https://himalayas.app/jobs?q=<query>`; filter by the candidate's country/time zone where offered; open each job (`/companies/<company>/jobs/<slug>`).
 - **Y Combinator** (Work at a Startup, YC companies): `https://www.workatastartup.com/jobs?query=<query>` (uses the candidate's signed-in account; if it asks to sign in, return `blocked`); open each role for the description.
 - **Greenhouse / Lever / Workday / company pages**: open the given careers URL, use its search, and read each posting page.
+
+### Company careers (a company's own careers site)
+
+`source` = "Company careers", with `company` (e.g. "Google") and
+`careersUrl`, its job search page.
+
+1. Open `careersUrl`. If it no longer shows the company's job search
+   (moved, 404, a marketing page), find the official careers site from the
+   company's own homepage. Never use third-party job boards or aggregators
+   for this source: only postings on the company's own site count.
+2. Use the site's own search box and filters for every query, with the
+   candidate's `locations` (and remote, per `remotePreference`). Many big
+   companies list thousands of roles: always search, never page through
+   everything. If the site offers a "posted within" or date sort, use it
+   to stay within `recencyDays`; if it shows no dates, keep the newest
+   matching roles the search returns.
+3. Open each matching posting and read the full description,
+   qualifications and responsibilities. `company` = the company name given
+   (not a subsidiary or team name), `url` = the posting's own page on the
+   company site, `sourceJobId` = the site's job id or requisition number
+   when shown.
+4. Up to `maxJobs` postings for this company, across all queries.
+5. Searching a careers site needs no sign-in. If it insists on one, or
+   blocks automated browsing, return what you have with `blocked: true`
+   and a `blockedReason` naming the company.
 
 ### Telegram (job channels and groups the candidate follows)
 

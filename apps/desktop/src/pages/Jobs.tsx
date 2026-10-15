@@ -2,7 +2,7 @@ import { Badge, Box, Button, HStack, Input, Table, Tabs, Text } from "@chakra-ui
 import { useNavigate } from "@tanstack/react-router";
 import { filterJobs, JOB_FILTERS, locationOptions, sortJobs, timeAgo, type JobFilter } from "@job-hunter/shared";
 import { EmptyState, MatchScore, StatusBadge } from "@job-hunter/ui";
-import { Bookmark, FilePlus, Link2, Mail, Search, Send, Wand2 } from "lucide-react";
+import { Bookmark, Building2, FilePlus, Link2, Mail, Search, Send, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Chips, ErrorBanner, PageHeader } from "../components/common";
 import { JobLinkDialog } from "../components/JobLinkDialog";
@@ -38,6 +38,14 @@ export function JobsPage() {
             </Button>
             <Button variant="outline" onClick={() => setSharing(true)} title="Paste a job post or add screenshots/PDFs; get a resume and a Gmail draft">
               <FilePlus size={16} /> Add a job I found
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => huntPosts.mutate({ sources: ["Company careers"] })}
+              loading={huntPosts.isPending && huntPosts.variables?.sources?.[0] === "Company careers"}
+              title="Search the careers sites of the companies you picked in Settings > Job sources (Google, Microsoft, ...), then analyze the jobs and prepare applications for your review"
+            >
+              <Building2 size={16} /> Company careers
             </Button>
             <Button
               variant="outline"

@@ -634,6 +634,16 @@ export interface AppSettings {
   profileSync: ProfileSyncSettings;
   /** Telegram channels/groups the "Telegram" source scans (`@name` or t.me links). */
   telegramChannels: string[];
+  /** Companies whose own careers sites the "Company careers" source searches. */
+  targetCompanies: TargetCompany[];
+}
+
+/** A company whose careers site is searched directly. */
+export interface TargetCompany {
+  name: string;
+  /** Its job search page; Claude finds the official one if it moved. */
+  careersUrl: string;
+  enabled: boolean;
 }
 
 /** When job-site profiles that fell behind update without clicking Update. */

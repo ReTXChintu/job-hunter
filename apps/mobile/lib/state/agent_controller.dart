@@ -49,6 +49,11 @@ class AgentController extends ChangeNotifier {
         'sources': ['Telegram'],
       });
 
+  /// The careers sites of the companies picked on the desktop.
+  Future<RelayResponse> scanCompanyCareers() => _run('careers', 'start_job_hunt', const {
+        'sources': ['Company careers'],
+      });
+
   Future<RelayResponse> stop() => _run('stop', 'stop_job_hunt', const {});
 
   Future<RelayResponse> checkInbox() => _run('inbox', 'check_inbox', const {});

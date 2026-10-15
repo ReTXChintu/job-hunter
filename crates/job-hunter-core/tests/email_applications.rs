@@ -375,6 +375,7 @@ async fn telegram_channels_are_scanned_from_where_the_last_scan_stopped() {
             max_jobs: 10,
             seen_urls: &[],
             careers_url: None,
+            company: None,
             telegram_channels: Some(&inputs),
         });
     assert!(prompt.contains(r#""sinceMessageId": "1002""#));

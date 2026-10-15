@@ -262,6 +262,8 @@ pub struct DiscoveryParams<'a> {
     pub max_jobs: u32,
     pub seen_urls: &'a [String],
     pub careers_url: Option<&'a str>,
+    /// Company careers source only: whose site `careers_url` is.
+    pub company: Option<&'a str>,
     /// Telegram source only: `[{channel, sinceMessageId, sinceTime}]`.
     pub telegram_channels: Option<&'a Value>,
 }
@@ -273,6 +275,7 @@ pub fn discovery_prompt(p: &DiscoveryParams<'_>) -> String {
     let input = json!({
         "source": p.source,
         "careersUrl": p.careers_url,
+        "company": p.company,
         "queries": p.queries,
         "locations": p.locations,
         "remotePreference": p.remote_preference,

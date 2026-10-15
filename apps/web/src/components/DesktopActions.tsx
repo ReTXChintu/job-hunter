@@ -1,7 +1,7 @@
 import { Alert, Button, Flex, Text, VStack } from "@chakra-ui/react";
 import { AGENT_STATE_LABELS, isAgentRunning } from "@job-hunter/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Mail, Megaphone, Play, Square } from "lucide-react";
+import { Building2, Mail, Megaphone, Play, Square } from "lucide-react";
 
 import { useDesktopAction } from "../desktopActions";
 import { useSession } from "../session";
@@ -62,6 +62,16 @@ export function DesktopActions({ desktopOnline }: { desktopOnline: boolean | nul
             disabled={action.busy}
           >
             <Megaphone size={14} /> Find hiring posts
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => start("careers", ["Company careers"], "Your desktop is searching the companies' careers sites.")}
+            loading={action.running("careers")}
+            loadingText="Starting…"
+            disabled={action.busy}
+          >
+            <Building2 size={14} /> Company careers
           </Button>
           <Button
             size="sm"

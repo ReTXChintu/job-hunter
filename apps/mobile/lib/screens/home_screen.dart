@@ -461,6 +461,7 @@ class _Actions extends StatelessWidget {
             tile('prepare', 'Prepare applications', 'Resumes for the best jobs already found', Icons.auto_awesome_outlined, Colors.purple, agent.prepareApplications, 'Preparing applications on your desktop.'),
             tile('search', 'Search only', 'Find and score jobs, nothing prepared', Icons.search, Colors.blue, agent.searchOnly, 'Searching your job sites.'),
             tile('posts', 'Find hiring posts', 'LinkedIn posts asking for resumes', Icons.campaign_outlined, Colors.indigo, agent.findHiringPosts, 'Looking for LinkedIn hiring posts.'),
+            tile('careers', 'Company careers', 'Google, Microsoft, Accenture… on their own sites', Icons.apartment_outlined, Colors.deepPurple, agent.scanCompanyCareers, 'Searching company careers sites.'),
             tile('telegram', 'Scan Telegram', 'Your channels since the last scan', Icons.send_outlined, Colors.lightBlue, agent.scanTelegram, 'Scanning your Telegram channels.'),
             tile('inbox', 'Check Gmail', 'Replies from employers, spam included', Icons.mark_email_unread_outlined, Colors.teal, agent.checkInbox, 'Checking Gmail for replies.'),
             ActionTile(title: 'Apply from a link', subtitle: 'Paste a job link and apply', icon: Icons.link, color: Colors.deepOrange, busy: running == 'link', onTap: can ? () => _link(context, agent) : null),

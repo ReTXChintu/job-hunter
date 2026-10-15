@@ -418,7 +418,73 @@ pub async fn discover_source(
     truth: &CandidateTruth,
     source: &str,
 ) -> CoreResult<Vec<Job>> {
+    if !source.eq_ignore_ascii_case(crate::settings::COMPANY_CAREERS) {
+        return discover_one(step, truth, source, None).await;
+    }
+    // Company careers: each company's own site, one run each, so one slow
+    // or blocked site doesn't cost the others.
     let settings = step.app.settings().await;
+    let companies: Vec<_> = settings
+        .target_companies
+        .iter()
+        .filter(|c| c.enabled && !c.name.trim().is_empty() && !c.careers_url.trim().is_empty())
+        .cloned()
+        .collect();
+    if companies.is_empty() {
+        step.event(
+            EventLevel::Warn,
+            "MESSAGE",
+            "Company careers: no companies switched on. Pick them in Settings > Job sources.",
+        );
+        return Ok(vec![]);
+    }
+    let mut all = Vec::new();
+    for company in &companies {
+        step.app.agent.checkpoint(&step.cancel).await?;
+        step.activity(&format!("Searching {} careers", company.name))
+            .await;
+        match discover_one(step, truth, crate::settings::COMPANY_CAREERS, Some(company)).await {
+            Ok(jobs) => {
+                step.event_with(
+                    if jobs.is_empty() {
+                        EventLevel::Info
+                    } else {
+                        EventLevel::Success
+                    },
+                    "MESSAGE",
+                    format!("{} careers: {} jobs", company.name, jobs.len()),
+                    json!({ "company": company.name, "count": jobs.len() }),
+                );
+                all.extend(jobs);
+            }
+            Err(CoreError::Cancelled) => return Err(CoreError::Cancelled),
+            Err(
+                e @ (CoreError::ClaudeNotAuthenticated { .. }
+                | CoreError::ClaudeCliUnavailable { .. }
+                | CoreError::ClaudeInChromeUnavailable { .. }
+                | CoreError::ChromeNotConnected { .. }),
+            ) => return Err(e),
+            Err(e) => step.event(
+                EventLevel::Warn,
+                "STEP_FAILED",
+                format!("{} careers: {}", company.name, e.user_message()),
+            ),
+        }
+    }
+    Ok(all)
+}
+
+/// One search: a job site, or (with `company`) one company's careers site.
+async fn discover_one(
+    step: &StepCtx,
+    truth: &CandidateTruth,
+    source: &str,
+    company: Option<&crate::settings::TargetCompany>,
+) -> CoreResult<Vec<Job>> {
+    let settings = step.app.settings().await;
+    let label = company
+        .map(|c| format!("{} careers", c.name))
+        .unwrap_or_else(|| source.to_string());
     let profile = &truth.profile;
     let queries = build_queries(profile);
     let seen: Vec<String> = step
@@ -457,12 +523,13 @@ pub async fn discover_source(
         recency_days: settings.recency_days,
         max_jobs: settings.max_jobs_per_source,
         seen_urls: &seen,
-        careers_url: None,
+        careers_url: company.map(|c| c.careers_url.as_str()),
+        company: company.map(|c| c.name.as_str()),
         telegram_channels: telegram_channels.as_ref(),
     };
     let mut req = step
         .request(
-            &format!("discover:{}", slugify(source)),
+            &format!("discover:{}", slugify(&label)),
             prompts::discovery_prompt(&params),
         )
         .await?;
@@ -475,6 +542,8 @@ pub async fn discover_source(
         "maxJobs": settings.max_jobs_per_source,
         "seenUrls": seen,
         "telegramChannels": telegram_channels,
+        "company": company.map(|c| c.name.clone()),
+        "careersUrl": company.map(|c| c.careers_url.clone()),
     });
     let resp = step.run_claude(req).await?;
     #[derive(serde::Deserialize)]
@@ -520,7 +589,7 @@ pub async fn discover_source(
             EventLevel::Warn,
             "MESSAGE",
             format!(
-                "{source}: stopped early - {}",
+                "{label}: stopped early - {}",
                 if out.blocked_reason.is_empty() {
                     "site blocked the search".into()
                 } else {
